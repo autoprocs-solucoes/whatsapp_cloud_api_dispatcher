@@ -1,9 +1,144 @@
+// =============================================================================
+// Tipos do schema Supabase — espelha supabase/migrations/*
+// Gerar automaticamente no futuro: `supabase gen types typescript --linked`
+// Mantém formato canônico do Supabase para inferência completa em supabase-js.
+// =============================================================================
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+export type WorkspaceRole = "owner" | "member";
+
 export type Database = {
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3";
+  };
   public: {
-    Tables: Record<string, never>;
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
+    Tables: {
+      profile: {
+        Row: {
+          user_id: string;
+          full_name: string;
+          avatar_url: string | null;
+          is_superadmin: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          full_name?: string;
+          avatar_url?: string | null;
+          is_superadmin?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          full_name?: string;
+          avatar_url?: string | null;
+          is_superadmin?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      workspace: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          logo_url: string | null;
+          owner_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          logo_url?: string | null;
+          owner_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          logo_url?: string | null;
+          owner_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workspace_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profile";
+            referencedColumns: ["user_id"];
+          },
+        ];
+      };
+      workspace_member: {
+        Row: {
+          workspace_id: string;
+          user_id: string;
+          role: WorkspaceRole;
+          created_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          user_id: string;
+          role?: WorkspaceRole;
+          created_at?: string;
+        };
+        Update: {
+          workspace_id?: string;
+          user_id?: string;
+          role?: WorkspaceRole;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workspace_member_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workspace_member_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profile";
+            referencedColumns: ["user_id"];
+          },
+        ];
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      is_workspace_member: {
+        Args: { p_workspace_id: string };
+        Returns: boolean;
+      };
+      is_workspace_owner: {
+        Args: { p_workspace_id: string };
+        Returns: boolean;
+      };
+    };
+    Enums: {
+      workspace_role: WorkspaceRole;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
 };
+
+// Convenience aliases
+export type Profile = Database["public"]["Tables"]["profile"]["Row"];
+export type Workspace = Database["public"]["Tables"]["workspace"]["Row"];
+export type WorkspaceMember = Database["public"]["Tables"]["workspace_member"]["Row"];

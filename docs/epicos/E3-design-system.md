@@ -1,18 +1,20 @@
 # Épico E3 — Design system + layout shell
 
+> Status: **✅ Concluído** (2026-05-17). Layout navegável com identidade aplicada. WorkspaceSwitcher e UserMenu mockados nesta entrega — repassados a dados reais em E1.
+
 > Objetivo: aplicação tem identidade visual definida, layout principal navegável (sidebar + header), tema claro/escuro, e rotas placeholder pra todas as áreas do produto. **Sem autenticação real, sem dados** — toda navegação mockada.
 
 ## Critérios de aceite
 
-- [ ] Tokens visuais definidos (cores primárias, neutras, fontes, raios) em `globals.css` e documentados em `docs/design-tokens.md`.
-- [ ] Componentes shadcn instalados: `sidebar`, `avatar`, `badge`, `card`, `dropdown-menu`, `input`, `label`, `sonner`.
-- [ ] Layout principal `(app)/layout.tsx` com sidebar colapsável + header.
-- [ ] Header com workspace switcher (mockado) + dropdown de usuário (mockado) + toggle tema.
-- [ ] Rotas placeholder funcionando: `/dashboard`, `/contatos`, `/templates`, `/segmentos`, `/comunicados`, `/configuracoes`.
-- [ ] Sidebar navega entre rotas e marca rota ativa.
-- [ ] Tema claro + escuro funcionam via `next-themes`.
-- [ ] Home `/` continua sendo a landing (placeholder atual), separada do layout autenticado.
-- [ ] `npm run lint`, `npm run typecheck`, `npm run build` passam.
+- [x] Tokens visuais definidos (cores primárias, neutras, fontes, raios) em `globals.css` e documentados em `docs/design-tokens.md`.
+- [x] Componentes shadcn instalados: `sidebar`, `avatar`, `badge`, `card`, `dropdown-menu`, `input`, `label`, `sonner` (+ `tabs`, `alert-dialog` adicionados em E1).
+- [x] Layout principal `(app)/layout.tsx` com sidebar colapsável + header.
+- [x] Header com workspace switcher + dropdown de usuário + toggle tema (mockados em E3, plugados a dados reais em E1).
+- [x] Rotas placeholder funcionando: `/dashboard`, `/contatos`, `/templates`, `/segmentos`, `/comunicados`, `/configuracoes`.
+- [x] Sidebar navega entre rotas e marca rota ativa.
+- [x] Tema claro + escuro funcionam via `next-themes`.
+- [x] Home `/` continua sendo a landing (placeholder atual), separada do layout autenticado.
+- [x] `npm run lint`, `npm run typecheck`, `npm run build` passam.
 
 ## Stories
 

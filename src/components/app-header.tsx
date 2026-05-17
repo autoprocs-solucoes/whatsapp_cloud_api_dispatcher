@@ -19,7 +19,11 @@ function findPageTitle(pathname: string): string {
   return "";
 }
 
-export function AppHeader() {
+type Props = {
+  user: { fullName: string; email: string };
+};
+
+export function AppHeader({ user }: Props) {
   const pathname = usePathname();
   const title = findPageTitle(pathname);
 
@@ -30,7 +34,7 @@ export function AppHeader() {
       <h1 className="text-base font-semibold">{title}</h1>
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
-        <UserMenu />
+        <UserMenu fullName={user.fullName} email={user.email} />
       </div>
     </header>
   );

@@ -195,22 +195,31 @@ Plataforma web (Next.js + Supabase) usada internamente pela autoprocs para geren
 
 ## 9. Épicos (visão alta — detalhamento virá por épico)
 
-| # | Épico | Resumo |
-|---|-------|--------|
-| **E0** | Setup do projeto | Bootstrap Next 15 + Supabase + shadcn + tooling (lint, format, ci básico) |
-| **E1** | Autenticação e workspaces | Login, signup, criação/troca de workspace, convite de membros, roles, super-admin |
-| **E2** | Conexão Meta (Embedded Signup) | App Meta, fluxo embedded, persistência de WABA + phone numbers, status de conexão |
-| **E3** | Design system + layout base | Tokens, shadcn customizado, layout com sidebar, header, tema, telas vazias |
-| **E4** | Contatos — import + CRUD | Wizard 3 passos, normalização E.164, dedup, listagem, edição, opt-out manual |
-| **E5** | Templates | Sync da Meta, listagem, criação com submissão, preview com contato real |
-| **E6** | Segmentação | Query builder, segmentos salvos, contagem em tempo real |
-| **E7** | Comunicados — disparo | Wizard de novo comunicado, mapeamento variáveis, test send, filtro opt-out, execução no servidor |
-| **E8** | Relatórios | Detalhe do comunicado com contadores + lista de destinatários + export CSV |
-| **E9** | Dashboard | Visão geral do workspace |
-| **E10** | Super-admin autoprocs | Listagem cross-workspace, troubleshooting básico |
+| # | Épico | Status | Resumo |
+|---|-------|--------|--------|
+| **E0** | Setup do projeto | ✅ Concluído | Bootstrap Next 15 + Supabase + shadcn + tooling (lint, format, ci básico) |
+| **E1** | Autenticação e workspaces | 🔵 Código pronto, aguardando migration | Login, signup, criação/troca de workspace, convite de membros, roles, super-admin |
+| **E2** | Conexão Meta (Embedded Signup) | ⬜ Não iniciado | App Meta, fluxo embedded, persistência de WABA + phone numbers, status de conexão |
+| **E3** | Design system + layout base | ✅ Concluído | Tokens, shadcn customizado, layout com sidebar, header, tema, telas vazias |
+| **E4** | Contatos — import + CRUD | ⬜ Não iniciado | Wizard 3 passos, normalização E.164, dedup, listagem, edição, opt-out manual |
+| **E5** | Templates | ⬜ Não iniciado | Sync da Meta, listagem, criação com submissão, preview com contato real |
+| **E6** | Segmentação | ⬜ Não iniciado | Query builder, segmentos salvos, contagem em tempo real |
+| **E7** | Comunicados — disparo | ⬜ Não iniciado | Wizard de novo comunicado, mapeamento variáveis, test send, filtro opt-out, execução no servidor |
+| **E8** | Relatórios | ⬜ Não iniciado | Detalhe do comunicado com contadores + lista de destinatários + export CSV |
+| **E9** | Dashboard | ⬜ Não iniciado | Visão geral do workspace |
+| **E10** | Super-admin autoprocs | ⬜ Não iniciado | Listagem cross-workspace, troubleshooting básico |
 
 > Ordem sugerida de execução: **E0 → E3 → E1 → E2 → E4 → E5 → E6 → E7 → E8 → E9 → E10**.
 > Justificativa: design system e layout base cedo evita retrabalho visual; E2 (Meta) pode ser iniciada cedo em paralelo enquanto contatos/templates evoluem; E7 depende de quase tudo.
+
+### Legenda de status
+
+| Símbolo | Significado |
+|---------|-------------|
+| ✅ | Concluído e validado |
+| 🔵 | Código pronto, aguardando ação externa (user, infra, migration, etc) |
+| 🟡 | Em andamento |
+| ⬜ | Não iniciado |
 
 ---
 

@@ -18,10 +18,18 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+import {
+  WorkspaceSwitcher,
+  type WorkspaceOption,
+} from "@/components/workspace-switcher";
 import { navGroups } from "@/lib/navigation";
 
-export function AppSidebar() {
+type Props = {
+  activeWorkspace: WorkspaceOption;
+  workspaces: WorkspaceOption[];
+};
+
+export function AppSidebar({ activeWorkspace, workspaces }: Props) {
   const pathname = usePathname();
 
   return (
@@ -37,7 +45,7 @@ export function AppSidebar() {
           </div>
         </div>
         <div className="px-2 group-data-[collapsible=icon]:hidden">
-          <WorkspaceSwitcher />
+          <WorkspaceSwitcher active={activeWorkspace} workspaces={workspaces} />
         </div>
       </SidebarHeader>
 

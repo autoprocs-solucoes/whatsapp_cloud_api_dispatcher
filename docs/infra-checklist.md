@@ -8,9 +8,9 @@
 
 **Bloqueia**: deploy via Vercel + CI.
 
-- [ ] Criar repositório privado no GitHub: `autoprocs/whatsapp_cloud_api_dispatcher` (ou nome de sua preferência).
-- [ ] Adicionar SSH key ou login HTTPS local.
-- [ ] No projeto local:
+- [x] Criar repositório privado no GitHub: `autoprocs/whatsapp_cloud_api_dispatcher` (ou nome de sua preferência).
+- [x] Adicionar SSH key ou login HTTPS local.
+- [x] No projeto local:
   ```bash
   git init
   git add .
@@ -26,16 +26,16 @@
 
 **Bloqueia**: E1 (auth), E2+ (qualquer dado persistido).
 
-- [ ] Criar conta em [supabase.com](https://supabase.com).
-- [ ] Criar projeto:
+- [x] Criar conta em [supabase.com](https://supabase.com).
+- [x] Criar projeto:
   - **Nome**: `autoprocs-dispatcher`
   - **Região**: `sa-east-1` (São Paulo) — menor latência BR.
   - **Senha do Postgres**: anotar em local seguro (1Password/Bitwarden).
-- [ ] Em **Settings > API** copiar:
+- [x] Em **Settings > API** copiar:
   - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
   - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (cuidado, nunca commitar)
-- [ ] Configurar **Auth > URL Configuration**:
+- [x] Configurar **Auth > URL Configuration**:
   - Site URL: `https://<futuro-dominio>` (ou `http://localhost:3000` enquanto não tem)
   - Redirect URLs: adicionar `http://localhost:3000/**` para dev.
 
@@ -47,8 +47,8 @@
 
 > Autoprocs já tem app aprovada como Tech Provider Solution. Confirmar credenciais existentes.
 
-- [ ] Acessar [developers.facebook.com/apps](https://developers.facebook.com/apps/) e abrir o app da autoprocs.
-- [ ] Em **Configurações > Básico**, copiar:
+- [x] Acessar [developers.facebook.com/apps](https://developers.facebook.com/apps/) e abrir o app da autoprocs.
+- [x] Em **Configurações > Básico**, copiar:
   - `App ID` → `META_APP_ID`
   - `Chave Secreta do App` → `META_APP_SECRET`
 - [ ] Em **WhatsApp > Embedded Signup**:
@@ -108,7 +108,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ## Sinais de "pronto pra próximo épico"
 
-- [ ] `npm run dev` sobe em local sem erro de env var faltando.
-- [ ] Supabase abre dashboard com projeto ativo.
+- [x] `npm run dev` sobe em local sem erro de env var faltando.
+- [x] Supabase abre dashboard com projeto ativo.
 - [ ] App Meta exibe Embedded Signup Configuration com Config ID copiável.
 - [ ] (Opcional) Push pra `main` dispara build na Vercel com sucesso.

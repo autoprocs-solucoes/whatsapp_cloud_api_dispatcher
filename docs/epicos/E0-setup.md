@@ -1,16 +1,18 @@
 # Épico E0 — Setup do projeto
 
+> Status: **✅ Concluído** (2026-05-17). Repo pronto pra desenvolvimento de features.
+
 > Objetivo: deixar o repositório pronto pra desenvolvimento, com toda fundação técnica configurada (build, lint, types, Tailwind v4, shadcn, Supabase client, estrutura de pastas, CI). Nenhuma feature de produto entra aqui.
 
 ## Critérios de aceite globais
 
-- [ ] `npm run dev` sobe app local em `http://localhost:3000` com tela inicial estilizada.
-- [ ] `npm run lint` passa sem warnings.
-- [ ] `npm run typecheck` passa sem erros.
-- [ ] `npm run build` gera build de produção sem erros.
-- [ ] CI no GitHub Actions roda lint + typecheck + build em PRs.
-- [ ] README explica como subir local + lista variáveis de ambiente.
-- [ ] `.env.example` cobre todas as vars necessárias (Supabase + Meta).
+- [x] `npm run dev` sobe app local em `http://localhost:3000` com tela inicial estilizada. *(validado: `GET /` HTTP 200, renderiza "Autoprocs Dispatcher" + hero)*
+- [x] `npm run lint` passa sem warnings.
+- [x] `npm run typecheck` passa sem erros.
+- [x] `npm run build` gera build de produção sem erros. *(validado: 12 rotas, middleware 89.6 kB)*
+- [x] CI no GitHub Actions roda lint + typecheck + build em PRs. *(arquivo `.github/workflows/ci.yml`)*
+- [x] README explica como subir local + lista variáveis de ambiente. *(arquivo `README.md`)*
+- [x] `.env.example` cobre todas as vars necessárias (Supabase + Meta). *(arquivo `.env.example`)*
 
 ---
 
