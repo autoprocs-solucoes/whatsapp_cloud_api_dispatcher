@@ -203,6 +203,108 @@ export type Database = {
           },
         ];
       };
+      contact: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          phone_e164: string;
+          full_name: string | null;
+          custom_fields: Json;
+          opt_out: boolean;
+          opt_out_at: string | null;
+          tags: string[];
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          phone_e164: string;
+          full_name?: string | null;
+          custom_fields?: Json;
+          opt_out?: boolean;
+          opt_out_at?: string | null;
+          tags?: string[];
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          phone_e164?: string;
+          full_name?: string | null;
+          custom_fields?: Json;
+          opt_out?: boolean;
+          opt_out_at?: string | null;
+          tags?: string[];
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contact_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profile";
+            referencedColumns: ["user_id"];
+          },
+        ];
+      };
+      contact_import: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          filename: string | null;
+          mapping: Json;
+          stats: Json;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          filename?: string | null;
+          mapping: Json;
+          stats: Json;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          filename?: string | null;
+          mapping?: Json;
+          stats?: Json;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contact_import_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_import_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profile";
+            referencedColumns: ["user_id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -234,3 +336,6 @@ export type WorkspaceMetaConnection =
   Database["public"]["Tables"]["workspace_meta_connection"]["Row"];
 export type WorkspacePhoneNumber =
   Database["public"]["Tables"]["workspace_phone_number"]["Row"];
+export type Contact = Database["public"]["Tables"]["contact"]["Row"];
+export type ContactInsert = Database["public"]["Tables"]["contact"]["Insert"];
+export type ContactImport = Database["public"]["Tables"]["contact_import"]["Row"];

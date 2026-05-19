@@ -15,9 +15,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         activeWorkspace={{ id: activeWorkspace.id, name: activeWorkspace.name }}
         workspaces={workspaces.map((w) => ({ id: w.id, name: w.name }))}
       />
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         <AppHeader user={{ fullName: user.profile.full_name, email: user.email }} />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );

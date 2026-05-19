@@ -1,22 +1,43 @@
-import { Users } from "lucide-react";
+import Link from "next/link";
+import { Upload } from "lucide-react";
 
-import { PageEmptyState } from "@/components/page-empty-state";
+import { Button } from "@/components/ui/button";
+import { ContactsTable } from "@/features/contacts/contacts-table";
+import { listContacts } from "@/features/contacts/actions";
 
-export default function ContatosPage() {
+type SearchParams = Promise<{
+  search?: string;
+  optOutFilter?: string;
+  page?: string;
+  pageSize?: string;
+}>;
+
+export default async function ContatosPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams;
+  const { contacts, total, page, pageSize } = await listContacts({
+    search: sp.search,
+    optOutFilter: (sp.optOutFilter as "all" | "active" | "opt_out" | undefined) ?? "all",
+    page: sp.page ? Number(sp.page) : 1,
+    pageSize: sp.pageSize ? Number(sp.pageSize) : 50,
+  });
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Contatos</h1>
-        <p className="text-muted-foreground text-sm">
-          Importe contatos via planilha, gerencie campos custom e opt-outs.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Contatos</h1>
+          <p className="text-muted-foreground text-sm">
+            Importe contatos via planilha, gerencie campos custom e opt-outs.
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/contatos/importar">
+            <Upload className="mr-1 size-4" /> Importar contatos
+          </Link>
+        </Button>
       </header>
-      <PageEmptyState
-        icon={Users}
-        title="Gestão de contatos em construção"
-        description="Wizard de import de 3 passos (upload, mapeamento, validação), lista paginada, edição individual e marcação de opt-out."
-        epic="E4"
-      />
+
+      <ContactsTable contacts={contacts} total={total} page={page} pageSize={pageSize} />
     </div>
   );
 }

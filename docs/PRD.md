@@ -199,9 +199,9 @@ Plataforma web (Next.js + Supabase) usada internamente pela autoprocs para geren
 |---|-------|--------|--------|
 | **E0** | Setup do projeto | ✅ Concluído | Bootstrap Next 15 + Supabase + shadcn + tooling (lint, format, ci básico) |
 | **E1** | Autenticação e workspaces | ✅ Concluído | Login, signup, criação/troca de workspace, convite de membros, roles, super-admin |
-| **E2** | Conexão Meta (Embedded Signup) | 🔵 Código pronto, aguardando migration | App Meta, fluxo embedded, persistência de WABA + phone numbers, status de conexão |
+| **E2** | Conexão Meta (Embedded Signup) | 🔵 Conexão manual implementada (MVP); Embedded Signup oculto até Advanced Access aprovar | App Meta, fluxo embedded, persistência de WABA + phone numbers, status de conexão |
 | **E3** | Design system + layout base | ✅ Concluído | Tokens, shadcn customizado, layout com sidebar, header, tema, telas vazias |
-| **E4** | Contatos — import + CRUD | ⬜ Não iniciado | Wizard 3 passos, normalização E.164, dedup, listagem, edição, opt-out manual |
+| **E4** | Contatos — import + CRUD | 🔵 Código pronto, aguardando migration | Wizard 3 passos, normalização E.164, dedup (UPSERT), listagem, edição, opt-out manual |
 | **E5** | Templates | ⬜ Não iniciado | Sync da Meta, listagem, criação com submissão, preview com contato real |
 | **E6** | Segmentação | ⬜ Não iniciado | Query builder, segmentos salvos, contagem em tempo real |
 | **E7** | Comunicados — disparo | ⬜ Não iniciado | Wizard de novo comunicado, mapeamento variáveis, test send, filtro opt-out, execução no servidor |
