@@ -418,13 +418,18 @@ export async function executeDispatchAction(
   const conn = await getMetaConnection(ctx.workspaceId);
   if (!conn) return { ok: false, error: "Workspace sem conexão Meta" };
 
-  // Marca como running
-  const { error: lockErr } = await admin
+  // Lock atômico: UPDATE condicional `draft → running` e checa linhas afetadas.
+  // Se 0 linhas, outro request já pegou — evita double-send em race.
+  const { data: locked, error: lockErr } = await admin
     .from("dispatch")
     .update({ status: "running", started_at: new Date().toISOString() })
     .eq("id", dispatch.id)
-    .eq("status", "draft");
+    .eq("status", "draft")
+    .select("id");
   if (lockErr) return { ok: false, error: `Falha ao marcar como running: ${lockErr.message}` };
+  if (!locked || locked.length === 0) {
+    return { ok: false, error: "Comunicado já está sendo executado" };
+  }
 
   const { data: recipients } = await admin
     .from("dispatch_recipient")
