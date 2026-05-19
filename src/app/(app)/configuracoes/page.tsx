@@ -6,11 +6,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MetaConnectionPanel } from "@/features/meta/meta-connection-panel";
 import { InviteMemberForm } from "@/features/workspace/invite-member-form";
 import { MembersTable } from "@/features/workspace/members-table";
 import { removeMemberAction } from "@/features/workspace/actions";
 import { WorkspaceSettingsForm } from "@/features/workspace/workspace-settings-form";
 import { requireUser } from "@/server/auth";
+import { getMetaConnection } from "@/server/meta";
 import { getWorkspaceMembers } from "@/server/members";
 import { requireActiveWorkspace } from "@/server/workspace";
 
@@ -18,14 +20,17 @@ export default async function ConfiguracoesPage() {
   const user = await requireUser();
   const workspace = await requireActiveWorkspace();
   const isOwner = workspace.role === "owner";
-  const members = await getWorkspaceMembers(workspace.id);
+  const [members, metaConnection] = await Promise.all([
+    getWorkspaceMembers(workspace.id),
+    getMetaConnection(workspace.id),
+  ]);
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground text-sm">
-          Edite o workspace, gerencie membros e (em breve) conecte sua conta Meta.
+          Edite o workspace, gerencie membros e conecte sua conta Meta.
         </p>
       </header>
 
@@ -33,9 +38,7 @@ export default async function ConfiguracoesPage() {
         <TabsList>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
-          <TabsTrigger value="meta" disabled>
-            Meta (E2)
-          </TabsTrigger>
+          <TabsTrigger value="meta">Meta</TabsTrigger>
         </TabsList>
 
         <TabsContent value="workspace">
@@ -83,6 +86,14 @@ export default async function ConfiguracoesPage() {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="meta">
+          <MetaConnectionPanel
+            workspaceId={workspace.id}
+            canManage={isOwner}
+            connection={metaConnection}
+          />
         </TabsContent>
       </Tabs>
     </div>

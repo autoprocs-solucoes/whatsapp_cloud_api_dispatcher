@@ -1,6 +1,8 @@
 # Épico E1 — Autenticação e Workspaces
 
-> Status: **🔵 Código pronto, aguardando user aplicar migration `0001_init_auth_workspaces.sql` no Supabase para testar fluxo end-to-end.**
+> Status: **✅ Concluído** (2026-05-17). Migration aplicada, fluxo validado pelo user (signup → onboarding → workspace → dashboard).
+>
+> Nota técnica: server actions usam padrão `getUser() → admin client` em vez de RLS direto, porque @supabase/ssr não propaga o JWT pro PostgREST consistentemente em server actions. Segurança garantida pela autenticação explícita.
 
 > Objetivo: usuário cria conta, loga, cria seu primeiro workspace, convida membros e troca entre workspaces. Toda data isolada por workspace via RLS. Roles owner/member.
 

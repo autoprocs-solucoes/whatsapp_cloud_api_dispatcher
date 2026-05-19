@@ -198,8 +198,8 @@ Plataforma web (Next.js + Supabase) usada internamente pela autoprocs para geren
 | # | Épico | Status | Resumo |
 |---|-------|--------|--------|
 | **E0** | Setup do projeto | ✅ Concluído | Bootstrap Next 15 + Supabase + shadcn + tooling (lint, format, ci básico) |
-| **E1** | Autenticação e workspaces | 🔵 Código pronto, aguardando migration | Login, signup, criação/troca de workspace, convite de membros, roles, super-admin |
-| **E2** | Conexão Meta (Embedded Signup) | ⬜ Não iniciado | App Meta, fluxo embedded, persistência de WABA + phone numbers, status de conexão |
+| **E1** | Autenticação e workspaces | ✅ Concluído | Login, signup, criação/troca de workspace, convite de membros, roles, super-admin |
+| **E2** | Conexão Meta (Embedded Signup) | 🔵 Código pronto, aguardando migration | App Meta, fluxo embedded, persistência de WABA + phone numbers, status de conexão |
 | **E3** | Design system + layout base | ✅ Concluído | Tokens, shadcn customizado, layout com sidebar, header, tema, telas vazias |
 | **E4** | Contatos — import + CRUD | ⬜ Não iniciado | Wizard 3 passos, normalização E.164, dedup, listagem, edição, opt-out manual |
 | **E5** | Templates | ⬜ Não iniciado | Sync da Meta, listagem, criação com submissão, preview com contato real |

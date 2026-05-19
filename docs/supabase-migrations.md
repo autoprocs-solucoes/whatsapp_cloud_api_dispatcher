@@ -19,6 +19,7 @@
 | # | Arquivo | O que cria |
 |---|---------|------------|
 | 0001 | `0001_init_auth_workspaces.sql` | `profile`, `workspace`, `workspace_member`, RLS, triggers, helpers RPC |
+| 0002 | `0002_meta_connection.sql` | `workspace_meta_connection`, `workspace_phone_number`, RLS |
 
 ## Verificação pós-aplicação
 
