@@ -156,3 +156,65 @@ export async function subscribeAppToWaba(wabaId: string, token: string): Promise
     token,
   });
 }
+
+// ----------------------------------------------------------------------------
+// Templates do WABA. Categoria e status são strings da Meta.
+// ----------------------------------------------------------------------------
+export type MetaTemplateButton = {
+  type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | string;
+  text: string;
+  url?: string;
+  phone_number?: string;
+  example?: string[];
+};
+
+export type MetaTemplateComponent = {
+  type: "HEADER" | "BODY" | "FOOTER" | "BUTTONS";
+  format?: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
+  text?: string;
+  buttons?: MetaTemplateButton[];
+  example?: { header_text?: string[]; body_text?: string[][] };
+};
+
+export type MetaTemplate = {
+  id: string;
+  name: string;
+  language: string;
+  status: string;
+  category: string;
+  components: MetaTemplateComponent[];
+};
+
+type TemplatesResponse = {
+  data: MetaTemplate[];
+  paging?: { cursors?: { after?: string }; next?: string };
+};
+
+export async function listTemplates(
+  wabaId: string,
+  token: string,
+): Promise<MetaTemplate[]> {
+  const out: MetaTemplate[] = [];
+  let after: string | undefined;
+
+  do {
+    const query: Record<string, string> = {
+      fields: "id,name,language,status,category,components",
+      limit: "100",
+    };
+    if (after) query.after = after;
+
+    const data = await request<TemplatesResponse>(`/${wabaId}/message_templates`, {
+      method: "GET",
+      token,
+      query,
+    });
+
+    const batch = data.data ?? [];
+    out.push(...batch);
+    // Para se não voltou nada ou se Meta não indicou próxima página explícita.
+    after = batch.length > 0 && data.paging?.next ? data.paging.cursors?.after : undefined;
+  } while (after);
+
+  return out;
+}

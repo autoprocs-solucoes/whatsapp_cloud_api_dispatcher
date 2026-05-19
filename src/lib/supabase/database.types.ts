@@ -260,6 +260,65 @@ export type Database = {
           },
         ];
       };
+      template: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          meta_template_id: string;
+          name: string;
+          language: string;
+          category: string;
+          status: string;
+          header_text: string | null;
+          body_text: string | null;
+          footer_text: string | null;
+          buttons: Json;
+          components_raw: Json | null;
+          last_synced_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          meta_template_id: string;
+          name: string;
+          language: string;
+          category: string;
+          status: string;
+          header_text?: string | null;
+          body_text?: string | null;
+          footer_text?: string | null;
+          buttons?: Json;
+          components_raw?: Json | null;
+          last_synced_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          meta_template_id?: string;
+          name?: string;
+          language?: string;
+          category?: string;
+          status?: string;
+          header_text?: string | null;
+          body_text?: string | null;
+          footer_text?: string | null;
+          buttons?: Json;
+          components_raw?: Json | null;
+          last_synced_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "template_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       contact_import: {
         Row: {
           id: string;
@@ -339,3 +398,4 @@ export type WorkspacePhoneNumber =
 export type Contact = Database["public"]["Tables"]["contact"]["Row"];
 export type ContactInsert = Database["public"]["Tables"]["contact"]["Insert"];
 export type ContactImport = Database["public"]["Tables"]["contact_import"]["Row"];
+export type Template = Database["public"]["Tables"]["template"]["Row"];
