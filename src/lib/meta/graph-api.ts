@@ -218,3 +218,68 @@ export async function listTemplates(
 
   return out;
 }
+
+// ----------------------------------------------------------------------------
+// Envia template message via WhatsApp Cloud API.
+// Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages
+// ----------------------------------------------------------------------------
+export type SendTemplateParams = {
+  phoneNumberId: string;
+  to: string;
+  token: string;
+  templateName: string;
+  language: string;
+  bodyVariables?: string[];
+  headerVariables?: string[];
+};
+
+type SendTemplateResponse = {
+  messaging_product: string;
+  contacts: { input: string; wa_id: string }[];
+  messages: { id: string }[];
+};
+
+export async function sendTemplate(
+  params: SendTemplateParams,
+): Promise<{ messageId: string }> {
+  const components: Record<string, unknown>[] = [];
+
+  if (params.headerVariables && params.headerVariables.length > 0) {
+    components.push({
+      type: "header",
+      parameters: params.headerVariables.map((v) => ({ type: "text", text: v })),
+    });
+  }
+
+  if (params.bodyVariables && params.bodyVariables.length > 0) {
+    components.push({
+      type: "body",
+      parameters: params.bodyVariables.map((v) => ({ type: "text", text: v })),
+    });
+  }
+
+  const body = {
+    messaging_product: "whatsapp",
+    to: params.to,
+    type: "template",
+    template: {
+      name: params.templateName,
+      language: { code: params.language },
+      ...(components.length > 0 ? { components } : {}),
+    },
+  };
+
+  const data = await request<SendTemplateResponse>(`/${params.phoneNumberId}/messages`, {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify(body),
+  });
+
+  const messageId = data.messages?.[0]?.id;
+  if (!messageId) {
+    throw new GraphApiError(500, { error: { message: "Resposta sem message id" } });
+  }
+  return { messageId };
+}
+
+export { extractPlaceholders } from "./placeholders";

@@ -204,7 +204,7 @@ Plataforma web (Next.js + Supabase) usada internamente pela autoprocs para geren
 | **E4** | Contatos — import + CRUD | 🔵 Código pronto, aguardando migration | Wizard 3 passos, normalização E.164, dedup (UPSERT), listagem, edição, opt-out manual |
 | **E5** | Templates | 🔵 Código pronto (só listar+sync no MVP), aguardando migration | Sync da Meta, listagem com status badge. Criação fica pra V2; preview migrado pra E7. |
 | **E6** | Segmentação | 🔵 Código pronto, aguardando migration | Query builder (flat AND/OR), segmentos salvos, contagem em tempo real |
-| **E7** | Comunicados — disparo | ⬜ Não iniciado | Wizard de novo comunicado, mapeamento variáveis, test send, filtro opt-out, execução no servidor |
+| **E7** | Comunicados — disparo | 🔵 Código pronto, aguardando migration | Wizard 6 passos, mapeamento variáveis header/body, test send, filtro opt-out, execução sequencial |
 | **E8** | Relatórios | ⬜ Não iniciado | Detalhe do comunicado com contadores + lista de destinatários + export CSV |
 | **E9** | Dashboard | ⬜ Não iniciado | Visão geral do workspace |
 | **E10** | Super-admin autoprocs | ⬜ Não iniciado | Listagem cross-workspace, troubleshooting básico |

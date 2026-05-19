@@ -409,6 +409,145 @@ export type Database = {
           },
         ];
       };
+      dispatch: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          template_id: string;
+          phone_number_id: string;
+          segment_id: string | null;
+          recipient_source: "segment" | "manual";
+          manual_phones: string[];
+          variable_mapping: Json;
+          status: "draft" | "running" | "done" | "failed" | "canceled";
+          total_recipients: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          started_at: string | null;
+          finished_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          template_id: string;
+          phone_number_id: string;
+          segment_id?: string | null;
+          recipient_source: "segment" | "manual";
+          manual_phones?: string[];
+          variable_mapping?: Json;
+          status?: "draft" | "running" | "done" | "failed" | "canceled";
+          total_recipients?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          template_id?: string;
+          phone_number_id?: string;
+          segment_id?: string | null;
+          recipient_source?: "segment" | "manual";
+          manual_phones?: string[];
+          variable_mapping?: Json;
+          status?: "draft" | "running" | "done" | "failed" | "canceled";
+          total_recipients?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dispatch_template_id_fkey";
+            columns: ["template_id"];
+            isOneToOne: false;
+            referencedRelation: "template";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dispatch_segment_id_fkey";
+            columns: ["segment_id"];
+            isOneToOne: false;
+            referencedRelation: "segment";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dispatch_recipient: {
+        Row: {
+          id: string;
+          dispatch_id: string;
+          contact_id: string | null;
+          phone_e164: string;
+          payload: Json;
+          status: "queued" | "sent" | "delivered" | "read" | "failed";
+          meta_message_id: string | null;
+          error_code: string | null;
+          error_message: string | null;
+          sent_at: string | null;
+          delivered_at: string | null;
+          read_at: string | null;
+          failed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          dispatch_id: string;
+          contact_id?: string | null;
+          phone_e164: string;
+          payload?: Json;
+          status?: "queued" | "sent" | "delivered" | "read" | "failed";
+          meta_message_id?: string | null;
+          error_code?: string | null;
+          error_message?: string | null;
+          sent_at?: string | null;
+          delivered_at?: string | null;
+          read_at?: string | null;
+          failed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          dispatch_id?: string;
+          contact_id?: string | null;
+          phone_e164?: string;
+          payload?: Json;
+          status?: "queued" | "sent" | "delivered" | "read" | "failed";
+          meta_message_id?: string | null;
+          error_code?: string | null;
+          error_message?: string | null;
+          sent_at?: string | null;
+          delivered_at?: string | null;
+          read_at?: string | null;
+          failed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_recipient_dispatch_id_fkey";
+            columns: ["dispatch_id"];
+            isOneToOne: false;
+            referencedRelation: "dispatch";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dispatch_recipient_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contact";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -446,3 +585,9 @@ export type ContactImport = Database["public"]["Tables"]["contact_import"]["Row"
 export type Template = Database["public"]["Tables"]["template"]["Row"];
 export type Segment = Database["public"]["Tables"]["segment"]["Row"];
 export type SegmentInsert = Database["public"]["Tables"]["segment"]["Insert"];
+export type Dispatch = Database["public"]["Tables"]["dispatch"]["Row"];
+export type DispatchInsert = Database["public"]["Tables"]["dispatch"]["Insert"];
+export type DispatchRecipient = Database["public"]["Tables"]["dispatch_recipient"]["Row"];
+export type DispatchRecipientInsert = Database["public"]["Tables"]["dispatch_recipient"]["Insert"];
+export type DispatchStatus = Dispatch["status"];
+export type DispatchRecipientStatus = DispatchRecipient["status"];
