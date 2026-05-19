@@ -36,9 +36,6 @@ export function AppSidebar({ activeWorkspace, workspaces }: Props) {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
-            <MessageCircle className="size-4" />
-          </div>
           <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
             <span className="truncate font-semibold">Autoprocs</span>
             <span className="text-muted-foreground truncate text-xs">Dispatcher</span>
@@ -73,13 +70,6 @@ export function AppSidebar({ activeWorkspace, workspaces }: Props) {
           </SidebarGroup>
         ))}
       </SidebarContent>
-
-      <SidebarFooter>
-        <div className="text-muted-foreground px-2 py-1 text-xs group-data-[collapsible=icon]:hidden">
-          MVP — em desenvolvimento
-        </div>
-      </SidebarFooter>
-
       <SidebarRail />
     </Sidebar>
   );

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, MessageCircle } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -7,9 +7,6 @@ export default function HomePage() {
   return (
     <main className="bg-background relative flex min-h-screen flex-col items-center justify-center px-6">
       <div className="w-full max-w-xl text-center">
-        <div className="bg-primary text-primary-foreground mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl">
-          <MessageCircle className="size-7" />
-        </div>
         <p className="text-primary mb-3 text-sm font-medium tracking-wide uppercase">
           Autoprocs · Dispatcher
         </p>
@@ -31,9 +28,6 @@ export default function HomePage() {
             </Link>
           </Button>
         </div>
-        <p className="text-muted-foreground mt-10 text-xs">
-          MVP em desenvolvimento. Autenticação chega no épico E1.
-        </p>
       </div>
     </main>
   );

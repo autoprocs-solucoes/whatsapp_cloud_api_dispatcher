@@ -6,9 +6,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="bg-muted/30 flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
-            <MessageCircle className="size-4" />
-          </div>
           <span className="font-semibold">Autoprocs Dispatcher</span>
         </Link>
       </header>

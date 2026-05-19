@@ -53,14 +53,16 @@ export function UserMenu({ fullName, email }: Props) {
           Perfil
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <form action={signOutAction}>
-          <DropdownMenuItem asChild className="gap-2">
-            <button type="submit" className="w-full text-left">
-              <LogOut className="size-4" />
-              Sair
-            </button>
-          </DropdownMenuItem>
-        </form>
+        <DropdownMenuItem
+          className="gap-2"
+          onSelect={(event) => {
+            event.preventDefault();
+            void signOutAction();
+          }}
+        >
+          <LogOut className="size-4" />
+          Sair
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
