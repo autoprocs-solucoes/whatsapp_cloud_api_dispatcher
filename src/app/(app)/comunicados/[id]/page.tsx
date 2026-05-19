@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Download } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,13 @@ export default async function ComunicadoDetalhe({
   const { dispatch, template, recipients, totalRecipients, counts } = detail;
   const totalPages = Math.max(1, Math.ceil(totalRecipients / 50));
 
+  const total = dispatch.total_recipients || 0;
+  const sentLike = (counts.sent ?? 0) + (counts.delivered ?? 0) + (counts.read ?? 0);
+  const deliveredLike = (counts.delivered ?? 0) + (counts.read ?? 0);
+  const readCount = counts.read ?? 0;
+  const failedCount = counts.failed ?? 0;
+  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+
   return (
     <div className="space-y-6">
       <div>
@@ -82,9 +89,18 @@ export default async function ComunicadoDetalhe({
               {new Date(dispatch.created_at).toLocaleString("pt-BR")}
             </p>
           </div>
-          <Badge variant={statusBadgeVariant(dispatch.status)} className="text-xs">
-            {STATUS_LABELS[dispatch.status] ?? dispatch.status}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={statusBadgeVariant(dispatch.status)} className="text-xs">
+              {STATUS_LABELS[dispatch.status] ?? dispatch.status}
+            </Badge>
+            {totalRecipients > 0 && (
+              <Button asChild size="sm" variant="outline">
+                <a href={`/comunicados/${dispatch.id}/export`} download>
+                  <Download className="mr-1 size-4" /> Exportar CSV
+                </a>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -107,6 +123,45 @@ export default async function ComunicadoDetalhe({
             <p className="text-foreground text-xl font-semibold">{counts[s] ?? 0}</p>
           </div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="bg-muted/40 rounded-md border p-3">
+          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+            Taxa de envio
+          </p>
+          <p className="text-foreground text-lg font-semibold">{pct(sentLike)}%</p>
+          <p className="text-muted-foreground text-[10px]">
+            {sentLike} de {total}
+          </p>
+        </div>
+        <div className="bg-muted/40 rounded-md border p-3">
+          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+            Taxa de entrega
+          </p>
+          <p className="text-foreground text-lg font-semibold">{pct(deliveredLike)}%</p>
+          <p className="text-muted-foreground text-[10px]">
+            {deliveredLike} de {total}
+          </p>
+        </div>
+        <div className="bg-muted/40 rounded-md border p-3">
+          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+            Taxa de leitura
+          </p>
+          <p className="text-foreground text-lg font-semibold">{pct(readCount)}%</p>
+          <p className="text-muted-foreground text-[10px]">
+            {readCount} de {total}
+          </p>
+        </div>
+        <div className="border-destructive/30 bg-destructive/5 rounded-md border p-3">
+          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+            Taxa de falha
+          </p>
+          <p className="text-destructive text-lg font-semibold">{pct(failedCount)}%</p>
+          <p className="text-muted-foreground text-[10px]">
+            {failedCount} de {total}
+          </p>
+        </div>
       </div>
 
       <div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ContactsTable } from "@/features/contacts/contacts-table";
@@ -21,6 +21,13 @@ export default async function ContatosPage({ searchParams }: { searchParams: Sea
     pageSize: sp.pageSize ? Number(sp.pageSize) : 50,
   });
 
+  const exportParams = new URLSearchParams();
+  if (sp.search) exportParams.set("search", sp.search);
+  if (sp.optOutFilter && sp.optOutFilter !== "all") {
+    exportParams.set("optOutFilter", sp.optOutFilter);
+  }
+  const exportHref = `/contatos/export${exportParams.toString() ? `?${exportParams}` : ""}`;
+
   return (
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-4">
@@ -30,11 +37,20 @@ export default async function ContatosPage({ searchParams }: { searchParams: Sea
             Importe contatos via planilha, gerencie campos custom e opt-outs.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/contatos/importar">
-            <Upload className="mr-1 size-4" /> Importar contatos
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {total > 0 && (
+            <Button asChild variant="outline">
+              <a href={exportHref} download>
+                <Download className="mr-1 size-4" /> Exportar CSV
+              </a>
+            </Button>
+          )}
+          <Button asChild>
+            <Link href="/contatos/importar">
+              <Upload className="mr-1 size-4" /> Importar contatos
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <ContactsTable contacts={contacts} total={total} page={page} pageSize={pageSize} />
