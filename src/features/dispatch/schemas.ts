@@ -17,9 +17,11 @@ export const variableMappingEntrySchema = z.object({
   fallback: z.string().max(500).default(""),
 });
 
-// Key format: "header:N" or "body:N" — Meta numera placeholders por componente.
+// Key format: "header:<placeholder>" / "body:<placeholder>" — placeholder
+// pode ser número (`1`, `2`) pra templates positionais ou nome (`nome`,
+// `moto_clube`) pra templates com named parameters.
 export const variableMappingSchema = z.record(
-  z.string().regex(/^(header|body):\d+$/),
+  z.string().regex(/^(header|body):([a-zA-Z_]\w*|\d+)$/),
   variableMappingEntrySchema,
 );
 

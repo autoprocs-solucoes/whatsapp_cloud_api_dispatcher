@@ -223,14 +223,20 @@ export async function listTemplates(
 // Envia template message via WhatsApp Cloud API.
 // Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages
 // ----------------------------------------------------------------------------
+/**
+ * Parâmetro de template. Se `name` presente, vai como `parameter_name`
+ * (named params). Se ausente, vai posicional (ordem do array conta).
+ */
+export type TemplateParameter = { name?: string; text: string };
+
 export type SendTemplateParams = {
   phoneNumberId: string;
   to: string;
   token: string;
   templateName: string;
   language: string;
-  bodyVariables?: string[];
-  headerVariables?: string[];
+  bodyParameters?: TemplateParameter[];
+  headerParameters?: TemplateParameter[];
 };
 
 type SendTemplateResponse = {
@@ -239,22 +245,27 @@ type SendTemplateResponse = {
   messages: { id: string }[];
 };
 
+function renderParameter(p: TemplateParameter): Record<string, unknown> {
+  if (p.name) return { type: "text", parameter_name: p.name, text: p.text };
+  return { type: "text", text: p.text };
+}
+
 export async function sendTemplate(
   params: SendTemplateParams,
 ): Promise<{ messageId: string }> {
   const components: Record<string, unknown>[] = [];
 
-  if (params.headerVariables && params.headerVariables.length > 0) {
+  if (params.headerParameters && params.headerParameters.length > 0) {
     components.push({
       type: "header",
-      parameters: params.headerVariables.map((v) => ({ type: "text", text: v })),
+      parameters: params.headerParameters.map(renderParameter),
     });
   }
 
-  if (params.bodyVariables && params.bodyVariables.length > 0) {
+  if (params.bodyParameters && params.bodyParameters.length > 0) {
     components.push({
       type: "body",
-      parameters: params.bodyVariables.map((v) => ({ type: "text", text: v })),
+      parameters: params.bodyParameters.map(renderParameter),
     });
   }
 

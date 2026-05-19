@@ -10,7 +10,9 @@ import {
   GraphApiError,
   extractPlaceholders,
   sendTemplate,
+  type TemplateParameter,
 } from "@/lib/meta/graph-api";
+import { isNamedPlaceholder } from "@/lib/meta/placeholders";
 import { normalizeBR } from "@/lib/phone/e164";
 import {
   createDispatchSchema,
@@ -55,6 +57,17 @@ function parseMappingField(raw: FormDataEntryValue | null): VariableMapping | nu
   } catch {
     return null;
   }
+}
+
+function buildParameters(
+  placeholders: string[],
+  resolved: Record<string, string>,
+  component: "header" | "body",
+): TemplateParameter[] {
+  return placeholders.map((p) => {
+    const text = resolved[`${component}:${p}`] ?? "";
+    return isNamedPlaceholder(p) ? { name: p, text } : { text };
+  });
 }
 
 function parseManualPhones(raw: FormDataEntryValue | null): string[] {
@@ -273,8 +286,8 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
     custom_fields: {},
   };
   const resolved = resolveVariables(syntheticRecipient, parsed.data.variable_mapping);
-  const headerVars = headerPlaceholders.map((p) => resolved[`header:${p}`] ?? "");
-  const bodyVars = bodyPlaceholders.map((p) => resolved[`body:${p}`] ?? "");
+  const headerParameters = buildParameters(headerPlaceholders, resolved, "header");
+  const bodyParameters = buildParameters(bodyPlaceholders, resolved, "body");
 
   try {
     const r = await sendTemplate({
@@ -283,8 +296,8 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
       token: conn.connection.access_token,
       templateName: template.name,
       language: template.language,
-      headerVariables: headerVars,
-      bodyVariables: bodyVars,
+      headerParameters,
+      bodyParameters,
     });
     return { ok: true, data: { messageId: r.messageId } };
   } catch (e) {
@@ -428,8 +441,8 @@ export async function executeDispatchAction(
 
   for (const r of queue) {
     const payload = (r.payload ?? {}) as Record<string, string>;
-    const headerVars = headerPlaceholders.map((p) => payload[`header:${p}`] ?? "");
-    const bodyVars = bodyPlaceholders.map((p) => payload[`body:${p}`] ?? "");
+    const headerParameters = buildParameters(headerPlaceholders, payload, "header");
+    const bodyParameters = buildParameters(bodyPlaceholders, payload, "body");
 
     try {
       const res = await sendTemplate({
@@ -438,8 +451,8 @@ export async function executeDispatchAction(
         token: conn.connection.access_token,
         templateName: template.name,
         language: template.language,
-        headerVariables: headerVars,
-        bodyVariables: bodyVars,
+        headerParameters,
+        bodyParameters,
       });
       await admin
         .from("dispatch_recipient")

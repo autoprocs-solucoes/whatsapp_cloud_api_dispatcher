@@ -29,7 +29,7 @@ function renderText(
   labels: Record<string, string>,
 ): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
-  const re = /\{\{\s*(\d+)\s*\}\}/g;
+  const re = /\{\{\s*([a-zA-Z_]\w*|\d+)\s*\}\}/g;
   let lastIndex = 0;
   let m: RegExpExecArray | null;
   let i = 0;
