@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Download, FileUp, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -19,8 +19,10 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
+  analyzeImportAction,
   confirmImportAction,
   previewImportAction,
+  type ImportAnalysis,
   type ImportStats,
   type PreviewImportResult,
 } from "@/features/contacts/actions";
@@ -69,7 +71,24 @@ export function ContactsImportWizard() {
   const [fullNameColumn, setFullNameColumn] = useState<string>("");
   const [customColumns, setCustomColumns] = useState<CustomColumnConfig[]>([]);
 
+  const [analysis, setAnalysis] = useState<ImportAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [stats, setStats] = useState<ImportStats | null>(null);
+
+  function buildMappingFormData() {
+    if (!file) return null;
+    const mapping = {
+      phoneColumn,
+      fullNameColumn: fullNameColumn || null,
+      customColumns: customColumns
+        .filter((c) => c.enabled && c.fieldKey.trim())
+        .map((c) => ({ sourceHeader: c.sourceHeader, fieldKey: c.fieldKey.trim() })),
+    };
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("mapping", JSON.stringify(mapping));
+    return fd;
+  }
 
   function resetMapping(p: PreviewImportResult) {
     const phone = p.autoMapping.phoneColumn ?? "";
@@ -108,19 +127,8 @@ export function ContactsImportWizard() {
   }
 
   function handleConfirm() {
-    if (!file) return;
-
-    const mapping = {
-      phoneColumn,
-      fullNameColumn: fullNameColumn || null,
-      customColumns: customColumns
-        .filter((c) => c.enabled && c.fieldKey.trim())
-        .map((c) => ({ sourceHeader: c.sourceHeader, fieldKey: c.fieldKey.trim() })),
-    };
-
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("mapping", JSON.stringify(mapping));
+    const fd = buildMappingFormData();
+    if (!fd) return;
 
     startTransition(async () => {
       const res = await confirmImportAction(fd);
@@ -134,6 +142,36 @@ export function ContactsImportWizard() {
       );
     });
   }
+
+  useEffect(() => {
+    if (step !== 3 || stats || !file || !phoneColumn) return;
+
+    const fd = buildMappingFormData();
+    if (!fd) return;
+
+    let cancelled = false;
+    setIsAnalyzing(true);
+    setAnalysis(null);
+
+    analyzeImportAction(fd)
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          toast.error(res.error);
+          setStep(2);
+          return;
+        }
+        setAnalysis(res.data);
+      })
+      .finally(() => {
+        if (!cancelled) setIsAnalyzing(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const canAdvanceStep1 = preview !== null && !isPending;
   const canAdvanceStep2 = phoneColumn !== "" && !isPending;
@@ -325,20 +363,16 @@ export function ContactsImportWizard() {
       {step === 3 && preview && (
         <Card>
           <CardHeader>
-            <CardTitle>3. Confirmar import</CardTitle>
+            <CardTitle>3. Revisar e confirmar</CardTitle>
             <CardDescription>
-              Revise os números antes de gravar. Inválidos são pulados, duplicados no arquivo
-              também. Existentes serão atualizados.
+              Veja exatamente quem será criado e quem será atualizado antes de gravar.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {!stats ? (
               <>
                 <div className="rounded-md border p-4 text-sm">
-                  <p>
-                    <strong>{preview.totalRows}</strong> linha(s) no arquivo serão processadas.
-                  </p>
-                  <p className="text-muted-foreground mt-1 text-xs">
+                  <p className="text-muted-foreground text-xs">
                     Telefone: <code>{phoneColumn}</code>
                     {fullNameColumn && (
                       <>
@@ -350,11 +384,78 @@ export function ContactsImportWizard() {
                   </p>
                 </div>
 
+                {isAnalyzing && (
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Loader2 className="size-4 animate-spin" /> Analisando arquivo…
+                  </div>
+                )}
+
+                {analysis && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <StatCard label="Total" value={analysis.total} />
+                      <StatCard label="Novos" value={analysis.valid_new} accent="primary" />
+                      <StatCard
+                        label="Atualizados"
+                        value={analysis.valid_updated}
+                        accent="secondary"
+                      />
+                      <StatCard
+                        label="Inválidos"
+                        value={analysis.invalid}
+                        accent="destructive"
+                      />
+                    </div>
+                    {analysis.duplicates_in_file > 0 && (
+                      <p className="text-muted-foreground text-xs">
+                        {analysis.duplicates_in_file} duplicado(s) dentro do arquivo (será mantida
+                        só a primeira ocorrência).
+                      </p>
+                    )}
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <PreviewList
+                        title="Serão criados"
+                        emptyMessage="Nenhum contato novo."
+                        total={analysis.valid_new}
+                        sample={analysis.new_sample}
+                      />
+                      <PreviewList
+                        title="Serão atualizados"
+                        emptyMessage="Nenhum contato existente será atualizado."
+                        total={analysis.valid_updated}
+                        sample={analysis.updated_sample}
+                      />
+                    </div>
+
+                    {analysis.invalid_rows.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          downloadCsv("contatos_invalidos.csv", analysis.invalid_rows)
+                        }
+                      >
+                        <Download className="mr-1 size-4" /> Baixar CSV de inválidos (
+                        {analysis.invalid_rows.length})
+                      </Button>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-between">
                   <Button variant="outline" onClick={() => setStep(2)}>
                     <ArrowLeft className="mr-1 size-4" /> Voltar
                   </Button>
-                  <Button onClick={handleConfirm} disabled={isPending}>
+                  <Button
+                    onClick={handleConfirm}
+                    disabled={
+                      isPending ||
+                      isAnalyzing ||
+                      !analysis ||
+                      analysis.valid_new + analysis.valid_updated === 0
+                    }
+                  >
                     {isPending ? (
                       <>
                         <Loader2 className="mr-1 size-4 animate-spin" /> Importando…
@@ -439,6 +540,48 @@ function StepIndicator({ step }: { step: Step }) {
           {i < items.length - 1 && <div className="bg-input mx-1 h-px w-8" />}
         </div>
       ))}
+    </div>
+  );
+}
+
+function PreviewList({
+  title,
+  emptyMessage,
+  total,
+  sample,
+}: {
+  title: string;
+  emptyMessage: string;
+  total: number;
+  sample: { row: number; phone_e164: string; full_name: string | null }[];
+}) {
+  const remaining = total - sample.length;
+  return (
+    <div className="rounded-md border">
+      <div className="border-b px-3 py-2">
+        <p className="text-sm font-medium">
+          {title} <span className="text-muted-foreground">({total})</span>
+        </p>
+      </div>
+      {total === 0 ? (
+        <p className="text-muted-foreground p-3 text-xs">{emptyMessage}</p>
+      ) : (
+        <>
+          <ul className="max-h-64 divide-y overflow-y-auto text-xs">
+            {sample.map((r) => (
+              <li key={`${r.row}-${r.phone_e164}`} className="flex justify-between gap-2 px-3 py-1.5">
+                <span className="truncate">{r.full_name || <span className="text-muted-foreground italic">sem nome</span>}</span>
+                <span className="text-muted-foreground font-mono">{r.phone_e164}</span>
+              </li>
+            ))}
+          </ul>
+          {remaining > 0 && (
+            <p className="text-muted-foreground border-t px-3 py-1.5 text-xs">
+              + {remaining} adicional(is) não exibido(s)
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -80,7 +80,7 @@ export async function previewImportAction(
 }
 
 // ----------------------------------------------------------------------------
-// Confirma import: parse + normaliza + upsert em batch
+// Análise e confirmação do import
 // ----------------------------------------------------------------------------
 export type ImportStats = {
   total: number;
@@ -91,14 +91,34 @@ export type ImportStats = {
   invalid_rows: { row: number; phone: string; reason: string }[];
 };
 
+export type PreviewRow = {
+  row: number;
+  phone_e164: string;
+  full_name: string | null;
+};
+
+export type ImportAnalysis = ImportStats & {
+  new_sample: PreviewRow[];
+  updated_sample: PreviewRow[];
+};
+
+const PREVIEW_SAMPLE_LIMIT = 100;
 const BATCH_SIZE = 500;
 
-export async function confirmImportAction(
-  formData: FormData,
-): Promise<ActionResult<ImportStats>> {
-  const ctx = await ensureMember();
-  if (!ctx) return { ok: false, error: "Não autenticado" };
+type UpsertRow = {
+  workspace_id: string;
+  phone_e164: string;
+  full_name: string | null;
+  custom_fields: Record<string, string>;
+  created_by: string;
+};
 
+async function parseFileAndMapping(
+  formData: FormData,
+): Promise<
+  | { ok: true; parsed: Awaited<ReturnType<typeof parseSpreadsheet>>; mapping: ImportMapping; file: File }
+  | { ok: false; error: string }
+> {
   const file = formData.get("file");
   const mappingRaw = formData.get("mapping");
   if (!(file instanceof File) || file.size === 0) {
@@ -116,18 +136,22 @@ export async function confirmImportAction(
     return { ok: false, error: "Mapeamento inválido" };
   }
 
-  let parsed;
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    parsed = await parseSpreadsheet(buffer, file.name, file.type);
+    const parsed = await parseSpreadsheet(buffer, file.name, file.type);
+    return { ok: true, parsed, mapping, file };
   } catch (e) {
     if (e instanceof SpreadsheetParseError) return { ok: false, error: e.message };
     return { ok: false, error: "Falha ao ler arquivo" };
   }
+}
 
+async function analyzeRows(
+  parsed: Awaited<ReturnType<typeof parseSpreadsheet>>,
+  mapping: ImportMapping,
+  ctx: { workspaceId: string; userId: string },
+): Promise<{ analysis: ImportAnalysis; upserts: UpsertRow[] }> {
   const admin = createAdminClient();
-
-  // Pega contatos existentes do workspace pra calcular new vs updated
   const { data: existing } = await admin
     .from("contact")
     .select("phone_e164")
@@ -135,35 +159,29 @@ export async function confirmImportAction(
   const existingSet = new Set((existing ?? []).map((c) => c.phone_e164));
 
   const seenInFile = new Set<string>();
-  const stats: ImportStats = {
+  const analysis: ImportAnalysis = {
     total: parsed.rows.length,
     valid_new: 0,
     valid_updated: 0,
     invalid: 0,
     duplicates_in_file: 0,
     invalid_rows: [],
+    new_sample: [],
+    updated_sample: [],
   };
-
-  type Row = {
-    workspace_id: string;
-    phone_e164: string;
-    full_name: string | null;
-    custom_fields: Record<string, string>;
-    created_by: string;
-  };
-  const upserts: Row[] = [];
+  const upserts: UpsertRow[] = [];
 
   parsed.rows.forEach((row, i) => {
     const rawPhone = row[mapping.phoneColumn] ?? "";
     const norm = normalizeBR(rawPhone);
     if (!norm.ok) {
-      stats.invalid++;
-      stats.invalid_rows.push({ row: i + 2, phone: rawPhone, reason: norm.reason });
+      analysis.invalid++;
+      analysis.invalid_rows.push({ row: i + 2, phone: rawPhone, reason: norm.reason });
       return;
     }
 
     if (seenInFile.has(norm.e164)) {
-      stats.duplicates_in_file++;
+      analysis.duplicates_in_file++;
       return;
     }
     seenInFile.add(norm.e164);
@@ -176,11 +194,18 @@ export async function confirmImportAction(
 
     const nameRaw = mapping.fullNameColumn ? row[mapping.fullNameColumn] : undefined;
     const fullName = nameRaw ? nameRaw.trim() : null;
+    const previewRow: PreviewRow = { row: i + 2, phone_e164: norm.e164, full_name: fullName };
 
     if (existingSet.has(norm.e164)) {
-      stats.valid_updated++;
+      analysis.valid_updated++;
+      if (analysis.updated_sample.length < PREVIEW_SAMPLE_LIMIT) {
+        analysis.updated_sample.push(previewRow);
+      }
     } else {
-      stats.valid_new++;
+      analysis.valid_new++;
+      if (analysis.new_sample.length < PREVIEW_SAMPLE_LIMIT) {
+        analysis.new_sample.push(previewRow);
+      }
     }
 
     upserts.push({
@@ -192,7 +217,34 @@ export async function confirmImportAction(
     });
   });
 
-  // Upsert em batches
+  return { analysis, upserts };
+}
+
+export async function analyzeImportAction(
+  formData: FormData,
+): Promise<ActionResult<ImportAnalysis>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const prep = await parseFileAndMapping(formData);
+  if (!prep.ok) return { ok: false, error: prep.error };
+
+  const { analysis } = await analyzeRows(prep.parsed, prep.mapping, ctx);
+  return { ok: true, data: analysis };
+}
+
+export async function confirmImportAction(
+  formData: FormData,
+): Promise<ActionResult<ImportStats>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const prep = await parseFileAndMapping(formData);
+  if (!prep.ok) return { ok: false, error: prep.error };
+
+  const { analysis, upserts } = await analyzeRows(prep.parsed, prep.mapping, ctx);
+  const admin = createAdminClient();
+
   for (let i = 0; i < upserts.length; i += BATCH_SIZE) {
     const batch = upserts.slice(i, i + BATCH_SIZE);
     const { error } = await admin
@@ -203,11 +255,19 @@ export async function confirmImportAction(
     }
   }
 
-  // Audit em contact_import
+  const stats: ImportStats = {
+    total: analysis.total,
+    valid_new: analysis.valid_new,
+    valid_updated: analysis.valid_updated,
+    invalid: analysis.invalid,
+    duplicates_in_file: analysis.duplicates_in_file,
+    invalid_rows: analysis.invalid_rows,
+  };
+
   await admin.from("contact_import").insert({
     workspace_id: ctx.workspaceId,
-    filename: file.name,
-    mapping: JSON.parse(JSON.stringify(mapping)),
+    filename: prep.file.name,
+    mapping: JSON.parse(JSON.stringify(prep.mapping)),
     stats: JSON.parse(JSON.stringify({ ...stats, invalid_rows: stats.invalid_rows.length })),
     created_by: ctx.userId,
   });

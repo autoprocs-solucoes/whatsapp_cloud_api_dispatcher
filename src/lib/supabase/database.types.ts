@@ -364,6 +364,51 @@ export type Database = {
           },
         ];
       };
+      segment: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          rules: Json;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          name: string;
+          rules: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          name?: string;
+          rules?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "segment_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "segment_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profile";
+            referencedColumns: ["user_id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -399,3 +444,5 @@ export type Contact = Database["public"]["Tables"]["contact"]["Row"];
 export type ContactInsert = Database["public"]["Tables"]["contact"]["Insert"];
 export type ContactImport = Database["public"]["Tables"]["contact_import"]["Row"];
 export type Template = Database["public"]["Tables"]["template"]["Row"];
+export type Segment = Database["public"]["Tables"]["segment"]["Row"];
+export type SegmentInsert = Database["public"]["Tables"]["segment"]["Insert"];
