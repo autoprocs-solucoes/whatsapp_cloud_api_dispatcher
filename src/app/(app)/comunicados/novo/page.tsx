@@ -22,11 +22,11 @@ export default async function NovoComunicadoPage() {
   const approvedTemplates = templates.filter((t) => t.status === "APPROVED");
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Novo comunicado</h1>
-        <p className="text-muted-foreground text-sm">
-          Wizard de 6 passos · opt-outs filtrados automaticamente.
+    <div className="space-y-3">
+      <header className="flex items-baseline gap-3">
+        <h1 className="text-lg font-semibold tracking-tight">Novo comunicado</h1>
+        <p className="text-muted-foreground text-xs">
+          Wizard 6 passos · opt-outs filtrados automaticamente.
         </p>
       </header>
 

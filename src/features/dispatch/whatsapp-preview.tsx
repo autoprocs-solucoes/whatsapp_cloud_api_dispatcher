@@ -83,19 +83,13 @@ export function WhatsAppPreview({
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-[340px] overflow-hidden rounded-3xl border-[10px] border-neutral-900 shadow-xl",
+        "mx-auto w-full max-w-[260px] overflow-hidden rounded-2xl border-[6px] border-neutral-900 shadow-xl",
         "bg-[#e8e0d3] dark:bg-[#0b141a]",
         className,
       )}
-      style={{ aspectRatio: "9 / 16" }}
     >
-      {/* Notch */}
-      <div className="flex justify-center bg-neutral-900 py-1">
-        <div className="h-1.5 w-16 rounded-full bg-neutral-700" />
-      </div>
-
       {/* WhatsApp top bar */}
-      <div className="flex items-center gap-2 bg-[#075e54] px-3 py-2 text-white dark:bg-[#1f2c33]">
+      <div className="flex items-center gap-2 bg-[#075e54] px-3 py-1.5 text-white dark:bg-[#1f2c33]">
         <ArrowLeft className="size-4 opacity-80" />
         <div className="bg-primary/30 flex size-7 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold uppercase">
           {(senderName ?? "AP").slice(0, 2)}
@@ -111,7 +105,7 @@ export function WhatsAppPreview({
 
       {/* Chat area */}
       <div
-        className="relative h-[420px] overflow-y-auto px-3 py-3"
+        className="relative max-h-[260px] min-h-[120px] overflow-y-auto px-2.5 py-2"
         style={{
           backgroundImage:
             "radial-gradient(circle at 20% 15%, rgba(0,0,0,0.04) 0, transparent 40%), radial-gradient(circle at 80% 70%, rgba(0,0,0,0.04) 0, transparent 40%)",
@@ -173,13 +167,13 @@ export function WhatsAppPreview({
       </div>
 
       {/* Bottom input strip */}
-      <div className="bg-[#f0f0f0] px-3 py-2 dark:bg-[#1f2c33]">
+      <div className="bg-[#f0f0f0] px-2 py-1.5 dark:bg-[#1f2c33]">
         <div className="flex items-center gap-2">
-          <div className="text-muted-foreground flex-1 rounded-full bg-white px-3 py-1.5 text-[11px] dark:bg-[#2a3942] dark:text-neutral-400">
+          <div className="text-muted-foreground flex-1 rounded-full bg-white px-3 py-1 text-[10px] dark:bg-[#2a3942] dark:text-neutral-400">
             Mensagem
           </div>
-          <div className="flex size-7 items-center justify-center rounded-full bg-[#00a884] text-white">
-            <Camera className="size-3.5" />
+          <div className="flex size-5 items-center justify-center rounded-full bg-[#00a884] text-white">
+            <Camera className="size-3" />
           </div>
         </div>
       </div>

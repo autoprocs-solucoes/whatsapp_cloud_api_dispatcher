@@ -170,7 +170,7 @@ export function resolveVariables(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, entry] of Object.entries(mapping)) {
-    const raw = resolveColumn(recipient, entry.column).trim();
+    const raw = entry.column ? resolveColumn(recipient, entry.column).trim() : "";
     out[key] = raw || entry.fallback || "";
   }
   return out;

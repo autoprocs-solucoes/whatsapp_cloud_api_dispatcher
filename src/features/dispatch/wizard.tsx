@@ -113,8 +113,9 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
       const s = mappingState[key];
       if (!s) continue;
       const col = decodeColumn(s.columnId);
-      if (!col) continue;
-      out[key] = { column: col, fallback: s.fallback };
+      const fallback = s.fallback ?? "";
+      if (!col && fallback.trim().length === 0) continue;
+      out[key] = { column: col, fallback };
     }
     return out;
   }, [allMappingKeys, mappingState]);
@@ -196,7 +197,8 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
     if (step === 3) {
       return allMappingKeys.every((m) => {
         const s = mappingState[`${m.component}:${m.num}`];
-        return s && decodeColumn(s.columnId);
+        if (!s) return false;
+        return Boolean(decodeColumn(s.columnId)) || s.fallback.trim().length > 0;
       });
     }
     if (step === 4) {
@@ -289,9 +291,9 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Stepper */}
-      <ol className="flex flex-wrap items-center gap-2 text-xs">
+      <ol className="flex flex-wrap items-center gap-1.5 text-xs">
         {STEPS.map((s, i) => {
           const active = step === s.id;
           const done = step > s.id;
@@ -327,10 +329,10 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
       </ol>
 
       {/* Step content + preview side-by-side */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="rounded-md border p-5">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="rounded-md border p-3">
         {step === 1 && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="space-y-2">
               <Label>Template aprovado</Label>
               <Combobox
@@ -345,7 +347,7 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
               />
             </div>
             {selectedTemplate && (
-              <div className="bg-muted/40 space-y-2 rounded-md p-3 text-sm">
+              <div className="bg-muted/40 space-y-1 rounded-md p-2 text-xs">
                 {selectedTemplate.header_text && (
                   <p>
                     <span className="text-muted-foreground text-[10px] uppercase">Header </span>
@@ -387,50 +389,76 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
         )}
 
         {step === 3 && (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {allMappingKeys.length === 0 ? (
               <p className="text-muted-foreground text-sm">
                 Esse template não tem placeholders. Pode seguir.
               </p>
             ) : (
-              allMappingKeys.map((m) => {
-                const key = `${m.component}:${m.num}`;
-                const v = mappingState[key];
-                return (
-                  <div key={key} className="grid gap-2 sm:grid-cols-[140px_1fr_1fr] sm:items-end">
-                    <div>
-                      <Label className="text-xs">
-                        {`{{${m.num}}}`}{" "}
-                        <span className="text-muted-foreground">({m.component})</span>
-                      </Label>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-muted-foreground text-[10px]">Coluna</span>
-                      <Combobox
-                        value={v?.columnId ?? ""}
-                        onChange={(id) => updateMapping(key, { columnId: id })}
-                        groups={columnGroups}
-                        placeholder="Coluna do contato"
-                        searchPlaceholder="Buscar coluna…"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-muted-foreground text-[10px]">Fallback</span>
+              <>
+                <p className="text-muted-foreground text-xs">
+                  Defina <strong>coluna</strong> pra variar por contato, ou só{" "}
+                  <strong>fallback</strong> pra mandar valor fixo a todos.
+                </p>
+                <div className="text-muted-foreground hidden grid-cols-[150px_1fr_1fr] gap-2 px-1 text-[10px] font-medium uppercase tracking-wider sm:grid">
+                  <span>Placeholder</span>
+                  <span>Coluna (opcional)</span>
+                  <span>Fallback / valor fixo</span>
+                </div>
+                {allMappingKeys.map((m) => {
+                  const key = `${m.component}:${m.num}`;
+                  const v = mappingState[key];
+                  const hasColumn = Boolean(v?.columnId);
+                  return (
+                    <div
+                      key={key}
+                      className="grid gap-2 sm:grid-cols-[150px_1fr_1fr] sm:items-center"
+                    >
+                      <div className="bg-muted/60 inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 font-mono text-xs sm:w-full sm:justify-center">
+                        <span>{`{{${m.num}}}`}</span>
+                        <span className="text-muted-foreground text-[10px]">
+                          {m.component}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Combobox
+                          value={v?.columnId ?? ""}
+                          onChange={(id) => updateMapping(key, { columnId: id })}
+                          groups={columnGroups}
+                          placeholder="— sem coluna —"
+                          searchPlaceholder="Buscar coluna…"
+                          triggerClassName="w-full flex-1"
+                        />
+                        {hasColumn && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => updateMapping(key, { columnId: "" })}
+                            title="Remover coluna"
+                          >
+                            ×
+                          </Button>
+                        )}
+                      </div>
                       <Input
                         value={v?.fallback ?? ""}
                         onChange={(e) => updateMapping(key, { fallback: e.target.value })}
-                        placeholder="valor padrão se vazio"
+                        placeholder={
+                          hasColumn ? "usado se coluna vazia" : "valor fixo pra todos"
+                        }
                       />
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </>
             )}
           </div>
         )}
 
         {step === 4 && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="bg-muted/40 inline-flex rounded-md p-0.5">
               {(["segment", "manual"] as const).map((s) => (
                 <button
@@ -471,7 +499,7 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
                 <textarea
                   value={manualPhonesText}
                   onChange={(e) => setManualPhonesText(e.target.value)}
-                  rows={8}
+                  rows={4}
                   placeholder="61999999999\n(11) 98765-4321"
                   className="border-input focus-visible:border-ring focus-visible:ring-ring/50 w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-[3px]"
                 />
@@ -521,7 +549,7 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
         )}
 
         {step === 6 && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="space-y-1 text-sm">
               <p>
                 <span className="text-muted-foreground">Template:</span>{" "}

@@ -12,10 +12,14 @@ export const variableColumnSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
-export const variableMappingEntrySchema = z.object({
-  column: variableColumnSchema,
-  fallback: z.string().max(500).default(""),
-});
+export const variableMappingEntrySchema = z
+  .object({
+    column: variableColumnSchema.nullable().default(null),
+    fallback: z.string().max(500).default(""),
+  })
+  .refine((d) => d.column !== null || d.fallback.trim().length > 0, {
+    message: "Informe uma coluna ou um fallback",
+  });
 
 // Key format: "header:<placeholder>" / "body:<placeholder>" — placeholder
 // pode ser número (`1`, `2`) pra templates positionais ou nome (`nome`,
