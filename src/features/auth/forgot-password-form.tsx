@@ -15,25 +15,30 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signInAction, type ActionResult } from "@/features/auth/actions";
+import { requestPasswordResetAction, type ActionResult } from "@/features/auth/actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Entrando..." : "Entrar"}
+      {pending ? "Enviando..." : "Enviar link de recuperação"}
     </Button>
   );
 }
 
-export function LoginForm() {
-  const [state, formAction] = useActionState<ActionResult | null, FormData>(signInAction, null);
+export function ForgotPasswordForm() {
+  const [state, formAction] = useActionState<ActionResult | null, FormData>(
+    requestPasswordResetAction,
+    null,
+  );
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Entrar</CardTitle>
-        <CardDescription>Acesse sua conta da Autoprocs Dispatcher.</CardDescription>
+        <CardTitle>Esqueci a senha</CardTitle>
+        <CardDescription>
+          Informe seu email e enviaremos um link para redefinir a senha.
+        </CardDescription>
       </CardHeader>
       <form action={formAction} className="space-y-4">
         <CardContent className="space-y-4">
@@ -51,37 +56,21 @@ export function LoginForm() {
               <p className="text-destructive text-xs">{state.fieldErrors.email}</p>
             )}
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Senha</Label>
-              <Link
-                href="/forgot-password"
-                className="text-primary text-xs hover:underline"
-              >
-                Esqueci a senha
-              </Link>
-            </div>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-            />
-            {state?.ok === false && state.fieldErrors?.password && (
-              <p className="text-destructive text-xs">{state.fieldErrors.password}</p>
-            )}
-          </div>
           {state?.ok === false && !state.fieldErrors && (
             <p className="text-destructive text-sm">{state.error}</p>
+          )}
+          {state?.ok === true && (
+            <p className="text-sm text-muted-foreground">
+              Se o email estiver cadastrado, você receberá em instantes um link para redefinir a
+              senha.
+            </p>
           )}
         </CardContent>
         <CardFooter className="flex-col gap-3">
           <SubmitButton />
           <p className="text-muted-foreground text-center text-sm">
-            Não tem conta?{" "}
-            <Link href="/signup" className="text-primary hover:underline">
-              Criar conta
+            <Link href="/login" className="text-primary hover:underline">
+              Voltar para entrar
             </Link>
           </p>
         </CardFooter>

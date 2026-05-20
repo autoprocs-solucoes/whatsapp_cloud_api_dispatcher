@@ -9,7 +9,8 @@
       "Bash(npx tsc *)",
       "Bash(npm audit *)",
       "Bash(npm uninstall *)",
-      "Bash(dir *)"
+      "Bash(dir *)",
+      "Bash(npx next *)"
     ]
   }
 }

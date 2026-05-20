@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { RecoveryRedirect } from "@/features/auth/recovery-redirect";
 
 import "./globals.css";
 
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <RecoveryRedirect />
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>

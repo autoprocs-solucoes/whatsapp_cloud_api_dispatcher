@@ -183,7 +183,7 @@ export async function inviteMemberAction(
 
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
     parsed.data.email,
-    { redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback` },
+    { redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/aceitar-convite` },
   );
 
   if (inviteError || !invited.user) {

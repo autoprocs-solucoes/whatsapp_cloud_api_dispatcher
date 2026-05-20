@@ -14,6 +14,7 @@ const PROTECTED_PREFIXES = [
   "/comunicados",
   "/configuracoes",
   "/onboarding",
+  "/aceitar-convite",
 ];
 
 const AUTH_ROUTES = ["/login", "/signup"];

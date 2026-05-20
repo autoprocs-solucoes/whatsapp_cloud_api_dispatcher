@@ -1,9 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { getCurrentUser } from "@/server/auth";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const user = await getCurrentUser();
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
     <main className="bg-background relative flex min-h-screen flex-col items-center justify-center px-6">
       <div className="w-full max-w-xl text-center">
@@ -18,12 +25,9 @@ export default function HomePage() {
           em um só lugar.
         </p>
         <div className="mt-8 flex items-center justify-center gap-3">
-          <Button size="lg" disabled>
-            Entrar
-          </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="/dashboard">
-              Ver app
+            <Link href="/login">
+              Entrar
               <ArrowRight className="size-4" />
             </Link>
           </Button>
