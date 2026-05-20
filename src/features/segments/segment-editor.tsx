@@ -54,10 +54,19 @@ const OP_LABELS: Record<Op, string> = {
   equals: "é igual a",
   not_equals: "diferente de",
   contains: "contém",
+  not_contains: "não contém",
+  starts_with: "começa com",
+  ends_with: "termina com",
   in: "está em",
+  not_in: "não está em",
   has_tag: "tem tag",
   not_has_tag: "não tem tag",
+  is_empty: "está vazio",
+  is_not_empty: "está preenchido",
 };
+
+const EMPTY_OPS: Op[] = ["is_empty", "is_not_empty"];
+const LIST_OPS: Op[] = ["in", "not_in"];
 
 function makeUid() {
   return Math.random().toString(36).slice(2, 10);
@@ -74,8 +83,19 @@ function fieldFromRule(rule: Rule): { fieldId: string; customKeyInput: string } 
 }
 
 function opsForField(fieldId: string): Op[] {
-  if (fieldId === "tags") return ["has_tag", "not_has_tag"];
-  return ["equals", "not_equals", "contains", "in"];
+  if (fieldId === "tags") return ["has_tag", "not_has_tag", "is_empty", "is_not_empty"];
+  return [
+    "equals",
+    "not_equals",
+    "contains",
+    "not_contains",
+    "starts_with",
+    "ends_with",
+    "in",
+    "not_in",
+    "is_empty",
+    "is_not_empty",
+  ];
 }
 
 function ruleToEditor(rule: Rule): EditorRule {
@@ -86,7 +106,7 @@ function ruleToEditor(rule: Rule): EditorRule {
     fieldId,
     customKeyInput,
     op: rule.op,
-    valueText: isList ? "" : String(rule.value),
+    valueText: isList || rule.value === undefined ? "" : String(rule.value),
     valueList: isList ? (rule.value as string[]) : [],
   };
 }
@@ -126,7 +146,11 @@ function buildRule(r: EditorRule): Rule | null {
   const field = buildField(r.fieldId, r.customKeyInput);
   if (!field) return null;
 
-  if (r.op === "in") {
+  if (EMPTY_OPS.includes(r.op)) {
+    return { field, op: r.op };
+  }
+
+  if (LIST_OPS.includes(r.op)) {
     if (r.valueList.length === 0) return null;
     return { field, op: r.op, value: r.valueList };
   }
@@ -218,7 +242,8 @@ export function SegmentEditor(props: Props) {
     setRules((rs) =>
       rs.map((r) => {
         if (r.uid !== uid) return r;
-        if (op === "in") return { ...r, op, valueText: "" };
+        if (EMPTY_OPS.includes(op)) return { ...r, op, valueText: "", valueList: [] };
+        if (LIST_OPS.includes(op)) return { ...r, op, valueText: "" };
         return { ...r, op, valueList: [] };
       }),
     );
@@ -331,7 +356,8 @@ export function SegmentEditor(props: Props) {
           {rules.map((r, i) => {
             const allowedOps = opsForField(r.fieldId);
             const isCustomOther = r.fieldId === CUSTOM_OTHER_ID;
-            const isInOp = r.op === "in";
+            const isListOp = LIST_OPS.includes(r.op);
+            const isEmptyOp = EMPTY_OPS.includes(r.op);
 
             const fieldGroups: ComboboxGroup[] = [
               { options: FIELD_OPTIONS.map((f) => ({ value: f.id, label: f.label })) },
@@ -380,7 +406,11 @@ export function SegmentEditor(props: Props) {
                   triggerClassName="min-w-[160px]"
                 />
 
-                {isInOp ? (
+                {isEmptyOp ? (
+                  <div className="text-muted-foreground flex h-9 flex-1 items-center px-1 text-xs italic">
+                    (sem valor)
+                  </div>
+                ) : isListOp ? (
                   <Input
                     value={r.valueList.join(", ")}
                     onChange={(e) =>

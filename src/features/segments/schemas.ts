@@ -17,21 +17,40 @@ export const opSchema = z.enum([
   "equals",
   "not_equals",
   "contains",
+  "not_contains",
+  "starts_with",
+  "ends_with",
   "in",
+  "not_in",
   "has_tag",
   "not_has_tag",
+  "is_empty",
+  "is_not_empty",
 ]);
+
+const TAG_OPS = ["has_tag", "not_has_tag"] as const;
+const LIST_OPS = ["in", "not_in"] as const;
+const EMPTY_OPS = ["is_empty", "is_not_empty"] as const;
+const TEXT_OPS = [
+  "equals",
+  "not_equals",
+  "contains",
+  "not_contains",
+  "starts_with",
+  "ends_with",
+] as const;
 
 export const ruleSchema = z
   .object({
     field: fieldSchema,
     op: opSchema,
-    value: z.union([z.string(), z.array(z.string().min(1)).min(1).max(100)]),
+    value: z.union([z.string(), z.array(z.string().min(1)).min(1).max(100)]).optional(),
   })
   .superRefine((rule, ctx) => {
-    const isTagOp = rule.op === "has_tag" || rule.op === "not_has_tag";
-    const isListOp = rule.op === "in";
-    const isTextOp = !isTagOp && !isListOp;
+    const isTagOp = (TAG_OPS as readonly string[]).includes(rule.op);
+    const isListOp = (LIST_OPS as readonly string[]).includes(rule.op);
+    const isEmptyOp = (EMPTY_OPS as readonly string[]).includes(rule.op);
+    const isTextOp = (TEXT_OPS as readonly string[]).includes(rule.op);
 
     if (isTagOp && rule.field.kind !== "tags") {
       ctx.addIssue({
@@ -40,17 +59,17 @@ export const ruleSchema = z
         path: ["op"],
       });
     }
-    if (!isTagOp && rule.field.kind === "tags") {
+    if (rule.field.kind === "tags" && !isTagOp && !isEmptyOp) {
       ctx.addIssue({
         code: "custom",
-        message: "Campo 'tags' só aceita has_tag/not_has_tag",
+        message: "Campo 'tags' só aceita has_tag/not_has_tag ou vazio/preenchido",
         path: ["op"],
       });
     }
     if (isListOp && !Array.isArray(rule.value)) {
-      ctx.addIssue({ code: "custom", message: "Operador 'in' exige lista", path: ["value"] });
+      ctx.addIssue({ code: "custom", message: "Operador de lista exige array", path: ["value"] });
     }
-    if (isTextOp && Array.isArray(rule.value)) {
+    if (isTextOp && (rule.value === undefined || Array.isArray(rule.value))) {
       ctx.addIssue({
         code: "custom",
         message: "Operadores de texto exigem valor string",
