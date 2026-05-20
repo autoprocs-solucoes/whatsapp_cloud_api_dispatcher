@@ -10,7 +10,8 @@
       "Bash(npm audit *)",
       "Bash(npm uninstall *)",
       "Bash(dir *)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(npx eslint *)"
     ]
   }
 }

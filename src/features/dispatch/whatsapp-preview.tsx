@@ -20,6 +20,8 @@ type Props = {
   /** Para placeholders sem valor, mostrar este label (ex: nome da coluna). Por placeholder. */
   placeholderLabels?: Record<string, string>;
   className?: string;
+  /** Override do tamanho da área de chat (default: min-h-[120px] max-h-[260px]). */
+  chatClassName?: string;
 };
 
 function renderText(
@@ -77,6 +79,7 @@ export function WhatsAppPreview({
   resolved = {},
   placeholderLabels = {},
   className,
+  chatClassName,
 }: Props) {
   const hasContent = Boolean(headerText || bodyText || footerText || (buttons && buttons.length > 0));
 
@@ -105,7 +108,10 @@ export function WhatsAppPreview({
 
       {/* Chat area */}
       <div
-        className="relative max-h-[260px] min-h-[120px] overflow-y-auto px-2.5 py-2"
+        className={cn(
+          "relative overflow-y-auto px-2.5 py-2",
+          chatClassName ?? "max-h-[260px] min-h-[120px]",
+        )}
         style={{
           backgroundImage:
             "radial-gradient(circle at 20% 15%, rgba(0,0,0,0.04) 0, transparent 40%), radial-gradient(circle at 80% 70%, rgba(0,0,0,0.04) 0, transparent 40%)",

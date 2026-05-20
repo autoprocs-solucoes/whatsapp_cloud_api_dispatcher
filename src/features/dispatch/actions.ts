@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
 import { getMetaConnection } from "@/server/meta";
+import { env, serverEnv } from "@/lib/env";
 import {
   GraphApiError,
   extractPlaceholders,
@@ -113,6 +114,7 @@ async function loadTemplate(
 // ----------------------------------------------------------------------------
 export type DispatchListItem = Dispatch & {
   template_name: string | null;
+  segment_name: string | null;
   counts: Record<string, number>;
 };
 
@@ -123,7 +125,7 @@ export async function listDispatches(): Promise<DispatchListItem[]> {
   const admin = createAdminClient();
   const { data: dispatches } = await admin
     .from("dispatch")
-    .select("*, template:template_id(name)")
+    .select("*, template:template_id(name), segment:segment_id(name)")
     .eq("workspace_id", ctx.workspaceId)
     .order("created_at", { ascending: false })
     .limit(100);
@@ -144,11 +146,14 @@ export async function listDispatches(): Promise<DispatchListItem[]> {
   });
 
   return dispatches.map((d) => {
-    const tpl = d.template as { name: string } | null;
+    const tpl = (d as { template?: { name: string } | null }).template;
+    const seg = (d as { segment?: { name: string } | null }).segment;
     return {
       ...d,
       template: undefined,
+      segment: undefined,
       template_name: tpl?.name ?? null,
+      segment_name: seg?.name ?? null,
       counts: byDispatch[d.id] ?? {},
     } as DispatchListItem;
   });
@@ -160,6 +165,7 @@ export type DispatchDetail = {
   recipients: DispatchRecipient[];
   totalRecipients: number;
   counts: Record<string, number>;
+  reactionCount: number;
 };
 
 export async function getDispatch(
@@ -210,12 +216,19 @@ export async function getDispatch(
     counts[r.status] = (counts[r.status] ?? 0) + 1;
   });
 
+  const { count: reactionCount } = await admin
+    .from("dispatch_recipient")
+    .select("*", { count: "exact", head: true })
+    .eq("dispatch_id", id)
+    .not("reaction_emoji", "is", null);
+
   return {
     dispatch,
     template,
     recipients: recipients ?? [],
     totalRecipients: count ?? 0,
     counts,
+    reactionCount: reactionCount ?? 0,
   };
 }
 
@@ -382,17 +395,47 @@ export async function createDispatchAction(
 }
 
 // ----------------------------------------------------------------------------
-// Execute dispatch (loop sequencial)
+// Enqueue dispatch (marca como `queued` e kicka worker da Edge Function).
+// Worker (supabase/functions/process-dispatch-queue) processa em background;
+// pg_cron garante continuidade mesmo se o kick falhar.
 // ----------------------------------------------------------------------------
-const RATE_LIMIT_DELAY_MS = 300;
+function getWorkerUrl(): string | null {
+  // NEXT_PUBLIC_SUPABASE_URL é tipo https://<ref>.supabase.co
+  const base = env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "");
+  if (!base) return null;
+  return `${base}/functions/v1/process-dispatch-queue`;
+}
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+async function kickWorker(): Promise<void> {
+  const url = getWorkerUrl();
+  const key = serverEnv.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  try {
+    // Fire-and-forget com timeout curto: se o worker estiver lento, voltamos
+    // pra UI sem bloquear. Cron garante que continua sendo processado.
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 1500);
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: "{}",
+      signal: controller.signal,
+    })
+      .catch(() => {
+        /* ok — cron pega no próximo minuto */
+      })
+      .finally(() => clearTimeout(t));
+  } catch {
+    /* idem */
+  }
 }
 
 export async function executeDispatchAction(
   formData: FormData,
-): Promise<ActionResult<{ sent: number; failed: number }>> {
+): Promise<ActionResult<{ status: Dispatch["status"]; queued: number }>> {
   const ctx = await ensureMember();
   if (!ctx) return { ok: false, error: "Não autenticado" };
 
@@ -412,93 +455,36 @@ export async function executeDispatchAction(
     return { ok: false, error: `Comunicado já está ${dispatch.status}` };
   }
 
+  // Validações antes de enfileirar — pra dar erro síncrono cedo.
   const template = await loadTemplate(ctx.workspaceId, dispatch.template_id);
   if (!template) return { ok: false, error: "Template do comunicado não existe mais" };
 
   const conn = await getMetaConnection(ctx.workspaceId);
   if (!conn) return { ok: false, error: "Workspace sem conexão Meta" };
 
-  // Lock atômico: UPDATE condicional `draft → running` e checa linhas afetadas.
-  // Se 0 linhas, outro request já pegou — evita double-send em race.
+  // Transição atômica draft → queued. Se 0 linhas, outro request já enfileirou.
   const { data: locked, error: lockErr } = await admin
     .from("dispatch")
-    .update({ status: "running", started_at: new Date().toISOString() })
+    .update({ status: "queued" })
     .eq("id", dispatch.id)
     .eq("status", "draft")
     .select("id");
-  if (lockErr) return { ok: false, error: `Falha ao marcar como running: ${lockErr.message}` };
+  if (lockErr) return { ok: false, error: `Falha ao enfileirar: ${lockErr.message}` };
   if (!locked || locked.length === 0) {
     return { ok: false, error: "Comunicado já está sendo executado" };
   }
 
-  const { data: recipients } = await admin
+  const { count: queued } = await admin
     .from("dispatch_recipient")
-    .select("*")
+    .select("*", { count: "exact", head: true })
     .eq("dispatch_id", dispatch.id)
     .eq("status", "queued");
 
-  const queue = recipients ?? [];
-  const headerPlaceholders = extractPlaceholders(template.header_text);
-  const bodyPlaceholders = extractPlaceholders(template.body_text);
-
-  let sent = 0;
-  let failed = 0;
-
-  for (const r of queue) {
-    const payload = (r.payload ?? {}) as Record<string, string>;
-    const headerParameters = buildParameters(headerPlaceholders, payload, "header");
-    const bodyParameters = buildParameters(bodyPlaceholders, payload, "body");
-
-    try {
-      const res = await sendTemplate({
-        phoneNumberId: dispatch.phone_number_id,
-        to: r.phone_e164,
-        token: conn.connection.access_token,
-        templateName: template.name,
-        language: template.language,
-        headerParameters,
-        bodyParameters,
-      });
-      await admin
-        .from("dispatch_recipient")
-        .update({
-          status: "sent",
-          meta_message_id: res.messageId,
-          sent_at: new Date().toISOString(),
-        })
-        .eq("id", r.id);
-      sent++;
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Erro desconhecido";
-      const code = e instanceof GraphApiError ? String(e.status) : "exception";
-      await admin
-        .from("dispatch_recipient")
-        .update({
-          status: "failed",
-          error_code: code,
-          error_message: message.slice(0, 500),
-          failed_at: new Date().toISOString(),
-        })
-        .eq("id", r.id);
-      failed++;
-    }
-
-    if (RATE_LIMIT_DELAY_MS > 0) await sleep(RATE_LIMIT_DELAY_MS);
-  }
-
-  const finalStatus: Dispatch["status"] =
-    failed > 0 && sent === 0 ? "failed" : "done";
-
-  await admin
-    .from("dispatch")
-    .update({
-      status: finalStatus,
-      finished_at: new Date().toISOString(),
-    })
-    .eq("id", dispatch.id);
+  // Kick imediato no worker — não-bloqueante.
+  void kickWorker();
 
   revalidatePath("/comunicados");
   revalidatePath(`/comunicados/${dispatch.id}`);
-  return { ok: true, data: { sent, failed } };
+  return { ok: true, data: { status: "queued", queued: queued ?? 0 } };
 }
 

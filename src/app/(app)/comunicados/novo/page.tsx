@@ -6,13 +6,20 @@ import { listSegments, listCustomFieldKeys } from "@/features/segments/actions";
 import { getMetaConnection } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
 
-export default async function NovoComunicadoPage() {
+type SearchParams = Promise<{ template?: string }>;
+
+export default async function NovoComunicadoPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const workspace = await requireActiveWorkspace();
-  const [templates, segments, customKeys, conn] = await Promise.all([
+  const [templates, segments, customKeys, conn, sp] = await Promise.all([
     listTemplatesForWorkspace(),
     listSegments(),
     listCustomFieldKeys(),
     getMetaConnection(workspace.id),
+    searchParams,
   ]);
 
   if (!conn) {
@@ -35,6 +42,7 @@ export default async function NovoComunicadoPage() {
         phoneNumbers={conn.phoneNumbers}
         segments={segments}
         customKeys={customKeys}
+        initialTemplateId={sp.template}
       />
     </div>
   );

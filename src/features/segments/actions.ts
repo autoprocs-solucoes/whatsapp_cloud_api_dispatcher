@@ -55,6 +55,41 @@ export async function listSegments(): Promise<Segment[]> {
   return data ?? [];
 }
 
+export type SegmentWithCount = Segment & { contact_count: number | null };
+
+export async function listSegmentsWithCounts(): Promise<SegmentWithCount[]> {
+  const ctx = await ensureMember();
+  if (!ctx) return [];
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("segment")
+    .select("*")
+    .eq("workspace_id", ctx.workspaceId)
+    .order("created_at", { ascending: false });
+  const segments = data ?? [];
+
+  const counts = await Promise.all(
+    segments.map(async (s) => {
+      let rules: Rules;
+      try {
+        rules = rulesSchema.parse(s.rules);
+      } catch {
+        return null;
+      }
+      const base = admin
+        .from("contact")
+        .select("*", { count: "exact", head: true })
+        .eq("workspace_id", ctx.workspaceId);
+      const query = applyRules(base, rules);
+      const { count, error } = await query;
+      if (error) return null;
+      return count ?? 0;
+    }),
+  );
+
+  return segments.map((s, i) => ({ ...s, contact_count: counts[i] }));
+}
+
 export async function getSegment(id: string): Promise<Segment | null> {
   const ctx = await ensureMember();
   if (!ctx) return null;
@@ -115,6 +150,104 @@ export async function previewCountAction(rulesJson: string): Promise<ActionResul
   const { count, error } = await query;
   if (error) return { ok: false, error: `Falha na consulta: ${error.message}` };
   return { ok: true, data: { count: count ?? 0 } };
+}
+
+// ----------------------------------------------------------------------------
+// Preview de contatos (validação): por segmento salvo OU por regras ad-hoc
+// ----------------------------------------------------------------------------
+export type SegmentContactPreview = {
+  id: string;
+  full_name: string | null;
+  phone_e164: string;
+  tags: string[];
+};
+
+type ContactPreviewPayload = {
+  contacts: SegmentContactPreview[];
+  total: number;
+  truncated: boolean;
+};
+
+async function runContactPreview(
+  workspaceId: string,
+  rules: Rules,
+  limit: number,
+): Promise<ActionResult<ContactPreviewPayload>> {
+  const admin = createAdminClient();
+  const base = admin
+    .from("contact")
+    .select("id, full_name, phone_e164, tags", { count: "exact" })
+    .eq("workspace_id", workspaceId)
+    .order("full_name", { ascending: true, nullsFirst: false })
+    .limit(limit);
+  const query = applyRules(base, rules);
+  const { data, count, error } = await query;
+  if (error) return { ok: false, error: `Falha na consulta: ${error.message}` };
+
+  type Row = {
+    id: string;
+    full_name: string | null;
+    phone_e164: string;
+    tags: string[] | null;
+  };
+  const rows = (data ?? []) as Row[];
+  const total = count ?? rows.length;
+  return {
+    ok: true,
+    data: {
+      contacts: rows.map((c) => ({
+        id: c.id,
+        full_name: c.full_name,
+        phone_e164: c.phone_e164,
+        tags: c.tags ?? [],
+      })),
+      total,
+      truncated: total > rows.length,
+    },
+  };
+}
+
+export async function previewSegmentContactsAction(
+  segmentId: string,
+  limit = 200,
+): Promise<ActionResult<ContactPreviewPayload>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const admin = createAdminClient();
+  const { data: segment } = await admin
+    .from("segment")
+    .select("rules")
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("id", segmentId)
+    .maybeSingle();
+  if (!segment) return { ok: false, error: "Segmento não encontrado" };
+
+  let rules: Rules;
+  try {
+    rules = rulesSchema.parse(segment.rules);
+  } catch {
+    rules = { match: "and", rules: [] };
+  }
+
+  return runContactPreview(ctx.workspaceId, rules, limit);
+}
+
+export async function previewContactsByRulesAction(
+  rulesJson: string,
+  limit = 200,
+): Promise<ActionResult<ContactPreviewPayload>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  let rules: Rules;
+  try {
+    rules = rulesSchema.parse(JSON.parse(rulesJson));
+  } catch {
+    return { ok: false, error: "Regras inválidas" };
+  }
+
+  return runContactPreview(ctx.workspaceId, rules, limit);
 }
 
 // ----------------------------------------------------------------------------

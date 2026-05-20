@@ -6,10 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DispatchExecutePanel } from "@/features/dispatch/dispatch-execute-panel";
 import { getDispatch } from "@/features/dispatch/actions";
+import { ReadRateInfo } from "@/features/dashboard/read-rate-info";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
+  queued: "Na fila",
   running: "Em execução",
   done: "Concluído",
   failed: "Falhou",
@@ -31,8 +33,8 @@ function statusBadgeVariant(status: string): "default" | "secondary" | "destruct
     case "read":
     case "sent":
       return "default";
-    case "running":
     case "queued":
+    case "running":
       return "secondary";
     case "failed":
       return "destructive";
@@ -60,7 +62,7 @@ export default async function ComunicadoDetalhe({
   const detail = await getDispatch(id, { page, pageSize: 50, statusFilter });
   if (!detail) notFound();
 
-  const { dispatch, template, recipients, totalRecipients, counts } = detail;
+  const { dispatch, template, recipients, totalRecipients, counts, reactionCount } = detail;
   const totalPages = Math.max(1, Math.ceil(totalRecipients / 50));
 
   const total = dispatch.total_recipients || 0;
@@ -104,8 +106,14 @@ export default async function ComunicadoDetalhe({
         </div>
       </div>
 
-      {dispatch.status === "draft" && (
-        <DispatchExecutePanel dispatchId={dispatch.id} total={dispatch.total_recipients} />
+      {(dispatch.status === "draft" ||
+        dispatch.status === "queued" ||
+        dispatch.status === "running") && (
+        <DispatchExecutePanel
+          dispatchId={dispatch.id}
+          total={dispatch.total_recipients}
+          status={dispatch.status}
+        />
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -125,7 +133,7 @@ export default async function ComunicadoDetalhe({
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <div className="bg-muted/40 rounded-md border p-3">
           <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
             Taxa de envio
@@ -145,12 +153,24 @@ export default async function ComunicadoDetalhe({
           </p>
         </div>
         <div className="bg-muted/40 rounded-md border p-3">
-          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            Taxa de leitura
-          </p>
+          <div className="flex items-center justify-center gap-1">
+            <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+              Taxa de leitura
+            </p>
+            <ReadRateInfo />
+          </div>
           <p className="text-foreground text-lg font-semibold">{pct(readCount)}%</p>
           <p className="text-muted-foreground text-[10px]">
             {readCount} de {total}
+          </p>
+        </div>
+        <div className="bg-muted/40 rounded-md border p-3">
+          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+            Reações
+          </p>
+          <p className="text-foreground text-lg font-semibold">{pct(reactionCount)}%</p>
+          <p className="text-muted-foreground text-[10px]">
+            {reactionCount} de {total}
           </p>
         </div>
         <div className="border-destructive/30 bg-destructive/5 rounded-md border p-3">
@@ -195,13 +215,14 @@ export default async function ComunicadoDetalhe({
                 <th className="px-3 py-2 text-left font-medium">Enviado em</th>
                 <th className="px-3 py-2 text-left font-medium">Entregue em</th>
                 <th className="px-3 py-2 text-left font-medium">Lido em</th>
+                <th className="px-3 py-2 text-left font-medium">Reação</th>
                 <th className="px-3 py-2 text-left font-medium">Erro</th>
               </tr>
             </thead>
             <tbody>
               {recipients.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-muted-foreground px-3 py-8 text-center">
+                  <td colSpan={7} className="text-muted-foreground px-3 py-8 text-center">
                     Nenhum destinatário nesse filtro.
                   </td>
                 </tr>
@@ -222,6 +243,22 @@ export default async function ComunicadoDetalhe({
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs">
                       {r.read_at ? new Date(r.read_at).toLocaleString("pt-BR") : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {r.reaction_emoji ? (
+                        <span
+                          title={
+                            r.reaction_at
+                              ? new Date(r.reaction_at).toLocaleString("pt-BR")
+                              : undefined
+                          }
+                          className="text-base leading-none"
+                        >
+                          {r.reaction_emoji}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs">
                       {r.error_message ?? "—"}

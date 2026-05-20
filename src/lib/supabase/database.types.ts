@@ -419,7 +419,7 @@ export type Database = {
           recipient_source: "segment" | "manual";
           manual_phones: string[];
           variable_mapping: Json;
-          status: "draft" | "running" | "done" | "failed" | "canceled";
+          status: "draft" | "queued" | "running" | "done" | "failed" | "canceled";
           total_recipients: number;
           created_by: string | null;
           created_at: string;
@@ -436,7 +436,7 @@ export type Database = {
           recipient_source: "segment" | "manual";
           manual_phones?: string[];
           variable_mapping?: Json;
-          status?: "draft" | "running" | "done" | "failed" | "canceled";
+          status?: "draft" | "queued" | "running" | "done" | "failed" | "canceled";
           total_recipients?: number;
           created_by?: string | null;
           created_at?: string;
@@ -453,7 +453,7 @@ export type Database = {
           recipient_source?: "segment" | "manual";
           manual_phones?: string[];
           variable_mapping?: Json;
-          status?: "draft" | "running" | "done" | "failed" | "canceled";
+          status?: "draft" | "queued" | "running" | "done" | "failed" | "canceled";
           total_recipients?: number;
           created_by?: string | null;
           created_at?: string;
@@ -500,6 +500,10 @@ export type Database = {
           delivered_at: string | null;
           read_at: string | null;
           failed_at: string | null;
+          claimed_at: string | null;
+          attempts: number;
+          reaction_emoji: string | null;
+          reaction_at: string | null;
         };
         Insert: {
           id?: string;
@@ -515,6 +519,10 @@ export type Database = {
           delivered_at?: string | null;
           read_at?: string | null;
           failed_at?: string | null;
+          claimed_at?: string | null;
+          attempts?: number;
+          reaction_emoji?: string | null;
+          reaction_at?: string | null;
         };
         Update: {
           id?: string;
@@ -530,6 +538,10 @@ export type Database = {
           delivered_at?: string | null;
           read_at?: string | null;
           failed_at?: string | null;
+          claimed_at?: string | null;
+          attempts?: number;
+          reaction_emoji?: string | null;
+          reaction_at?: string | null;
         };
         Relationships: [
           {
@@ -560,6 +572,14 @@ export type Database = {
       is_workspace_owner: {
         Args: { p_workspace_id: string };
         Returns: boolean;
+      };
+      claim_dispatch_recipients: {
+        Args: {
+          p_dispatch_id: string;
+          p_limit: number;
+          p_stale_after?: string;
+        };
+        Returns: Database["public"]["Tables"]["dispatch_recipient"]["Row"][];
       };
     };
     Enums: {

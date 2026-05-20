@@ -12,6 +12,8 @@ const COLUMNS = [
   "delivered_at",
   "read_at",
   "failed_at",
+  "reaction_emoji",
+  "reaction_at",
   "error_code",
   "error_message",
 ] as const;

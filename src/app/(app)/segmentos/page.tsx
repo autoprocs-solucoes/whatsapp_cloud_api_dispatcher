@@ -3,10 +3,10 @@ import { Plus, Tag } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SegmentsTable } from "@/features/segments/segments-table";
-import { listSegments } from "@/features/segments/actions";
+import { listSegmentsWithCounts } from "@/features/segments/actions";
 
 export default async function SegmentosPage() {
-  const segments = await listSegments();
+  const segments = await listSegmentsWithCounts();
 
   return (
     <div className="space-y-6">

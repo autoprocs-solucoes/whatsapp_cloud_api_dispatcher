@@ -63,6 +63,7 @@ export default async function ComunicadosPage() {
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Template</th>
                 <th className="px-3 py-2 text-left font-medium">Origem</th>
+                <th className="px-3 py-2 text-left font-medium">Segmentação</th>
                 <th className="px-3 py-2 text-left font-medium">Total</th>
                 <th className="px-3 py-2 text-left font-medium">Enviados</th>
                 <th className="px-3 py-2 text-left font-medium">Falhas</th>
@@ -86,6 +87,19 @@ export default async function ComunicadosPage() {
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs">
                       {d.recipient_source === "segment" ? "Segmento" : "Lista manual"}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {d.recipient_source === "segment" ? (
+                        d.segment_name ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            {d.segment_name}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">Segmento removido</span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-xs">{d.total_recipients}</td>
                     <td className="px-3 py-2 text-xs">{positives}</td>

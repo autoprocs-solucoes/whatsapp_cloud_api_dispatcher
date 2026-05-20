@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, Loader2, Send, TestTube } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +19,10 @@ import {
   WhatsAppPreview,
   type PreviewButton,
 } from "@/features/dispatch/whatsapp-preview";
+import {
+  previewSegmentContactsAction,
+  type SegmentContactPreview,
+} from "@/features/segments/actions";
 import { extractPlaceholders } from "@/lib/meta/placeholders";
 import { cn } from "@/lib/utils";
 import type {
@@ -43,6 +47,7 @@ type Props = {
   phoneNumbers: WorkspacePhoneNumber[];
   segments: Segment[];
   customKeys: string[];
+  initialTemplateId?: string;
 };
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -69,12 +74,21 @@ function decodeColumn(id: ColumnId): VariableColumn | null {
   return null;
 }
 
-export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }: Props) {
+export function DispatchWizard({
+  templates,
+  phoneNumbers,
+  segments,
+  customKeys,
+  initialTemplateId,
+}: Props) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>(1);
+  const hasInitialTemplate = Boolean(
+    initialTemplateId && templates.some((t) => t.id === initialTemplateId),
+  );
+  const [step, setStep] = useState<Step>(hasInitialTemplate ? 2 : 1);
   const [isPending, startTransition] = useTransition();
 
-  const [templateId, setTemplateId] = useState("");
+  const [templateId, setTemplateId] = useState(hasInitialTemplate ? initialTemplateId! : "");
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [mappingState, setMappingState] = useState<
     Record<string, { columnId: ColumnId; fallback: string }>
@@ -83,6 +97,39 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
   const [segmentId, setSegmentId] = useState("");
   const [manualPhonesText, setManualPhonesText] = useState("");
   const [testPhone, setTestPhone] = useState("");
+
+  const [segmentPreview, setSegmentPreview] = useState<{
+    contacts: SegmentContactPreview[];
+    total: number;
+    truncated: boolean;
+  } | null>(null);
+  const [segmentPreviewLoading, setSegmentPreviewLoading] = useState(false);
+  const [segmentPreviewError, setSegmentPreviewError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (recipientSource !== "segment" || !segmentId) {
+      setSegmentPreview(null);
+      setSegmentPreviewError(null);
+      setSegmentPreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSegmentPreviewLoading(true);
+    setSegmentPreviewError(null);
+    previewSegmentContactsAction(segmentId).then((res) => {
+      if (cancelled) return;
+      setSegmentPreviewLoading(false);
+      if (!res.ok) {
+        setSegmentPreview(null);
+        setSegmentPreviewError(res.error);
+        return;
+      }
+      setSegmentPreview(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [recipientSource, segmentId]);
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === templateId) ?? null,
@@ -478,20 +525,101 @@ export function DispatchWizard({ templates, phoneNumbers, segments, customKeys }
             </div>
 
             {recipientSource === "segment" ? (
-              <div className="space-y-2">
-                <Label>Segmento</Label>
-                <Combobox
-                  value={segmentId}
-                  onChange={setSegmentId}
-                  options={segmentOptions}
-                  placeholder={
-                    segments.length === 0
-                      ? "Nenhum segmento criado ainda"
-                      : "Selecione…"
-                  }
-                  searchPlaceholder="Buscar segmento…"
-                  triggerClassName="w-full max-w-md"
-                />
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Segmento</Label>
+                  <Combobox
+                    value={segmentId}
+                    onChange={setSegmentId}
+                    options={segmentOptions}
+                    placeholder={
+                      segments.length === 0
+                        ? "Nenhum segmento criado ainda"
+                        : "Selecione…"
+                    }
+                    searchPlaceholder="Buscar segmento…"
+                    triggerClassName="w-full max-w-md"
+                  />
+                </div>
+
+                {segmentId && (
+                  <div className="space-y-2 rounded-md border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Contatos no segmento
+                      </p>
+                      {segmentPreviewLoading ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Loader2 className="size-3 animate-spin" />
+                          carregando…
+                        </span>
+                      ) : segmentPreview ? (
+                        <span className="text-xs text-muted-foreground">
+                          <strong className="text-foreground">{segmentPreview.total}</strong>{" "}
+                          contato(s)
+                          {segmentPreview.truncated &&
+                            ` (mostrando ${segmentPreview.contacts.length})`}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {segmentPreviewError && (
+                      <p className="text-destructive text-xs">{segmentPreviewError}</p>
+                    )}
+
+                    {segmentPreview && segmentPreview.contacts.length === 0 && !segmentPreviewLoading && (
+                      <p className="text-muted-foreground text-xs italic">
+                        Nenhum contato bate com as regras do segmento.
+                      </p>
+                    )}
+
+                    {segmentPreview && segmentPreview.contacts.length > 0 && (
+                      <div className="max-h-64 overflow-y-auto rounded-md border">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/40 sticky top-0">
+                            <tr className="text-muted-foreground text-left">
+                              <th className="px-2 py-1.5 font-medium">Nome</th>
+                              <th className="px-2 py-1.5 font-medium">Telefone</th>
+                              <th className="px-2 py-1.5 font-medium">Tags</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {segmentPreview.contacts.map((c) => (
+                              <tr key={c.id} className="border-t">
+                                <td className="px-2 py-1.5">
+                                  {c.full_name ?? (
+                                    <span className="text-muted-foreground italic">sem nome</span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-1.5 font-mono">{c.phone_e164}</td>
+                                <td className="px-2 py-1.5">
+                                  {c.tags.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {c.tags.map((t) => (
+                                        <span
+                                          key={t}
+                                          className="bg-muted rounded px-1.5 py-0.5 text-[10px]"
+                                        >
+                                          {t}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <p className="text-muted-foreground text-[10px]">
+                      Lista já desconta opt-outs. Confira antes de avançar.
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-2">

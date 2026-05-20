@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   createSegmentAction,
-  previewCountAction,
+  previewContactsByRulesAction,
   updateSegmentAction,
+  type SegmentContactPreview,
 } from "@/features/segments/actions";
 import {
   rulesSchema,
@@ -189,6 +190,8 @@ export function SegmentEditor(props: Props) {
   );
   const [rules, setRules] = useState<EditorRule[]>(initialEditorRules);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [previewContacts, setPreviewContacts] = useState<SegmentContactPreview[]>([]);
+  const [previewTruncated, setPreviewTruncated] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -198,21 +201,27 @@ export function SegmentEditor(props: Props) {
   useEffect(() => {
     if (!compiledRulesJson) {
       setPreviewCount(null);
+      setPreviewContacts([]);
+      setPreviewTruncated(false);
       setPreviewError(null);
       return;
     }
     let cancelled = false;
     setPreviewLoading(true);
     const handle = setTimeout(async () => {
-      const res = await previewCountAction(compiledRulesJson);
+      const res = await previewContactsByRulesAction(compiledRulesJson);
       if (cancelled) return;
       setPreviewLoading(false);
       if (!res.ok) {
         setPreviewError(res.error);
         setPreviewCount(null);
+        setPreviewContacts([]);
+        setPreviewTruncated(false);
       } else {
         setPreviewError(null);
-        setPreviewCount(res.data.count);
+        setPreviewCount(res.data.total);
+        setPreviewContacts(res.data.contacts);
+        setPreviewTruncated(res.data.truncated);
       }
     }, 400);
 
@@ -473,6 +482,85 @@ export function SegmentEditor(props: Props) {
             "Criar segmento"
           )}
         </Button>
+      </div>
+
+      <div className="space-y-2 rounded-md border p-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+            Contatos que entram no segmento
+          </p>
+          {previewLoading ? (
+            <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+              <Loader2 className="size-3 animate-spin" />
+              carregando…
+            </span>
+          ) : previewCount !== null ? (
+            <span className="text-muted-foreground text-xs">
+              <strong className="text-foreground">{previewCount}</strong> contato(s)
+              {previewTruncated && ` (mostrando ${previewContacts.length})`}
+            </span>
+          ) : null}
+        </div>
+
+        {previewError && <p className="text-destructive text-xs">{previewError}</p>}
+
+        {!compiledRulesJson && !previewError && (
+          <p className="text-muted-foreground text-xs italic">
+            Complete as regras pra ver a lista.
+          </p>
+        )}
+
+        {compiledRulesJson && !previewLoading && previewContacts.length === 0 && !previewError && (
+          <p className="text-muted-foreground text-xs italic">
+            Nenhum contato bate com as regras.
+          </p>
+        )}
+
+        {previewContacts.length > 0 && (
+          <div className="max-h-72 overflow-y-auto rounded-md border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 sticky top-0">
+                <tr className="text-muted-foreground text-left">
+                  <th className="px-2 py-1.5 font-medium">Nome</th>
+                  <th className="px-2 py-1.5 font-medium">Telefone</th>
+                  <th className="px-2 py-1.5 font-medium">Tags</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewContacts.map((c) => (
+                  <tr key={c.id} className="border-t">
+                    <td className="px-2 py-1.5">
+                      {c.full_name ?? (
+                        <span className="text-muted-foreground italic">sem nome</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 font-mono">{c.phone_e164}</td>
+                    <td className="px-2 py-1.5">
+                      {c.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {c.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="bg-muted rounded px-1.5 py-0.5 text-[10px]"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p className="text-muted-foreground text-[10px]">
+          Contagem já desconta opt-outs. Lista limitada a 200 — total mostra o número real.
+        </p>
       </div>
     </div>
   );

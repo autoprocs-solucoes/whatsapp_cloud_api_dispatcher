@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Pencil, Search, Trash2, UserX } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Columns3,
+  Pencil,
+  Search,
+  Trash2,
+  UserX,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -18,11 +26,32 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { EditContactDialog } from "@/features/contacts/edit-contact-dialog";
 import { cn } from "@/lib/utils";
 import { deleteContactAction, toggleOptOutAction } from "@/features/contacts/actions";
 import type { Contact } from "@/lib/supabase/database.types";
+
+type ColumnDef = { key: string; label: string; group: "base" | "custom" };
+
+const BASE_COLUMNS: ColumnDef[] = [
+  { key: "full_name", label: "Nome", group: "base" },
+  { key: "phone_e164", label: "Telefone", group: "base" },
+  { key: "tags", label: "Tags", group: "base" },
+  { key: "opt_out", label: "Status", group: "base" },
+  { key: "created_at", label: "Criado em", group: "base" },
+];
+
+const LOCKED_COLUMN = "phone_e164";
+const STORAGE_KEY = "contacts-table-visible-columns";
 
 type Props = {
   contacts: Contact[];
@@ -41,6 +70,63 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
   const optOutFilter = (searchParams.get("optOutFilter") ?? "all") as "all" | "active" | "opt_out";
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const customColumns = useMemo<ColumnDef[]>(() => {
+    const keys = new Set<string>();
+    contacts.forEach((c) => {
+      const cf = (c.custom_fields ?? {}) as Record<string, unknown>;
+      Object.keys(cf).forEach((k) => keys.add(k));
+    });
+    return Array.from(keys)
+      .sort()
+      .map((k) => ({ key: `cf:${k}`, label: k, group: "custom" as const }));
+  }, [contacts]);
+
+  const allColumns = useMemo(() => [...BASE_COLUMNS, ...customColumns], [customColumns]);
+
+  const [visible, setVisible] = useState<Set<string>>(
+    () => new Set(BASE_COLUMNS.map((c) => c.key)),
+  );
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw) as unknown;
+        if (Array.isArray(arr)) {
+          const next = new Set(arr.filter((v): v is string => typeof v === "string"));
+          next.add(LOCKED_COLUMN);
+          setVisible(next);
+        }
+      }
+    } catch {
+      // ignore
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(visible)));
+    } catch {
+      // ignore
+    }
+  }, [visible, hydrated]);
+
+  function toggleColumn(key: string, checked: boolean) {
+    if (key === LOCKED_COLUMN) return;
+    setVisible((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
+
+  const isVisible = (key: string) => visible.has(key);
+  const visibleColCount = allColumns.filter((c) => isVisible(c.key)).length + 1;
 
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -107,6 +193,46 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
               {f === "all" ? "Todos" : f === "active" ? "Ativos" : "Opt-out"}
             </Button>
           ))}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm">
+                <Columns3 className="mr-1 size-3.5" /> Colunas
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Colunas</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {BASE_COLUMNS.map((col) => (
+                <DropdownMenuCheckboxItem
+                  key={col.key}
+                  checked={isVisible(col.key)}
+                  disabled={col.key === LOCKED_COLUMN}
+                  onCheckedChange={(v) => toggleColumn(col.key, Boolean(v))}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {col.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {customColumns.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-muted-foreground text-xs">
+                    Campos custom
+                  </DropdownMenuLabel>
+                  {customColumns.map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.key}
+                      checked={isVisible(col.key)}
+                      onCheckedChange={(v) => toggleColumn(col.key, Boolean(v))}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {col.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -114,53 +240,95 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-xs">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">Nome</th>
-              <th className="px-3 py-2 text-left font-medium">Telefone</th>
-              <th className="px-3 py-2 text-left font-medium">Tags</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-              <th className="px-3 py-2 text-left font-medium">Criado em</th>
+              {isVisible("full_name") && (
+                <th className="px-3 py-2 text-left font-medium">Nome</th>
+              )}
+              {isVisible("phone_e164") && (
+                <th className="px-3 py-2 text-left font-medium">Telefone</th>
+              )}
+              {isVisible("tags") && (
+                <th className="px-3 py-2 text-left font-medium">Tags</th>
+              )}
+              {isVisible("opt_out") && (
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+              )}
+              {isVisible("created_at") && (
+                <th className="px-3 py-2 text-left font-medium">Criado em</th>
+              )}
+              {customColumns.map(
+                (col) =>
+                  isVisible(col.key) && (
+                    <th
+                      key={col.key}
+                      className="px-3 py-2 text-left font-medium"
+                      title={col.label}
+                    >
+                      {col.label}
+                    </th>
+                  ),
+              )}
               <th className="px-3 py-2 text-right font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
             {contacts.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-muted-foreground px-3 py-8 text-center">
+                <td colSpan={visibleColCount} className="text-muted-foreground px-3 py-8 text-center">
                   Nenhum contato encontrado.
                 </td>
               </tr>
             ) : (
               contacts.map((c) => (
                 <tr key={c.id} className={cn("border-t", c.opt_out && "opacity-60")}>
-                  <td className="px-3 py-2">{c.full_name ?? "—"}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{c.phone_e164}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {c.tags.length === 0 ? (
-                        <span className="text-muted-foreground text-xs">—</span>
+                  {isVisible("full_name") && (
+                    <td className="px-3 py-2">{c.full_name ?? "—"}</td>
+                  )}
+                  {isVisible("phone_e164") && (
+                    <td className="px-3 py-2 font-mono text-xs">{c.phone_e164}</td>
+                  )}
+                  {isVisible("tags") && (
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {c.tags.length === 0 ? (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        ) : (
+                          c.tags.map((t) => (
+                            <Badge key={t} variant="secondary" className="text-[10px]">
+                              {t}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </td>
+                  )}
+                  {isVisible("opt_out") && (
+                    <td className="px-3 py-2">
+                      {c.opt_out ? (
+                        <Badge variant="destructive" className="text-[10px]">
+                          Opt-out
+                        </Badge>
                       ) : (
-                        c.tags.map((t) => (
-                          <Badge key={t} variant="secondary" className="text-[10px]">
-                            {t}
-                          </Badge>
-                        ))
+                        <Badge variant="default" className="text-[10px]">
+                          Ativo
+                        </Badge>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    {c.opt_out ? (
-                      <Badge variant="destructive" className="text-[10px]">
-                        Opt-out
-                      </Badge>
-                    ) : (
-                      <Badge variant="default" className="text-[10px]">
-                        Ativo
-                      </Badge>
-                    )}
-                  </td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs">
-                    {new Date(c.created_at).toLocaleDateString("pt-BR")}
-                  </td>
+                    </td>
+                  )}
+                  {isVisible("created_at") && (
+                    <td className="text-muted-foreground px-3 py-2 text-xs">
+                      {new Date(c.created_at).toLocaleDateString("pt-BR")}
+                    </td>
+                  )}
+                  {customColumns.map((col) => {
+                    if (!isVisible(col.key)) return null;
+                    const cf = (c.custom_fields ?? {}) as Record<string, string>;
+                    const val = cf[col.label];
+                    return (
+                      <td key={col.key} className="px-3 py-2 text-xs">
+                        {val ? val : <span className="text-muted-foreground">—</span>}
+                      </td>
+                    );
+                  })}
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">
                       <Button

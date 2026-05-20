@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { deleteSegmentAction } from "@/features/segments/actions";
+import { deleteSegmentAction, type SegmentWithCount } from "@/features/segments/actions";
 import { rulesSchema, type Rules } from "@/features/segments/schemas";
 import type { Segment } from "@/lib/supabase/database.types";
 
 type Props = {
-  segments: Segment[];
+  segments: SegmentWithCount[];
 };
 
 function parseRules(raw: Segment["rules"]): Rules | null {
@@ -59,6 +59,7 @@ export function SegmentsTable({ segments }: Props) {
         <thead className="bg-muted/40 text-xs">
           <tr>
             <th className="px-3 py-2 text-left font-medium">Nome</th>
+            <th className="px-3 py-2 text-left font-medium">Contatos</th>
             <th className="px-3 py-2 text-left font-medium">Regras</th>
             <th className="px-3 py-2 text-left font-medium">Modo</th>
             <th className="px-3 py-2 text-left font-medium">Criado em</th>
@@ -76,6 +77,15 @@ export function SegmentsTable({ segments }: Props) {
                   <Link href={`/segmentos/${s.id}`} className="hover:underline">
                     {s.name}
                   </Link>
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {s.contact_count === null ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : (
+                    <Badge variant="outline" className="font-mono">
+                      {s.contact_count.toLocaleString("pt-BR")}
+                    </Badge>
+                  )}
                 </td>
                 <td className="text-muted-foreground px-3 py-2 text-xs">
                   {count} regra{count === 1 ? "" : "s"}
