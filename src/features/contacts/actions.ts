@@ -13,6 +13,7 @@ import {
 } from "@/lib/import/parse-spreadsheet";
 import { requireActiveWorkspace } from "@/server/workspace";
 import {
+  createContactSchema,
   deleteContactSchema,
   listContactsSchema,
   mappingSchema,
@@ -386,6 +387,56 @@ export async function toggleOptOutAction(formData: FormData): Promise<ActionResu
     })
     .eq("id", parsed.data.id)
     .eq("workspace_id", ctx.workspaceId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/contatos");
+  return { ok: true, data: undefined };
+}
+
+export async function createContactAction(formData: FormData): Promise<ActionResult> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const customFieldsRaw = formData.get("custom_fields");
+  const tagsRaw = formData.get("tags");
+  let customFields: Record<string, string> = {};
+  let tags: string[] = [];
+  try {
+    customFields = customFieldsRaw ? JSON.parse(String(customFieldsRaw)) : {};
+    tags = tagsRaw ? JSON.parse(String(tagsRaw)) : [];
+  } catch {
+    return { ok: false, error: "JSON inválido em custom_fields/tags" };
+  }
+
+  const parsed = createContactSchema.safeParse({
+    phone: formData.get("phone"),
+    full_name: formData.get("full_name") || null,
+    custom_fields: customFields,
+    tags,
+  });
+  if (!parsed.success) return { ok: false, error: "Dados inválidos" };
+
+  const norm = normalizeBR(parsed.data.phone);
+  if (!norm.ok) return { ok: false, error: `Telefone inválido: ${norm.reason}` };
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("contact")
+    .select("id")
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("phone_e164", norm.e164)
+    .maybeSingle();
+  if (existing) return { ok: false, error: "Já existe contato com esse telefone" };
+
+  const { error } = await admin.from("contact").insert({
+    workspace_id: ctx.workspaceId,
+    phone_e164: norm.e164,
+    full_name: parsed.data.full_name,
+    custom_fields: parsed.data.custom_fields,
+    tags: parsed.data.tags,
+    created_by: ctx.userId,
+  });
 
   if (error) return { ok: false, error: error.message };
 

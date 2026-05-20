@@ -26,6 +26,13 @@ export const updateContactSchema = z.object({
   tags: z.array(z.string().min(1).max(50)).max(50),
 });
 
+export const createContactSchema = z.object({
+  phone: z.string().min(1, "Telefone obrigatório"),
+  full_name: z.string().max(200).nullable(),
+  custom_fields: z.record(z.string(), z.string()),
+  tags: z.array(z.string().min(1).max(50)).max(50),
+});
+
 export const toggleOptOutSchema = z.object({
   id: z.string().uuid(),
   opt_out: z.boolean(),

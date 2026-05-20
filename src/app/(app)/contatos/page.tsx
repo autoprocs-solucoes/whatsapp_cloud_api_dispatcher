@@ -3,6 +3,7 @@ import { Download, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ContactsTable } from "@/features/contacts/contacts-table";
+import { NewContactButton } from "@/features/contacts/new-contact-button";
 import { listContacts } from "@/features/contacts/actions";
 
 type SearchParams = Promise<{
@@ -45,6 +46,7 @@ export default async function ContatosPage({ searchParams }: { searchParams: Sea
               </a>
             </Button>
           )}
+          <NewContactButton />
           <Button asChild>
             <Link href="/contatos/importar">
               <Upload className="mr-1 size-4" /> Importar contatos
