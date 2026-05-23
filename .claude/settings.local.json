@@ -11,7 +11,9 @@
       "Bash(npm uninstall *)",
       "Bash(dir *)",
       "Bash(npx next *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "WebSearch",
+      "WebFetch(domain:developers.facebook.com)"
     ]
   }
 }

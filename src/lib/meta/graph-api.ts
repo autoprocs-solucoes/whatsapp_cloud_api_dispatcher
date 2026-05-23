@@ -126,11 +126,42 @@ export type PhoneNumberInfo = {
   quality_rating?: string;
   code_verification_status?: string;
   is_pin_enabled?: boolean;
+  messaging_limit_tier?: string;
+  throughput?: { level?: string };
 };
 
 type PhoneNumbersResponse = {
   data: PhoneNumberInfo[];
 };
+
+// Em 2026 Meta deprecou `messaging_limit_tier` (per-phone) e movou pra
+// `whatsapp_business_manager_messaging_limit` (per portfolio, compartilhado
+// entre todos os números). Listing /phone_numbers não expõe — precisa hit
+// individual em /{phone_number_id}. Mantemos fallback no field antigo pra
+// contas em versões anteriores da Graph API.
+// Docs: https://developers.facebook.com/docs/whatsapp/messaging-limits/
+async function getPhoneNumberTier(
+  phoneNumberId: string,
+  token: string,
+): Promise<string | undefined> {
+  try {
+    const data = await request<Record<string, unknown>>(`/${phoneNumberId}`, {
+      method: "GET",
+      token,
+      query: {
+        fields: "whatsapp_business_manager_messaging_limit,messaging_limit_tier",
+      },
+    });
+    const next = data.whatsapp_business_manager_messaging_limit;
+    if (typeof next === "string" && next) return next;
+    const legacy = data.messaging_limit_tier;
+    if (typeof legacy === "string" && legacy) return legacy;
+    return undefined;
+  } catch (err) {
+    console.warn(`[getPhoneNumberTier] falhou pro ${phoneNumberId}`, err);
+    return undefined;
+  }
+}
 
 export async function listPhoneNumbers(
   wabaId: string,
@@ -141,10 +172,19 @@ export async function listPhoneNumbers(
     token,
     query: {
       fields:
-        "id,display_phone_number,verified_name,quality_rating,code_verification_status,is_pin_enabled",
+        "id,display_phone_number,verified_name,quality_rating,code_verification_status,is_pin_enabled,throughput",
     },
   });
-  return data.data ?? [];
+
+  const phones = data.data ?? [];
+  // Enriquece cada número com messaging_limit_tier (chamada individual).
+  const enriched = await Promise.all(
+    phones.map(async (p) => ({
+      ...p,
+      messaging_limit_tier: await getPhoneNumberTier(p.id, token),
+    })),
+  );
+  return enriched;
 }
 
 // ----------------------------------------------------------------------------

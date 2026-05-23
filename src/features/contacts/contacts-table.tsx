@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Bell,
   ChevronLeft,
   ChevronRight,
   Columns3,
+  ListFilter,
   Pencil,
   Search,
   Trash2,
@@ -31,6 +33,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -54,14 +58,27 @@ const BASE_COLUMNS: ColumnDef[] = [
 const LOCKED_COLUMN = "phone_e164";
 const STORAGE_KEY = "contacts-table-visible-columns";
 
+const OPT_OUT_LABELS: Record<"all" | "active" | "opt_out", string> = {
+  all: "Todos",
+  active: "Ativos",
+  opt_out: "Opt-out",
+};
+
+const PENDING_LABELS: Record<"all" | "with_pending" | "without_pending", string> = {
+  all: "Todas",
+  with_pending: "Com pendência",
+  without_pending: "Sem pendência",
+};
+
 type Props = {
   contacts: Contact[];
   total: number;
   page: number;
   pageSize: number;
+  pendingCounts: Record<string, number>;
 };
 
-export function ContactsTable({ contacts, total, page, pageSize }: Props) {
+export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -69,6 +86,10 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
 
   const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
   const optOutFilter = (searchParams.get("optOutFilter") ?? "all") as "all" | "active" | "opt_out";
+  const pendingFilter = (searchParams.get("pendingFilter") ?? "all") as
+    | "all"
+    | "with_pending"
+    | "without_pending";
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -182,18 +203,64 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
             Buscar
           </Button>
         </form>
-        <div className="flex gap-1">
-          {(["all", "active", "opt_out"] as const).map((f) => (
-            <Button
-              key={f}
-              type="button"
-              variant={optOutFilter === f ? "default" : "outline"}
-              size="sm"
-              onClick={() => updateParams({ optOutFilter: f === "all" ? null : f, page: "1" })}
-            >
-              {f === "all" ? "Todos" : f === "active" ? "Ativos" : "Opt-out"}
-            </Button>
-          ))}
+        <div className="flex flex-wrap gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant={optOutFilter === "all" ? "outline" : "default"}
+                size="sm"
+              >
+                <ListFilter className="mr-1 size-3.5" />
+                Status: {OPT_OUT_LABELS[optOutFilter]}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Status</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={optOutFilter}
+                onValueChange={(v) =>
+                  updateParams({ optOutFilter: v === "all" ? null : v, page: "1" })
+                }
+              >
+                {(["all", "active", "opt_out"] as const).map((f) => (
+                  <DropdownMenuRadioItem key={f} value={f}>
+                    {OPT_OUT_LABELS[f]}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant={pendingFilter === "all" ? "outline" : "default"}
+                size="sm"
+                title="Filtrar por pendência de custom fields"
+              >
+                <Bell className="mr-1 size-3.5" />
+                Pendência: {PENDING_LABELS[pendingFilter]}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Pendência de custom fields</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={pendingFilter}
+                onValueChange={(v) =>
+                  updateParams({ pendingFilter: v === "all" ? null : v, page: "1" })
+                }
+              >
+                {(["all", "with_pending", "without_pending"] as const).map((f) => (
+                  <DropdownMenuRadioItem key={f} value={f}>
+                    {PENDING_LABELS[f]}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" size="sm">
@@ -285,7 +352,25 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
                     <td className="px-3 py-2">{c.full_name ?? "—"}</td>
                   )}
                   {isVisible("phone_e164") && (
-                    <td className="px-3 py-2 font-mono text-xs">{c.phone_e164}</td>
+                    <td className="px-3 py-2 font-mono text-xs">
+                      <div className="flex items-center gap-2">
+                        <span>{c.phone_e164}</span>
+                        {(() => {
+                          const n = pendingCounts[c.id] ?? 0;
+                          if (n === 0) return null;
+                          return (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+                              title={`${n} atualização(ões) de custom fields pendente(s)`}
+                            >
+                              <Bell className="mr-1 size-3" />
+                              {n} pendente{n > 1 ? "s" : ""}
+                            </Badge>
+                          );
+                        })()}
+                      </div>
+                    </td>
                   )}
                   {isVisible("tags") && (
                     <td className="px-3 py-2">

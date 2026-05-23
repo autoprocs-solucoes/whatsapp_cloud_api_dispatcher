@@ -61,6 +61,10 @@ export const decidePendingUpdateSchema = z.object({
 export const listContactsSchema = z.object({
   search: z.string().optional().default(""),
   optOutFilter: z.enum(["all", "active", "opt_out"]).optional().default("all"),
+  pendingFilter: z
+    .enum(["all", "with_pending", "without_pending"])
+    .optional()
+    .default("all"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(10).max(200).default(50),
 });

@@ -165,6 +165,7 @@ export type Database = {
           verified_name: string | null;
           quality_rating: string | null;
           code_verification_status: string | null;
+          messaging_limit_tier: string | null;
           is_registered: boolean;
           last_synced_at: string;
           created_at: string;
@@ -177,6 +178,7 @@ export type Database = {
           verified_name?: string | null;
           quality_rating?: string | null;
           code_verification_status?: string | null;
+          messaging_limit_tier?: string | null;
           is_registered?: boolean;
           last_synced_at?: string;
           created_at?: string;
@@ -189,6 +191,7 @@ export type Database = {
           verified_name?: string | null;
           quality_rating?: string | null;
           code_verification_status?: string | null;
+          messaging_limit_tier?: string | null;
           is_registered?: boolean;
           last_synced_at?: string;
           created_at?: string;

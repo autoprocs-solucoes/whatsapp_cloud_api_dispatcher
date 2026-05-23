@@ -1,4 +1,4 @@
-import { CheckCircle2, Phone } from "lucide-react";
+import { CheckCircle2, Gauge, Phone } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,24 @@ function qualityBadgeVariant(rating: string | null): "default" | "secondary" | "
     default:
       return "secondary";
   }
+}
+
+// Limites Meta — desde out/2025 são por Business Portfolio (compartilhado
+// entre todos os números do mesmo portfolio).
+// Docs: https://developers.facebook.com/docs/whatsapp/messaging-limits
+const TIER_LABEL: Record<string, string> = {
+  TIER_50: "50 conversas / 24h",
+  TIER_250: "250 conversas / 24h",
+  TIER_1K: "1.000 conversas / 24h",
+  TIER_2K: "2.000 conversas / 24h",
+  TIER_10K: "10.000 conversas / 24h",
+  TIER_100K: "100.000 conversas / 24h",
+  TIER_UNLIMITED: "Ilimitado",
+};
+
+function tierLabel(tier: string | null): string {
+  if (!tier) return "Limite não informado pela Meta";
+  return TIER_LABEL[tier] ?? tier;
 }
 
 export function MetaConnectionPanel({ workspaceId, canManage, connection }: Props) {
@@ -112,15 +130,22 @@ export function MetaConnectionPanel({ workspaceId, canManage, connection }: Prop
             phoneNumbers.map((p, idx) => (
               <div key={p.id}>
                 {idx > 0 && <Separator className="my-3" />}
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
                     <p className="font-medium">{p.display_phone_number}</p>
                     <p className="text-muted-foreground text-xs">
                       {p.verified_name ?? "Sem nome verificado"} ·{" "}
                       <code className="text-[10px]">{p.phone_number_id}</code>
                     </p>
+                    <p
+                      className="text-muted-foreground flex items-center gap-1 text-xs"
+                      title="Limite Meta de conversas business-initiated em 24h. Desde out/2025 é por Business Portfolio (compartilhado entre todos os números). Sobe conforme verificação + qualidade."
+                    >
+                      <Gauge className="size-3" />
+                      Limite portfólio: <strong>{tierLabel(p.messaging_limit_tier)}</strong>
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-end gap-1">
                     <Badge variant={qualityBadgeVariant(p.quality_rating)}>
                       Quality: {p.quality_rating ?? "—"}
                     </Badge>

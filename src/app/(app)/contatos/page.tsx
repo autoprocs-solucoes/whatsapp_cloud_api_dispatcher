@@ -9,15 +9,18 @@ import { listContacts } from "@/features/contacts/actions";
 type SearchParams = Promise<{
   search?: string;
   optOutFilter?: string;
+  pendingFilter?: string;
   page?: string;
   pageSize?: string;
 }>;
 
 export default async function ContatosPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const { contacts, total, page, pageSize } = await listContacts({
+  const { contacts, total, page, pageSize, pendingCounts } = await listContacts({
     search: sp.search,
     optOutFilter: (sp.optOutFilter as "all" | "active" | "opt_out" | undefined) ?? "all",
+    pendingFilter:
+      (sp.pendingFilter as "all" | "with_pending" | "without_pending" | undefined) ?? "all",
     page: sp.page ? Number(sp.page) : 1,
     pageSize: sp.pageSize ? Number(sp.pageSize) : 50,
   });
@@ -55,7 +58,13 @@ export default async function ContatosPage({ searchParams }: { searchParams: Sea
         </div>
       </header>
 
-      <ContactsTable contacts={contacts} total={total} page={page} pageSize={pageSize} />
+      <ContactsTable
+        contacts={contacts}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        pendingCounts={pendingCounts}
+      />
     </div>
   );
 }

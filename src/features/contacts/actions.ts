@@ -288,16 +288,36 @@ export type ListContactsResult = {
   total: number;
   page: number;
   pageSize: number;
+  pendingCounts: Record<string, number>;
 };
 
 export async function listContacts(
   params: Partial<ListContactsParams>,
 ): Promise<ListContactsResult> {
   const ctx = await ensureMember();
-  if (!ctx) return { contacts: [], total: 0, page: 1, pageSize: 50 };
+  if (!ctx) return { contacts: [], total: 0, page: 1, pageSize: 50, pendingCounts: {} };
 
   const parsed = listContactsSchema.parse(params);
   const admin = createAdminClient();
+
+  let pendingIds: string[] | null = null;
+  if (parsed.pendingFilter !== "all") {
+    const { data: pend } = await admin
+      .from("contact_pending_update")
+      .select("contact_id")
+      .eq("workspace_id", ctx.workspaceId);
+    pendingIds = Array.from(new Set((pend ?? []).map((r) => r.contact_id)));
+  }
+
+  if (parsed.pendingFilter === "with_pending" && pendingIds && pendingIds.length === 0) {
+    return {
+      contacts: [],
+      total: 0,
+      page: parsed.page,
+      pageSize: parsed.pageSize,
+      pendingCounts: {},
+    };
+  }
 
   let query = admin
     .from("contact")
@@ -306,6 +326,13 @@ export async function listContacts(
 
   if (parsed.optOutFilter === "active") query = query.eq("opt_out", false);
   if (parsed.optOutFilter === "opt_out") query = query.eq("opt_out", true);
+
+  if (parsed.pendingFilter === "with_pending" && pendingIds) {
+    query = query.in("id", pendingIds);
+  }
+  if (parsed.pendingFilter === "without_pending" && pendingIds && pendingIds.length > 0) {
+    query = query.not("id", "in", `(${pendingIds.join(",")})`);
+  }
 
   if (parsed.search.trim()) {
     const s = parsed.search.trim().replace(/[%_]/g, "\\$&");
@@ -317,11 +344,27 @@ export async function listContacts(
   query = query.order("created_at", { ascending: false }).range(from, to);
 
   const { data, count } = await query;
+  const contacts = data ?? [];
+
+  const pendingCounts: Record<string, number> = {};
+  if (contacts.length > 0) {
+    const ids = contacts.map((c) => c.id);
+    const { data: pendRows } = await admin
+      .from("contact_pending_update")
+      .select("contact_id")
+      .eq("workspace_id", ctx.workspaceId)
+      .in("contact_id", ids);
+    (pendRows ?? []).forEach((r) => {
+      pendingCounts[r.contact_id] = (pendingCounts[r.contact_id] ?? 0) + 1;
+    });
+  }
+
   return {
-    contacts: data ?? [],
+    contacts,
     total: count ?? 0,
     page: parsed.page,
     pageSize: parsed.pageSize,
+    pendingCounts,
   };
 }
 
