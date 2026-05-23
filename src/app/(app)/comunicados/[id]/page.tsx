@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Download } from "lucide-react";
+import { ChevronLeft, Copy, Download } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,11 @@ export default async function ComunicadoDetalhe({
             <Badge variant={statusBadgeVariant(dispatch.status)} className="text-xs">
               {STATUS_LABELS[dispatch.status] ?? dispatch.status}
             </Badge>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/comunicados/novo?from=${dispatch.id}`}>
+                <Copy className="mr-1 size-4" /> Duplicar
+              </Link>
+            </Button>
             {totalRecipients > 0 && (
               <Button asChild size="sm" variant="outline">
                 <a href={`/comunicados/${dispatch.id}/export`} download>

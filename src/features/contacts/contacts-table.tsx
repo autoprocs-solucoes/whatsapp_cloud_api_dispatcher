@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { parseCustomFields } from "@/features/contacts/custom-fields";
 import { EditContactDialog } from "@/features/contacts/edit-contact-dialog";
 import { cn } from "@/lib/utils";
 import { deleteContactAction, toggleOptOutAction } from "@/features/contacts/actions";
@@ -74,7 +75,7 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
   const customColumns = useMemo<ColumnDef[]>(() => {
     const keys = new Set<string>();
     contacts.forEach((c) => {
-      const cf = (c.custom_fields ?? {}) as Record<string, unknown>;
+      const cf = parseCustomFields(c.custom_fields);
       Object.keys(cf).forEach((k) => keys.add(k));
     });
     return Array.from(keys)
@@ -321,7 +322,7 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
                   )}
                   {customColumns.map((col) => {
                     if (!isVisible(col.key)) return null;
-                    const cf = (c.custom_fields ?? {}) as Record<string, string>;
+                    const cf = parseCustomFields(c.custom_fields);
                     const val = cf[col.label];
                     return (
                       <td key={col.key} className="px-3 py-2 text-xs">

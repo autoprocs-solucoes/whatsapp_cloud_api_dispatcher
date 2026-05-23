@@ -233,6 +233,45 @@ export async function getDispatch(
 }
 
 // ----------------------------------------------------------------------------
+// Configs de um dispatch existente p/ pré-preencher wizard (duplicar).
+// Retorna só os campos do form, sem recipients/status — usuário re-resolve.
+// ----------------------------------------------------------------------------
+export type DispatchPreset = {
+  template_id: string;
+  phone_number_id: string;
+  recipient_source: "segment" | "manual";
+  segment_id: string | null;
+  manual_phones: string[];
+  variable_mapping: VariableMapping;
+};
+
+export async function getDispatchPreset(id: string): Promise<DispatchPreset | null> {
+  const ctx = await ensureMember();
+  if (!ctx) return null;
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("dispatch")
+    .select(
+      "template_id, phone_number_id, recipient_source, segment_id, manual_phones, variable_mapping",
+    )
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return null;
+
+  const mapping = variableMappingSchema.safeParse(data.variable_mapping ?? {});
+  return {
+    template_id: data.template_id,
+    phone_number_id: data.phone_number_id,
+    recipient_source: data.recipient_source as DispatchPreset["recipient_source"],
+    segment_id: data.segment_id ?? null,
+    manual_phones: data.manual_phones ?? [],
+    variable_mapping: mapping.success ? mapping.data : {},
+  };
+}
+
+// ----------------------------------------------------------------------------
 // Preview recipients (estimativa antes do confirm)
 // ----------------------------------------------------------------------------
 export async function previewRecipientsAction(

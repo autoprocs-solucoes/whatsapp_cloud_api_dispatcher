@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { updateContactAction } from "@/features/contacts/actions";
+import {
+  approvePendingUpdateAction,
+  listPendingUpdatesAction,
+  rejectPendingUpdateAction,
+  updateContactAction,
+} from "@/features/contacts/actions";
+import {
+  parseCustomFields,
+  type PendingUpdateItem,
+} from "@/features/contacts/custom-fields";
 import type { Contact } from "@/lib/supabase/database.types";
 
 type Props = {
@@ -34,15 +43,29 @@ export function EditContactDialog({ contact, open, onOpenChange }: Props) {
   const [tagInput, setTagInput] = useState("");
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [newKey, setNewKey] = useState("");
+  const [pending, setPending] = useState<PendingUpdateItem[]>([]);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!contact) return;
+    if (!contact) {
+      setPending([]);
+      return;
+    }
     setFullName(contact.full_name ?? "");
     setTags(contact.tags ?? []);
     setTagInput("");
     setNewKey("");
-    const cf = (contact.custom_fields ?? {}) as Record<string, string>;
-    setCustomFields(Object.entries(cf).map(([key, value]) => ({ key, value: String(value) })));
+    const cf = parseCustomFields(contact.custom_fields);
+    setCustomFields(Object.entries(cf).map(([key, value]) => ({ key, value })));
+    setPending([]);
+    let alive = true;
+    listPendingUpdatesAction(contact.id).then((res) => {
+      if (!alive) return;
+      if (res.ok) setPending(res.data);
+    });
+    return () => {
+      alive = false;
+    };
   }, [contact]);
 
   if (!contact) return null;
@@ -59,6 +82,51 @@ export function EditContactDialog({ contact, open, onOpenChange }: Props) {
     if (!k || customFields.find((f) => f.key === k)) return;
     setCustomFields([...customFields, { key: k, value: "" }]);
     setNewKey("");
+  }
+
+  function handleApprovePending(item: PendingUpdateItem) {
+    if (!contact) return;
+    const fd = new FormData();
+    fd.append("contact_id", contact.id);
+    fd.append("pending_id", item.id);
+    setDecidingId(item.id);
+    startTransition(async () => {
+      const res = await approvePendingUpdateAction(fd);
+      setDecidingId(null);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`Campo ${item.field} atualizado`);
+      setPending((prev) => prev.filter((p) => p.id !== item.id));
+      setCustomFields((prev) => {
+        const idx = prev.findIndex((f) => f.key === item.field);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = { key: item.field, value: item.value };
+          return copy;
+        }
+        return [...prev, { key: item.field, value: item.value }];
+      });
+    });
+  }
+
+  function handleRejectPending(item: PendingUpdateItem) {
+    if (!contact) return;
+    const fd = new FormData();
+    fd.append("contact_id", contact.id);
+    fd.append("pending_id", item.id);
+    setDecidingId(item.id);
+    startTransition(async () => {
+      const res = await rejectPendingUpdateAction(fd);
+      setDecidingId(null);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Solicitação rejeitada");
+      setPending((prev) => prev.filter((p) => p.id !== item.id));
+    });
   }
 
   function handleSave() {
@@ -139,6 +207,71 @@ export function EditContactDialog({ contact, open, onOpenChange }: Props) {
               </Button>
             </div>
           </div>
+
+          {pending.length > 0 && (
+            <div className="space-y-2 rounded-md border border-amber-300/40 bg-amber-50/40 p-3 dark:bg-amber-950/20">
+              <div className="flex items-center justify-between">
+                <Label>Solicitações pendentes</Label>
+                <Badge variant="outline" className="text-[10px]">
+                  {pending.length}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Atualizações propostas por fluxo externo. Aprovar grava em campos custom.
+              </p>
+              <div className="space-y-2">
+                {pending.map((item) => {
+                  const cf = parseCustomFields(contact.custom_fields);
+                  const currentValue = cf[item.field];
+                  const isUpdate = currentValue !== undefined;
+                  const busy = decidingId === item.id;
+                  return (
+                    <div key={item.id} className="bg-background space-y-1 rounded border p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs">{item.field}</span>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {isUpdate ? "atualizar" : "novo"}
+                        </Badge>
+                      </div>
+                      {isUpdate && (
+                        <div className="text-muted-foreground text-xs">
+                          atual: <span className="font-mono">{currentValue || "—"}</span>
+                        </div>
+                      )}
+                      <div className="text-xs">
+                        proposto: <span className="font-mono">{item.value}</span>
+                      </div>
+                      <div className="text-muted-foreground flex items-center justify-between text-[10px]">
+                        <span>{item.source ?? "externo"}</span>
+                        <span>{new Date(item.created_at).toLocaleString("pt-BR")}</span>
+                      </div>
+                      <div className="flex justify-end gap-1 pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={busy || isPending}
+                          onClick={() => handleRejectPending(item)}
+                        >
+                          <X className="size-3.5" />
+                          Rejeitar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={busy || isPending}
+                          onClick={() => handleApprovePending(item)}
+                        >
+                          <Check className="size-3.5" />
+                          Aprovar
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Campos custom</Label>

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeBR } from "@/lib/phone/e164";
+import { parseCustomFields } from "@/features/contacts/custom-fields";
 import { applyRules } from "@/features/segments/rules";
 import { rulesSchema, type Rules } from "@/features/segments/schemas";
 import type { Contact } from "@/lib/supabase/database.types";
@@ -31,7 +32,7 @@ function contactToRecipient(c: Contact): ResolvedRecipient {
     contact_id: c.id,
     phone_e164: c.phone_e164,
     full_name: c.full_name,
-    custom_fields: (c.custom_fields ?? {}) as Record<string, string>,
+    custom_fields: parseCustomFields(c.custom_fields),
   };
 }
 

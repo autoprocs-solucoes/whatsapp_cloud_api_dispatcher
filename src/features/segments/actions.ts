@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
+import { parseCustomFields } from "@/features/contacts/custom-fields";
 import {
   createSegmentSchema,
   deleteSegmentSchema,
@@ -118,10 +119,8 @@ export async function listCustomFieldKeys(): Promise<string[]> {
 
   const keys = new Set<string>();
   (data ?? []).forEach((row) => {
-    const cf = row.custom_fields as Record<string, unknown> | null;
-    if (cf && typeof cf === "object") {
-      Object.keys(cf).forEach((k) => keys.add(k));
-    }
+    const cf = parseCustomFields(row.custom_fields);
+    Object.keys(cf).forEach((k) => keys.add(k));
   });
   return Array.from(keys).sort();
 }

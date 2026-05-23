@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { DispatchWizard } from "@/features/dispatch/wizard";
+import { getDispatchPreset } from "@/features/dispatch/actions";
 import { listTemplatesForWorkspace } from "@/features/templates/actions";
 import { listSegments, listCustomFieldKeys } from "@/features/segments/actions";
 import { getMetaConnection } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
 
-type SearchParams = Promise<{ template?: string }>;
+type SearchParams = Promise<{ template?: string; from?: string }>;
 
 export default async function NovoComunicadoPage({
   searchParams,
@@ -14,12 +15,13 @@ export default async function NovoComunicadoPage({
   searchParams: SearchParams;
 }) {
   const workspace = await requireActiveWorkspace();
-  const [templates, segments, customKeys, conn, sp] = await Promise.all([
+  const sp = await searchParams;
+  const [templates, segments, customKeys, conn, preset] = await Promise.all([
     listTemplatesForWorkspace(),
     listSegments(),
     listCustomFieldKeys(),
     getMetaConnection(workspace.id),
-    searchParams,
+    sp.from ? getDispatchPreset(sp.from) : Promise.resolve(null),
   ]);
 
   if (!conn) {
@@ -27,13 +29,18 @@ export default async function NovoComunicadoPage({
   }
 
   const approvedTemplates = templates.filter((t) => t.status === "APPROVED");
+  const isDuplicate = Boolean(preset);
 
   return (
     <div className="space-y-3">
       <header className="flex items-baseline gap-3">
-        <h1 className="text-lg font-semibold tracking-tight">Novo comunicado</h1>
+        <h1 className="text-lg font-semibold tracking-tight">
+          {isDuplicate ? "Duplicar comunicado" : "Novo comunicado"}
+        </h1>
         <p className="text-muted-foreground text-xs">
-          Wizard 6 passos · opt-outs filtrados automaticamente.
+          {isDuplicate
+            ? "Configurações pré-preenchidas · revise antes de disparar."
+            : "Wizard 6 passos · opt-outs filtrados automaticamente."}
         </p>
       </header>
 
@@ -43,6 +50,7 @@ export default async function NovoComunicadoPage({
         segments={segments}
         customKeys={customKeys}
         initialTemplateId={sp.template}
+        initialPreset={preset}
       />
     </div>
   );

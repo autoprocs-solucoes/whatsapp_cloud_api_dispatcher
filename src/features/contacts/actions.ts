@@ -14,14 +14,17 @@ import {
 import { requireActiveWorkspace } from "@/server/workspace";
 import {
   createContactSchema,
+  decidePendingUpdateSchema,
   deleteContactSchema,
   listContactsSchema,
   mappingSchema,
+  submitPendingUpdatesSchema,
   toggleOptOutSchema,
   updateContactSchema,
   type ImportMapping,
   type ListContactsParams,
 } from "@/features/contacts/schemas";
+import { parseCustomFields, type PendingUpdateItem } from "@/features/contacts/custom-fields";
 import type { Contact } from "@/lib/supabase/database.types";
 
 export type ActionResult<T = void> =
@@ -439,6 +442,145 @@ export async function createContactAction(formData: FormData): Promise<ActionRes
   });
 
   if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/contatos");
+  return { ok: true, data: undefined };
+}
+
+// ----------------------------------------------------------------------------
+// Pending updates (solicitações externas — IA — para custom_fields)
+// Persistido em tabela contact_pending_update. Cada submit é um INSERT
+// atômico — sem race em POSTs paralelos.
+// ----------------------------------------------------------------------------
+
+// IA manda shape custom_fields ({chave: valor, ...}). Explode em N rows.
+export async function submitPendingUpdatesAction(input: {
+  contact_id: string;
+  fields: Record<string, string>;
+  source?: string | null;
+}): Promise<ActionResult<{ inserted: number }>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const parsed = submitPendingUpdatesSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Dados inválidos" };
+
+  const admin = createAdminClient();
+  const { data: contact, error: fetchErr } = await admin
+    .from("contact")
+    .select("id")
+    .eq("id", parsed.data.contact_id)
+    .eq("workspace_id", ctx.workspaceId)
+    .maybeSingle();
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!contact) return { ok: false, error: "Contato não encontrado" };
+
+  const rows = Object.entries(parsed.data.fields).map(([field, value]) => ({
+    workspace_id: ctx.workspaceId,
+    contact_id: parsed.data.contact_id,
+    field,
+    value,
+    source: parsed.data.source ?? null,
+  }));
+
+  const { error } = await admin.from("contact_pending_update").insert(rows);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/contatos");
+  return { ok: true, data: { inserted: rows.length } };
+}
+
+export async function listPendingUpdatesAction(
+  contactId: string,
+): Promise<ActionResult<PendingUpdateItem[]>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("contact_pending_update")
+    .select("id, field, value, source, created_at")
+    .eq("contact_id", contactId)
+    .eq("workspace_id", ctx.workspaceId)
+    .order("created_at", { ascending: true });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data: data ?? [] };
+}
+
+// Aprovar = grava em custom_fields (add ou replace por chave) e deleta a row.
+export async function approvePendingUpdateAction(formData: FormData): Promise<ActionResult> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const parsed = decidePendingUpdateSchema.safeParse({
+    contact_id: formData.get("contact_id"),
+    pending_id: formData.get("pending_id"),
+  });
+  if (!parsed.success) return { ok: false, error: "Dados inválidos" };
+
+  const admin = createAdminClient();
+
+  const { data: pending, error: pendingErr } = await admin
+    .from("contact_pending_update")
+    .select("id, field, value")
+    .eq("id", parsed.data.pending_id)
+    .eq("contact_id", parsed.data.contact_id)
+    .eq("workspace_id", ctx.workspaceId)
+    .maybeSingle();
+  if (pendingErr) return { ok: false, error: pendingErr.message };
+  if (!pending) return { ok: false, error: "Solicitação não encontrada" };
+
+  const { data: contact, error: contactErr } = await admin
+    .from("contact")
+    .select("custom_fields")
+    .eq("id", parsed.data.contact_id)
+    .eq("workspace_id", ctx.workspaceId)
+    .maybeSingle();
+  if (contactErr) return { ok: false, error: contactErr.message };
+  if (!contact) return { ok: false, error: "Contato não encontrado" };
+
+  const nextCustom = { ...parseCustomFields(contact.custom_fields), [pending.field]: pending.value };
+
+  const { error: updErr } = await admin
+    .from("contact")
+    .update({ custom_fields: nextCustom })
+    .eq("id", parsed.data.contact_id)
+    .eq("workspace_id", ctx.workspaceId);
+  if (updErr) return { ok: false, error: updErr.message };
+
+  const { error: delErr } = await admin
+    .from("contact_pending_update")
+    .delete()
+    .eq("id", parsed.data.pending_id)
+    .eq("workspace_id", ctx.workspaceId);
+  if (delErr) return { ok: false, error: delErr.message };
+
+  revalidatePath("/contatos");
+  return { ok: true, data: undefined };
+}
+
+// Rejeitar = só deleta a row.
+export async function rejectPendingUpdateAction(formData: FormData): Promise<ActionResult> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const parsed = decidePendingUpdateSchema.safeParse({
+    contact_id: formData.get("contact_id"),
+    pending_id: formData.get("pending_id"),
+  });
+  if (!parsed.success) return { ok: false, error: "Dados inválidos" };
+
+  const admin = createAdminClient();
+  const { error, count } = await admin
+    .from("contact_pending_update")
+    .delete({ count: "exact" })
+    .eq("id", parsed.data.pending_id)
+    .eq("contact_id", parsed.data.contact_id)
+    .eq("workspace_id", ctx.workspaceId);
+
+  if (error) return { ok: false, error: error.message };
+  if (!count) return { ok: false, error: "Solicitação não encontrada" };
 
   revalidatePath("/contatos");
   return { ok: true, data: undefined };

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
+import { parseCustomFields } from "@/features/contacts/custom-fields";
 import type { Contact } from "@/lib/supabase/database.types";
 
 const BASE_COLUMNS = [
@@ -70,7 +71,7 @@ export async function GET(req: Request) {
   // Descobre dinamicamente todas chaves de custom_fields.
   const customKeySet = new Set<string>();
   for (const c of all) {
-    const cf = (c.custom_fields ?? {}) as Record<string, unknown>;
+    const cf = parseCustomFields(c.custom_fields);
     Object.keys(cf).forEach((k) => customKeySet.add(k));
   }
   const customKeys = Array.from(customKeySet).sort((a, b) =>
@@ -80,7 +81,7 @@ export async function GET(req: Request) {
   const header = [...BASE_COLUMNS, ...customKeys].join(",");
   const rows = all.map((c) => {
     const base = BASE_COLUMNS.map((k) => csvEscape(formatBase(c, k)));
-    const cf = (c.custom_fields ?? {}) as Record<string, unknown>;
+    const cf = parseCustomFields(c.custom_fields);
     const custom = customKeys.map((k) => csvEscape(cf[k]));
     return [...base, ...custom].join(",");
   });

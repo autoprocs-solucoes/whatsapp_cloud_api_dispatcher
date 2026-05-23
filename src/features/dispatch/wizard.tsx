@@ -42,12 +42,22 @@ function columnLabel(id: string): string {
   return id;
 }
 
+type InitialPreset = {
+  template_id: string;
+  phone_number_id: string;
+  recipient_source: "segment" | "manual";
+  segment_id: string | null;
+  manual_phones: string[];
+  variable_mapping: VariableMapping;
+};
+
 type Props = {
   templates: Template[];
   phoneNumbers: WorkspacePhoneNumber[];
   segments: Segment[];
   customKeys: string[];
   initialTemplateId?: string;
+  initialPreset?: InitialPreset | null;
 };
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -74,28 +84,72 @@ function decodeColumn(id: ColumnId): VariableColumn | null {
   return null;
 }
 
+function encodeColumn(col: VariableColumn | null): ColumnId {
+  if (!col) return "";
+  if (col.kind === "attr") return `attr:${col.name}`;
+  return `custom:${col.key}`;
+}
+
 export function DispatchWizard({
   templates,
   phoneNumbers,
   segments,
   customKeys,
   initialTemplateId,
+  initialPreset,
 }: Props) {
   const router = useRouter();
+
+  const presetTemplateId =
+    initialPreset && templates.some((t) => t.id === initialPreset.template_id)
+      ? initialPreset.template_id
+      : null;
+  const effectiveInitialTemplate = presetTemplateId ?? initialTemplateId ?? null;
   const hasInitialTemplate = Boolean(
-    initialTemplateId && templates.some((t) => t.id === initialTemplateId),
+    effectiveInitialTemplate && templates.some((t) => t.id === effectiveInitialTemplate),
   );
+
+  const presetPhoneNumberId =
+    initialPreset &&
+    phoneNumbers.some((p) => p.phone_number_id === initialPreset.phone_number_id)
+      ? initialPreset.phone_number_id
+      : "";
+  const presetSegmentId =
+    initialPreset?.recipient_source === "segment" &&
+    initialPreset.segment_id &&
+    segments.some((s) => s.id === initialPreset.segment_id)
+      ? initialPreset.segment_id
+      : "";
+
+  const initialMappingState: Record<string, { columnId: ColumnId; fallback: string }> = {};
+  if (initialPreset) {
+    for (const [k, v] of Object.entries(initialPreset.variable_mapping)) {
+      initialMappingState[k] = {
+        columnId: encodeColumn(v.column),
+        fallback: v.fallback ?? "",
+      };
+    }
+  }
+
   const [step, setStep] = useState<Step>(hasInitialTemplate ? 2 : 1);
   const [isPending, startTransition] = useTransition();
 
-  const [templateId, setTemplateId] = useState(hasInitialTemplate ? initialTemplateId! : "");
-  const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [templateId, setTemplateId] = useState(
+    hasInitialTemplate ? effectiveInitialTemplate! : "",
+  );
+  const [phoneNumberId, setPhoneNumberId] = useState(presetPhoneNumberId);
   const [mappingState, setMappingState] = useState<
     Record<string, { columnId: ColumnId; fallback: string }>
-  >({});
-  const [recipientSource, setRecipientSource] = useState<"segment" | "manual">("segment");
-  const [segmentId, setSegmentId] = useState("");
-  const [manualPhonesText, setManualPhonesText] = useState("");
+  >(initialMappingState);
+  const [recipientSource, setRecipientSource] = useState<"segment" | "manual">(
+    initialPreset?.recipient_source ?? "segment",
+  );
+  const [segmentId, setSegmentId] = useState(presetSegmentId);
+  const [manualPhonesText, setManualPhonesText] = useState(
+    initialPreset?.recipient_source === "manual"
+      ? initialPreset.manual_phones.join("\n")
+      : "",
+  );
   const [testPhone, setTestPhone] = useState("");
 
   const [segmentPreview, setSegmentPreview] = useState<{

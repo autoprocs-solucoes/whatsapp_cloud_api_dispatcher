@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Send } from "lucide-react";
+import { Copy, Plus, Send } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,7 @@ export default async function ComunicadosPage() {
                 <th className="px-3 py-2 text-left font-medium">Falhas</th>
                 <th className="px-3 py-2 text-left font-medium">Status</th>
                 <th className="px-3 py-2 text-left font-medium">Criado em</th>
+                <th className="px-3 py-2 text-right font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -111,6 +112,13 @@ export default async function ComunicadosPage() {
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs">
                       {new Date(d.created_at).toLocaleString("pt-BR")}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button asChild size="sm" variant="ghost" title="Duplicar">
+                        <Link href={`/comunicados/novo?from=${d.id}`}>
+                          <Copy className="size-3.5" />
+                        </Link>
+                      </Button>
                     </td>
                   </tr>
                 );

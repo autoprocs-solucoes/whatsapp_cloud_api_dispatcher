@@ -42,6 +42,22 @@ export const deleteContactSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const submitPendingUpdatesSchema = z.object({
+  contact_id: z.string().uuid(),
+  fields: z
+    .record(
+      z.string().min(1).max(64).regex(/^[a-z0-9_]+$/i, "Use só letras, números e underscore"),
+      z.string().max(2000),
+    )
+    .refine((r) => Object.keys(r).length > 0, "Envie ao menos um campo"),
+  source: z.string().min(1).max(120).nullable().optional(),
+});
+
+export const decidePendingUpdateSchema = z.object({
+  contact_id: z.string().uuid(),
+  pending_id: z.string().uuid(),
+});
+
 export const listContactsSchema = z.object({
   search: z.string().optional().default(""),
   optOutFilter: z.enum(["all", "active", "opt_out"]).optional().default("all"),

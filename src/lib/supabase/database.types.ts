@@ -319,6 +319,51 @@ export type Database = {
           },
         ];
       };
+      contact_pending_update: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          contact_id: string;
+          field: string;
+          value: string;
+          source: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          contact_id: string;
+          field: string;
+          value: string;
+          source?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          contact_id?: string;
+          field?: string;
+          value?: string;
+          source?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contact_pending_update_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contact_pending_update_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contact";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       contact_import: {
         Row: {
           id: string;
