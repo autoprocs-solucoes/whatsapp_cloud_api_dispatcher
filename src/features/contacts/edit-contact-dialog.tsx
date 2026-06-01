@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { Check, ExternalLink, ImageIcon, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,42 @@ type Props = {
 };
 
 type CustomField = { key: string; value: string };
+
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?|#|$)/i;
+
+function isHttpUrl(value: string): boolean {
+  if (!value) return false;
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/** Render a field value; URLs become a clickable link (image or external) that
+ *  wraps instead of breaking the card layout. */
+function FieldValue({ value }: { value: string }) {
+  if (!isHttpUrl(value)) {
+    return <span className="font-mono break-words">{value || "—"}</span>;
+  }
+  const isImage = IMAGE_EXT_RE.test(value.trim());
+  return (
+    <a
+      href={value.trim()}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary inline-flex max-w-full items-center gap-1 align-bottom font-mono break-all underline underline-offset-2 hover:opacity-80"
+    >
+      {isImage ? (
+        <ImageIcon className="size-3 shrink-0" />
+      ) : (
+        <ExternalLink className="size-3 shrink-0" />
+      )}
+      <span className="break-all">{value.trim()}</span>
+    </a>
+  );
+}
 
 export function EditContactDialog({ contact, open, onOpenChange }: Props) {
   const [isPending, startTransition] = useTransition();
@@ -234,12 +270,12 @@ export function EditContactDialog({ contact, open, onOpenChange }: Props) {
                         </Badge>
                       </div>
                       {isUpdate && (
-                        <div className="text-muted-foreground text-xs">
-                          atual: <span className="font-mono">{currentValue || "—"}</span>
+                        <div className="text-muted-foreground min-w-0 text-xs">
+                          atual: <FieldValue value={currentValue ?? ""} />
                         </div>
                       )}
-                      <div className="text-xs">
-                        proposto: <span className="font-mono">{item.value}</span>
+                      <div className="min-w-0 text-xs">
+                        proposto: <FieldValue value={item.value} />
                       </div>
                       <div className="text-muted-foreground flex items-center justify-between text-[10px]">
                         <span>{item.source ?? "externo"}</span>
