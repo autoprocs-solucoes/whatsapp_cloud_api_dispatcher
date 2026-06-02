@@ -43,7 +43,7 @@ export default async function TemplatesPage() {
           </CardContent>
         </Card>
       ) : (
-        <TemplatesTable templates={templates} canSync={workspace.role === "owner"} />
+        <TemplatesTable templates={templates} isOwner={workspace.role === "owner"} />
       )}
     </div>
   );

@@ -3,19 +3,19 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, RefreshCw } from "lucide-react";
+import { EyeOff, Loader2, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WhatsAppPreview, type PreviewButton } from "@/features/dispatch/whatsapp-preview";
-import { syncTemplatesAction } from "@/features/templates/actions";
+import { setTemplateActiveAction, syncTemplatesAction } from "@/features/templates/actions";
 import { cn } from "@/lib/utils";
 import type { Template } from "@/lib/supabase/database.types";
 
 type Props = {
   templates: Template[];
-  canSync: boolean;
+  isOwner: boolean;
 };
 
 function statusVariant(
@@ -91,8 +91,10 @@ function extractButtons(buttons: unknown): PreviewButton[] {
     .map((b) => ({ type: b.type ?? "QUICK_REPLY", text: b.text! }));
 }
 
-function TemplateCard({ template }: { template: Template }) {
+function TemplateCard({ template, isOwner }: { template: Template; isOwner: boolean }) {
   const [hovered, setHovered] = useState(false);
+  const router = useRouter();
+  const [isToggling, startToggle] = useTransition();
 
   const examples = useMemo(
     () => extractExampleResolved(template.components_raw),
@@ -101,6 +103,19 @@ function TemplateCard({ template }: { template: Template }) {
   const buttons = useMemo(() => extractButtons(template.buttons), [template.buttons]);
 
   const isApproved = template.status === "APPROVED";
+  const isActive = template.active;
+
+  function handleToggle() {
+    startToggle(async () => {
+      const res = await setTemplateActiveAction(template.id, !isActive);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(isActive ? "Template desativado." : "Template reativado.");
+      router.refresh();
+    });
+  }
 
   return (
     <div
@@ -108,7 +123,7 @@ function TemplateCard({ template }: { template: Template }) {
       onMouseLeave={() => setHovered(false)}
       className={cn(
         "group relative flex h-full flex-col gap-3 rounded-lg border bg-card p-3 transition-shadow hover:shadow-md",
-        !isApproved && "opacity-70",
+        (!isApproved || !isActive) && "opacity-70",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -120,9 +135,16 @@ function TemplateCard({ template }: { template: Template }) {
             {template.language} · {template.category}
           </p>
         </div>
-        <Badge variant={statusVariant(template.status)} className="text-[10px]">
-          {template.status}
-        </Badge>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Badge variant={statusVariant(template.status)} className="text-[10px]">
+            {template.status}
+          </Badge>
+          {!isActive && (
+            <Badge variant="outline" className="gap-1 text-[10px]">
+              <EyeOff className="size-3" /> Desativado
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-center">
@@ -141,19 +163,38 @@ function TemplateCard({ template }: { template: Template }) {
         <span className="text-muted-foreground text-[10px]">
           {new Date(template.last_synced_at).toLocaleDateString("pt-BR")}
         </span>
-        {isApproved && (
-          <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-            <Link href={`/comunicados/novo?template=${template.id}`}>
-              <Plus className="mr-1 size-3" /> Criar comunicado
-            </Link>
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isOwner && (
+            <Button
+              onClick={handleToggle}
+              disabled={isToggling}
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+            >
+              {isToggling ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : isActive ? (
+                "Desativar"
+              ) : (
+                "Reativar"
+              )}
+            </Button>
+          )}
+          {isApproved && isActive && (
+            <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+              <Link href={`/comunicados/novo?template=${template.id}`}>
+                <Plus className="mr-1 size-3" /> Criar comunicado
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-export function TemplatesTable({ templates, canSync }: Props) {
+export function TemplatesTable({ templates, isOwner }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -175,7 +216,7 @@ export function TemplatesTable({ templates, canSync }: Props) {
         <p className="text-muted-foreground text-sm">
           {templates.length} template(s) no cache local. Hover preenche com valores de exemplo.
         </p>
-        {canSync && (
+        {isOwner && (
           <Button onClick={handleSync} disabled={isPending} size="sm">
             {isPending ? (
               <>
@@ -197,7 +238,7 @@ export function TemplatesTable({ templates, canSync }: Props) {
       ) : (
         <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {templates.map((t) => (
-            <TemplateCard key={t.id} template={t} />
+            <TemplateCard key={t.id} template={t} isOwner={isOwner} />
           ))}
         </div>
       )}

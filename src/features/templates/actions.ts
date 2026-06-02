@@ -37,13 +37,38 @@ function extractTexts(components: MetaTemplateComponent[]) {
 export async function listTemplatesForWorkspace(): Promise<Template[]> {
   const workspace = await requireActiveWorkspace();
   const admin = createAdminClient();
-  const { data } = await admin
+  let query = admin
     .from("template")
     .select("*")
-    .eq("workspace_id", workspace.id)
+    .eq("workspace_id", workspace.id);
+  // Members só veem templates ativos. Owner vê todos (pra poder reativar).
+  if (workspace.role !== "owner") query = query.eq("active", true);
+  const { data } = await query
     .order("status", { ascending: true })
     .order("name", { ascending: true });
   return data ?? [];
+}
+
+export async function setTemplateActiveAction(
+  id: string,
+  active: boolean,
+): Promise<ActionResult> {
+  const workspace = await requireActiveWorkspace();
+  if (workspace.role !== "owner") {
+    return { ok: false, error: "Apenas o owner pode ativar/desativar templates." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("template")
+    .update({ active })
+    .eq("id", id)
+    .eq("workspace_id", workspace.id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/templates");
+  return { ok: true, data: undefined };
 }
 
 export async function syncTemplatesAction(): Promise<ActionResult<{ synced: number }>> {

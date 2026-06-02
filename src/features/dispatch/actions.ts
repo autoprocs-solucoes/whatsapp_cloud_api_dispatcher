@@ -324,6 +324,9 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
 
   const template = await loadTemplate(ctx.workspaceId, parsed.data.template_id);
   if (!template) return { ok: false, error: "Template não encontrado" };
+  if (!template.active) {
+    return { ok: false, error: "Template desativado pelo owner" };
+  }
 
   const conn = await getMetaConnection(ctx.workspaceId);
   if (!conn) return { ok: false, error: "Workspace sem conexão Meta" };
@@ -383,6 +386,9 @@ export async function createDispatchAction(
   if (!template) return { ok: false, error: "Template não encontrado" };
   if (template.status !== "APPROVED") {
     return { ok: false, error: "Template não está aprovado" };
+  }
+  if (!template.active) {
+    return { ok: false, error: "Template desativado pelo owner" };
   }
 
   const { recipients, stats } = await resolveRecipients(ctx.workspaceId, parsed.data);

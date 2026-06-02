@@ -28,7 +28,7 @@ export default async function NovoComunicadoPage({
     redirect("/configuracoes?missing_meta=1");
   }
 
-  const approvedTemplates = templates.filter((t) => t.status === "APPROVED");
+  const approvedTemplates = templates.filter((t) => t.status === "APPROVED" && t.active);
   const isDuplicate = Boolean(preset);
 
   return (

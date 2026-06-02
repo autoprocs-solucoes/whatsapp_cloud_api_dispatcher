@@ -279,6 +279,7 @@ export type Database = {
           components_raw: Json | null;
           last_synced_at: string;
           created_at: string;
+          active: boolean;
         };
         Insert: {
           id?: string;
@@ -295,6 +296,7 @@ export type Database = {
           components_raw?: Json | null;
           last_synced_at?: string;
           created_at?: string;
+          active?: boolean;
         };
         Update: {
           id?: string;
@@ -311,6 +313,7 @@ export type Database = {
           components_raw?: Json | null;
           last_synced_at?: string;
           created_at?: string;
+          active?: boolean;
         };
         Relationships: [
           {
