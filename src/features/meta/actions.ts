@@ -51,6 +51,29 @@ async function requireOwnership(workspaceId: string) {
   return { ok: true as const, user };
 }
 
+// Registrar um número já conectado é uma ação de baixo risco (não expõe nem
+// troca credenciais, só corrige um estado inconsistente do lado da Meta) —
+// por isso qualquer membro do workspace pode fazer, não só o owner.
+async function requireMembership(workspaceId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Não autenticado" };
+
+  const admin = createAdminClient();
+  const { data: membership } = await admin
+    .from("workspace_member")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership) {
+    return { ok: false as const, error: "Você não faz parte deste workspace" };
+  }
+  return { ok: true as const, user };
+}
+
 export async function completeMetaSignupAction(input: unknown): Promise<ActionResult> {
   const parsed = completeMetaSignupSchema.safeParse(input);
   if (!parsed.success) {
@@ -177,7 +200,7 @@ export async function registerPhoneNumberAction(input: unknown): Promise<ActionR
   }
   const { workspaceId, phoneNumberRowId } = parsed.data;
 
-  const auth = await requireOwnership(workspaceId);
+  const auth = await requireMembership(workspaceId);
   if (!auth.ok) return auth;
 
   const admin = createAdminClient();

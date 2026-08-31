@@ -209,12 +209,13 @@ export function MetaConnectionPanel({
                     ) : (
                       <>
                         <Badge variant="destructive">Não registrado</Badge>
-                        {canManage && (
-                          <RegisterPhoneNumberButton
-                            workspaceId={workspaceId}
-                            phoneNumberRowId={p.id}
-                          />
-                        )}
+                        {/* Qualquer membro do workspace pode registrar — não é
+                            uma ação de gerenciar a conexão (canManage/owner),
+                            só corrige um estado inconsistente do número. */}
+                        <RegisterPhoneNumberButton
+                          workspaceId={workspaceId}
+                          phoneNumberRowId={p.id}
+                        />
                       </>
                     )}
                   </div>
