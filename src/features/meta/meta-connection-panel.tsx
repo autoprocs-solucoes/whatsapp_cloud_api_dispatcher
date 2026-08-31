@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DisconnectMetaButton } from "@/features/meta/disconnect-meta-button";
+import { EmbeddedSignupButton } from "@/features/meta/embedded-signup-button";
 import { ManualMetaConnectForm } from "@/features/meta/manual-connect-form";
+import { RegisterPhoneNumberButton } from "@/features/meta/register-phone-number-button";
 import { SyncMetaButton } from "@/features/meta/sync-meta-button";
 import type { MetaConnectionView } from "@/server/meta";
 
@@ -12,6 +14,15 @@ type Props = {
   workspaceId: string;
   canManage: boolean;
   connection: MetaConnectionView | null;
+  metaAppId: string | undefined;
+  graphApiVersion: string;
+  coexistenceConfigId: string | undefined;
+};
+
+const CONNECTION_METHOD_LABEL: Record<string, string> = {
+  coexistence: "Coexistência (WhatsApp Business app + Cloud API)",
+  embedded_signup: "Embedded Signup",
+  manual: "Manual (System User)",
 };
 
 function qualityBadgeVariant(rating: string | null): "default" | "secondary" | "destructive" {
@@ -45,21 +56,59 @@ function tierLabel(tier: string | null): string {
   return TIER_LABEL[tier] ?? tier;
 }
 
-export function MetaConnectionPanel({ workspaceId, canManage, connection }: Props) {
+export function MetaConnectionPanel({
+  workspaceId,
+  canManage,
+  connection,
+  metaAppId,
+  graphApiVersion,
+  coexistenceConfigId,
+}: Props) {
+  const coexistenceEnabled = Boolean(metaAppId && coexistenceConfigId);
+
   if (!connection) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Conectar WhatsApp Business</CardTitle>
           <CardDescription>
-            Para disparar mensagens, conecte a WhatsApp Business Account (WABA) do cliente. O
-            cliente compartilha credenciais via System User no Business Manager.
+            Para disparar mensagens, conecte a WhatsApp Business Account (WABA) do cliente. Use
+            login integrado com Coexistência se o cliente já usa o app WhatsApp Business e quer
+            manter os dois funcionando juntos, ou conecte manualmente via System User.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {canManage ? (
             <>
-              <ManualMetaConnectForm workspaceId={workspaceId} />
+              {coexistenceEnabled && (
+                <div className="space-y-2 rounded-md border p-4">
+                  <p className="text-sm font-medium">
+                    Login integrado com Coexistência
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    O cliente entra com a conta Facebook/Business dele e mantém o app WhatsApp
+                    Business ativo no celular, enquanto a Cloud API passa a disparar em conjunto
+                    pelo mesmo número.
+                  </p>
+                  <EmbeddedSignupButton
+                    appId={metaAppId!}
+                    configId={coexistenceConfigId!}
+                    graphApiVersion={graphApiVersion}
+                    workspaceId={workspaceId}
+                    featureType="whatsapp_business_app_onboarding"
+                    connectionMethod="coexistence"
+                    ctaLabel="Conectar com WhatsApp Business app"
+                  />
+                </div>
+              )}
+              <div className={coexistenceEnabled ? "space-y-4 border-t pt-4" : "space-y-4"}>
+                {coexistenceEnabled && (
+                  <p className="text-muted-foreground text-xs">
+                    Ou conecte manualmente (número novo, sem app WhatsApp Business no celular):
+                  </p>
+                )}
+                <ManualMetaConnectForm workspaceId={workspaceId} />
+              </div>
               <div className="text-muted-foreground border-t pt-4 text-xs">
                 Não sabe onde achar WABA ID + Access Token? Consulte o guia em{" "}
                 <code className="text-[10px]">docs/meta-setup-manual.md</code> e passe ao cliente
@@ -98,6 +147,9 @@ export function MetaConnectionPanel({ workspaceId, canManage, connection }: Prop
               {conn.business_name ?? "Business sem nome"} · WABA{" "}
               <code className="text-[11px]">{conn.waba_id}</code>
             </CardDescription>
+            <Badge variant="outline" className="w-fit">
+              {CONNECTION_METHOD_LABEL[conn.connection_method] ?? conn.connection_method}
+            </Badge>
           </div>
           {canManage && (
             <div className="flex items-center gap-2">
@@ -151,6 +203,19 @@ export function MetaConnectionPanel({ workspaceId, canManage, connection }: Prop
                     </Badge>
                     {p.code_verification_status && (
                       <Badge variant="secondary">{p.code_verification_status}</Badge>
+                    )}
+                    {p.is_registered ? (
+                      <Badge variant="default">Registrado (Cloud API)</Badge>
+                    ) : (
+                      <>
+                        <Badge variant="destructive">Não registrado</Badge>
+                        {canManage && (
+                          <RegisterPhoneNumberButton
+                            workspaceId={workspaceId}
+                            phoneNumberRowId={p.id}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

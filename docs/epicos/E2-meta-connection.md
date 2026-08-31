@@ -1,26 +1,42 @@
 # Épico E2 — Conexão Meta
 
-> Status: **🟡 Conexão manual implementada (MVP). Embedded Signup ficou em código mas oculto, reativado quando App Review aprovar Advanced Access em `whatsapp_business_management`.**
+> Status: **🟢 Advanced Access em `whatsapp_business_management` aprovado pela Meta. Login integrado (Embedded Signup) reativado, incluindo o fluxo de Coexistência. Conexão manual continua disponível como alternativa.**
 
 > Objetivo: workspace tem WABA + phone numbers conectados pra disparar mensagens. Pré-requisito de templates (E5) e disparos (E7).
 
-## Decisão MVP — conexão manual
+## Login integrado (Embedded Signup) — Coexistência
 
-Embedded Signup oficial da Meta exige App Review aprovado em `whatsapp_business_management` para clientes externos. Como autoprocs ainda não tem essa aprovação (só Standard Access), o MVP adota fluxo **manual**:
+Com Advanced Access aprovado, a aba Meta em `/configuracoes` oferece **login integrado** via Facebook Login for Business (FB JS SDK), com duas variantes por `featureType`:
+
+- **Coexistência** (`whatsapp_business_app_onboarding`, `META_COEXISTENCE_CONFIG_ID`) — para número que já usa o app WhatsApp Business no celular do cliente. O app continua ativo enquanto a Cloud API passa a disparar em conjunto pelo mesmo número (histórico e contatos sincronizam via webhook `smb_app_state_sync`, tratado no n8n).
+- **Embedded Signup padrão** (`META_EMBEDDED_SIGNUP_CONFIG_ID`) — para número novo, sem app WhatsApp Business associado.
+
+Cada Configuration ID é criada separadamente no painel Meta (WhatsApp > Embedded Signup), com o onboarding type correspondente. `workspace_meta_connection.connection_method` registra qual caminho foi usado (`coexistence` | `embedded_signup` | `manual`).
+
+### Registro do número na Cloud API
+
+Passo crítico da Coexistência: após o Embedded Signup, o número precisa ser
+registrado explicitamente via `POST /{phone_number_id}/register` (com PIN de
+6 dígitos, reaproveitado entre reconexões). O registro automático da Meta
+pelo popup às vezes falha silenciosamente — sem esse passo o envio falha com
+"The account is not registered" mesmo com a conexão aparentemente concluída.
+
+- `completeMetaSignupAction` já chama o registro pro(s) `phone_number_id`
+  vindo(s) da sessão do popup, e persiste `is_registered`/`pin` em
+  `workspace_phone_number` (migration `0016_phone_number_registration_pin.sql`).
+- Fallback manual: botão **Registrar** na lista de phone numbers quando
+  `is_registered = false` (`registerPhoneNumberAction`).
+
+## Conexão manual (alternativa)
+
+Fluxo **manual**, mantido para quando o cliente prefere configurar via Business Manager em vez do popup Meta:
 
 1. Cliente cria System User no Business Manager dele, gera token com permissões WhatsApp.
 2. Cliente passa **WABA ID + Access Token** pra autoprocs.
 3. Autoprocs admin cola esses dois valores na tela do workspace.
 4. App valida o token via Graph API, lista phone numbers, persiste tudo.
 
-Vantagens:
-- Sem App Review.
-- Sem dependência de ngrok/HTTPS pro popup Meta.
-- Token de System User não expira (long-lived).
-
-Trade-off: cliente precisa configurar System User no Business Manager dele (passo único, ~5 min com guia).
-
-> Embedded Signup pode reativado depois quando Advanced Access for aprovado, sem alterar schema (mesmas tabelas).
+Vantagens: sem depender do popup Meta; token de System User não expira (long-lived).
 
 ## Critérios de aceite
 
@@ -58,6 +74,7 @@ workspace_phone_number
   quality_rating                   text (GREEN | YELLOW | RED | UNKNOWN)
   code_verification_status         text (VERIFIED | NOT_VERIFIED)
   is_registered                    boolean (Cloud API registration status)
+  pin                              text (PIN de registro, reaproveitado entre reconexões)
   last_synced_at                   timestamptz
   unique(workspace_id, phone_number_id)
 ```

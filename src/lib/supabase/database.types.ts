@@ -125,6 +125,7 @@ export type Database = {
           connected_at: string;
           connected_by: string | null;
           updated_at: string;
+          connection_method: string;
         };
         Insert: {
           workspace_id: string;
@@ -135,6 +136,7 @@ export type Database = {
           connected_at?: string;
           connected_by?: string | null;
           updated_at?: string;
+          connection_method?: string;
         };
         Update: {
           workspace_id?: string;
@@ -145,6 +147,7 @@ export type Database = {
           connected_at?: string;
           connected_by?: string | null;
           updated_at?: string;
+          connection_method?: string;
         };
         Relationships: [
           {
@@ -167,6 +170,7 @@ export type Database = {
           code_verification_status: string | null;
           messaging_limit_tier: string | null;
           is_registered: boolean;
+          pin: string | null;
           last_synced_at: string;
           created_at: string;
         };
@@ -180,6 +184,7 @@ export type Database = {
           code_verification_status?: string | null;
           messaging_limit_tier?: string | null;
           is_registered?: boolean;
+          pin?: string | null;
           last_synced_at?: string;
           created_at?: string;
         };
@@ -193,6 +198,7 @@ export type Database = {
           code_verification_status?: string | null;
           messaging_limit_tier?: string | null;
           is_registered?: boolean;
+          pin?: string | null;
           last_synced_at?: string;
           created_at?: string;
         };

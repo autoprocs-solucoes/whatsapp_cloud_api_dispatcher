@@ -51,10 +51,15 @@
 - [x] Em **Configurações > Básico**, copiar:
   - `App ID` → `META_APP_ID`
   - `Chave Secreta do App` → `META_APP_SECRET`
-- [ ] Em **WhatsApp > Embedded Signup**:
-  - Confirmar que existe uma **Configuração** (Configuration) ativa.
-  - Copiar o `Configuration ID` → `META_EMBEDDED_SIGNUP_CONFIG_ID`.
-  - Verificar permissões habilitadas: `whatsapp_business_management`, `whatsapp_business_messaging`, `business_management`.
+- [x] Em **Login do Facebook para Empresas > Configurações**:
+  - Confirmado: existe uma **Configuração** ativa ("WPP") com as permissões
+    `whatsapp_business_management`, `whatsapp_business_messaging`,
+    `business_management`.
+  - Copiar o `Configuration ID` para **ambos** `META_EMBEDDED_SIGNUP_CONFIG_ID`
+    e `META_COEXISTENCE_CONFIG_ID` (mesma Configuration serve pros dois
+    fluxos — o que muda entre Embedded Signup padrão e Coexistência é só o
+    `featureType` passado no `FB.login()` em tempo de execução, não a
+    Configuration em si).
 - [ ] Definir um `META_VERIFY_TOKEN` (string aleatória gerada por você, ex: `openssl rand -hex 32`). Vamos usar quando configurar webhooks futuramente.
 
 ---
@@ -70,7 +75,7 @@
   - `NEXT_PUBLIC_SUPABASE_URL` (Production + Preview + Development)
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Production + Preview + Development)
   - `SUPABASE_SERVICE_ROLE_KEY` (Production + Preview)
-  - `META_APP_ID`, `META_APP_SECRET`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `META_GRAPH_API_VERSION`, `META_VERIFY_TOKEN`
+  - `META_APP_ID`, `META_APP_SECRET`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `META_COEXISTENCE_CONFIG_ID`, `META_GRAPH_API_VERSION`, `META_VERIFY_TOKEN`
   - `NEXT_PUBLIC_APP_URL` (a URL pública)
 - [ ] Deploy automático em push para `main`.
 
@@ -98,6 +103,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role>
 META_APP_ID=<app-id>
 META_APP_SECRET=<app-secret>
 META_EMBEDDED_SIGNUP_CONFIG_ID=<config-id>
+META_COEXISTENCE_CONFIG_ID=<coexistence-config-id>
 META_GRAPH_API_VERSION=v21.0
 META_VERIFY_TOKEN=<token-aleatorio>
 
@@ -110,5 +116,5 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 - [x] `npm run dev` sobe em local sem erro de env var faltando.
 - [x] Supabase abre dashboard com projeto ativo.
-- [ ] App Meta exibe Embedded Signup Configuration com Config ID copiável.
+- [x] App Meta exibe Embedded Signup Configuration com Config ID copiável.
 - [ ] (Opcional) Push pra `main` dispara build na Vercel com sucesso.

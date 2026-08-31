@@ -30,7 +30,13 @@ type FBLoginOptions = {
   config_id: string;
   response_type: "code";
   override_default_response_type: boolean;
-  extras?: { setup?: Record<string, unknown>; featureType?: string };
+  extras?: {
+    setup?: Record<string, unknown>;
+    featureType?: string;
+    sessionInfoVersion?: string;
+    version?: string;
+    features?: { name: string }[];
+  };
 };
 
 type FBSdk = {
@@ -60,6 +66,9 @@ type Props = {
   graphApiVersion: string;
   workspaceId: string;
   ctaLabel?: string;
+  /** "whatsapp_business_app_onboarding" ativa o fluxo de Coexistência. */
+  featureType?: string;
+  connectionMethod?: "embedded_signup" | "coexistence";
 };
 
 export function EmbeddedSignupButton({
@@ -68,6 +77,8 @@ export function EmbeddedSignupButton({
   graphApiVersion,
   workspaceId,
   ctaLabel = "Conectar Facebook",
+  featureType = "",
+  connectionMethod = "embedded_signup",
 }: Props) {
   const [sdkReady, setSdkReady] = React.useState(false);
   const [isPending, startTransition] = useTransition();
@@ -136,6 +147,7 @@ export function EmbeddedSignupButton({
             code,
             wabaId: session.waba_id,
             phoneNumberIds: session.phone_number_id ? [session.phone_number_id] : undefined,
+            connectionMethod,
           });
 
           if (result.ok) {
@@ -150,7 +162,20 @@ export function EmbeddedSignupButton({
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
-        extras: { setup: {}, featureType: "" },
+        extras: {
+          setup: {},
+          featureType,
+          sessionInfoVersion: "3",
+          // Sem "version"/"features" a Meta cai num bug ("<business_id> não é
+          // um ID comercial válido") ao registrar o número na Coexistência —
+          // achado testando manualmente no fluxo de Cadastro Incorporado.
+          ...(connectionMethod === "coexistence"
+            ? {
+                version: "v3",
+                features: [{ name: "marketing_messages_lite" }, { name: "app_only_install" }],
+              }
+            : {}),
+        },
       },
     );
   }

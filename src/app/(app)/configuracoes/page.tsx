@@ -11,6 +11,7 @@ import { InviteMemberForm } from "@/features/workspace/invite-member-form";
 import { MembersTable } from "@/features/workspace/members-table";
 import { removeMemberAction } from "@/features/workspace/actions";
 import { WorkspaceSettingsForm } from "@/features/workspace/workspace-settings-form";
+import { serverEnv } from "@/lib/env";
 import { requireUser } from "@/server/auth";
 import { getMetaConnection } from "@/server/meta";
 import { getWorkspaceMembers } from "@/server/members";
@@ -93,6 +94,9 @@ export default async function ConfiguracoesPage() {
             workspaceId={workspace.id}
             canManage={isOwner}
             connection={metaConnection}
+            metaAppId={serverEnv.META_APP_ID}
+            graphApiVersion={serverEnv.META_GRAPH_API_VERSION}
+            coexistenceConfigId={serverEnv.META_COEXISTENCE_CONFIG_ID}
           />
         </TabsContent>
       </Tabs>

@@ -1,5 +1,7 @@
 "use server";
 
+import { randomInt } from "crypto";
+
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -9,14 +11,21 @@ import {
   getWabaInfo,
   GraphApiError,
   listPhoneNumbers,
+  registerPhoneNumber,
   subscribeAppToWaba,
 } from "@/lib/meta/graph-api";
 import {
   completeMetaSignupSchema,
   connectMetaManuallySchema,
   disconnectMetaSchema,
+  registerPhoneNumberSchema,
   syncMetaConnectionSchema,
 } from "@/features/meta/schemas";
+
+// PIN de 6 dígitos pro registro na Cloud API (two-step verification).
+function generatePin(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -47,7 +56,7 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
   if (!parsed.success) {
     return { ok: false, error: "Dados inválidos do Embedded Signup" };
   }
-  const { workspaceId, code, wabaId } = parsed.data;
+  const { workspaceId, code, wabaId, phoneNumberIds, connectionMethod } = parsed.data;
 
   const auth = await requireOwnership(workspaceId);
   if (!auth.ok) return auth;
@@ -71,12 +80,38 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
           connected_at: new Date().toISOString(),
           connected_by: auth.user.id,
           updated_at: new Date().toISOString(),
+          connection_method: connectionMethod,
         },
         { onConflict: "workspace_id" },
       );
 
     if (upsertError) {
       return { ok: false, error: `Falha ao salvar conexão: ${upsertError.message}` };
+    }
+
+    // Carrega pin/is_registered anteriores (se essa era uma reconexão) antes
+    // de apagar as linhas — reaproveitar o pin evita quebrar o /register de
+    // um número que já tem verificação em duas etapas ativada.
+    const { data: existingPhones } = await admin
+      .from("workspace_phone_number")
+      .select("phone_number_id, pin, is_registered")
+      .eq("workspace_id", workspaceId);
+    const existingByPhoneId = new Map(
+      (existingPhones ?? []).map((p) => [p.phone_number_id, p]),
+    );
+
+    // Registra na Cloud API o(s) número(s) selecionado(s) no popup. Passo
+    // crítico da Coexistência: o registro automático da Meta às vezes falha
+    // silenciosamente, e sem ele o número não consegue enviar mensagem via
+    // Cloud API mesmo com o Embedded Signup concluído.
+    const registrationByPhoneId = new Map<string, { pin: string; registered: boolean }>();
+    for (const phoneNumberId of phoneNumberIds ?? []) {
+      const pin = existingByPhoneId.get(phoneNumberId)?.pin || generatePin();
+      const result = await registerPhoneNumber(phoneNumberId, accessToken, pin);
+      if (!result.ok) {
+        console.warn(`[completeMetaSignupAction] register não-ok (${result.status}) para ${phoneNumberId}:`, result.message);
+      }
+      registrationByPhoneId.set(phoneNumberId, { pin, registered: result.ok });
     }
 
     // Substitui phone numbers (limpa antigos, insere atuais).
@@ -90,17 +125,22 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
 
     if (phoneNumbers.length > 0) {
       const { error: insertError } = await admin.from("workspace_phone_number").insert(
-        phoneNumbers.map((p) => ({
-          workspace_id: workspaceId,
-          phone_number_id: p.id,
-          display_phone_number: p.display_phone_number,
-          verified_name: p.verified_name ?? null,
-          quality_rating: p.quality_rating ?? null,
-          code_verification_status: p.code_verification_status ?? null,
-          messaging_limit_tier: p.messaging_limit_tier ?? null,
-          is_registered: false,
-          last_synced_at: new Date().toISOString(),
-        })),
+        phoneNumbers.map((p) => {
+          const registration = registrationByPhoneId.get(p.id);
+          const existing = existingByPhoneId.get(p.id);
+          return {
+            workspace_id: workspaceId,
+            phone_number_id: p.id,
+            display_phone_number: p.display_phone_number,
+            verified_name: p.verified_name ?? null,
+            quality_rating: p.quality_rating ?? null,
+            code_verification_status: p.code_verification_status ?? null,
+            messaging_limit_tier: p.messaging_limit_tier ?? null,
+            is_registered: registration?.registered ?? existing?.is_registered ?? false,
+            pin: registration?.pin ?? existing?.pin ?? null,
+            last_synced_at: new Date().toISOString(),
+          };
+        }),
       );
       if (insertError) {
         return { ok: false, error: `Falha ao salvar phone numbers: ${insertError.message}` };
@@ -123,6 +163,63 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
     const message = err instanceof Error ? err.message : "Erro desconhecido";
     return { ok: false, error: message };
   }
+}
+
+// Repete o passo de registro na Cloud API pra um número que conectou (via
+// Coexistência ou Embedded Signup) mas nunca chegou a registrar de fato
+// (erro da Meta "The account is not registered" ao tentar enviar) — comum
+// quando o popup do Embedded Signup fecha antes desse passo silencioso
+// completar do lado da Meta.
+export async function registerPhoneNumberAction(input: unknown): Promise<ActionResult> {
+  const parsed = registerPhoneNumberSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Dados inválidos" };
+  }
+  const { workspaceId, phoneNumberRowId } = parsed.data;
+
+  const auth = await requireOwnership(workspaceId);
+  if (!auth.ok) return auth;
+
+  const admin = createAdminClient();
+
+  const { data: connection } = await admin
+    .from("workspace_meta_connection")
+    .select("access_token")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!connection) {
+    return { ok: false, error: "Workspace não tem conexão Meta" };
+  }
+
+  const { data: phone } = await admin
+    .from("workspace_phone_number")
+    .select("id, phone_number_id, pin")
+    .eq("id", phoneNumberRowId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!phone) {
+    return { ok: false, error: "Phone number não encontrado" };
+  }
+
+  const pin = phone.pin || generatePin();
+  const result = await registerPhoneNumber(phone.phone_number_id, connection.access_token, pin);
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.message ?? `Meta recusou o registro (status ${result.status}).`,
+    };
+  }
+
+  const { error: updateError } = await admin
+    .from("workspace_phone_number")
+    .update({ is_registered: true, pin })
+    .eq("id", phoneNumberRowId);
+  if (updateError) {
+    return { ok: false, error: `Falha ao salvar status: ${updateError.message}` };
+  }
+
+  revalidatePath("/configuracoes");
+  return { ok: true, data: undefined };
 }
 
 export async function connectMetaManuallyAction(
@@ -167,6 +264,7 @@ export async function connectMetaManuallyAction(
           connected_at: new Date().toISOString(),
           connected_by: auth.user.id,
           updated_at: new Date().toISOString(),
+          connection_method: "manual",
         },
         { onConflict: "workspace_id" },
       );

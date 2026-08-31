@@ -198,6 +198,37 @@ export async function subscribeAppToWaba(wabaId: string, token: string): Promise
 }
 
 // ----------------------------------------------------------------------------
+// Registra o número na Cloud API. Passo crítico da Coexistência: sem ele a
+// Meta pode devolver "The account is not registered" ao tentar enviar
+// mensagem, mesmo depois do Embedded Signup ter concluído com sucesso (o
+// registro automático da Meta pelo popup às vezes falha silenciosamente).
+// Não lança em erro — o chamador decide se bloqueia o fluxo (um número já
+// registrado também devolve erro aqui, e isso é esperado).
+// Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/reference/registration
+// ----------------------------------------------------------------------------
+export type RegisterPhoneNumberResult = { ok: boolean; status: number; message?: string };
+
+export async function registerPhoneNumber(
+  phoneNumberId: string,
+  token: string,
+  pin: string,
+): Promise<RegisterPhoneNumberResult> {
+  try {
+    await request<{ success: boolean }>(`/${phoneNumberId}/register`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ messaging_product: "whatsapp", pin }),
+    });
+    return { ok: true, status: 200 };
+  } catch (err) {
+    if (err instanceof GraphApiError) {
+      return { ok: false, status: err.status, message: err.message };
+    }
+    throw err;
+  }
+}
+
+// ----------------------------------------------------------------------------
 // Templates do WABA. Categoria e status são strings da Meta.
 // ----------------------------------------------------------------------------
 export type MetaTemplateButton = {
