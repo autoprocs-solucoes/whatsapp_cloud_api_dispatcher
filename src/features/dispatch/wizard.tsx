@@ -190,6 +190,17 @@ export function DispatchWizard({
     [templates, templateId],
   );
 
+  // Template e número remetente precisam ser da MESMA conta Meta (WABA) — a
+  // Cloud API recusa enviar um template de uma WABA por um número de outra.
+  // Quando o template muda pra uma WABA diferente, limpa a seleção de número.
+  useEffect(() => {
+    if (!selectedTemplate || !phoneNumberId) return;
+    const current = phoneNumbers.find((p) => p.phone_number_id === phoneNumberId);
+    if (current && current.connection_id !== selectedTemplate.connection_id) {
+      setPhoneNumberId("");
+    }
+  }, [selectedTemplate, phoneNumbers, phoneNumberId]);
+
   const headerPlaceholders = useMemo(
     () => extractPlaceholders(selectedTemplate?.header_text),
     [selectedTemplate],
@@ -234,11 +245,15 @@ export function DispatchWizard({
     hint: `${t.language} · ${t.category}`,
   }));
 
-  const phoneOptions = phoneNumbers.map((p) => ({
-    value: p.phone_number_id,
-    label: p.display_phone_number,
-    hint: p.verified_name ?? undefined,
-  }));
+  // Só mostra números da mesma conta (WABA) do template escolhido — evita
+  // montar uma combinação que a Meta recusaria no envio.
+  const phoneOptions = phoneNumbers
+    .filter((p) => !selectedTemplate || p.connection_id === selectedTemplate.connection_id)
+    .map((p) => ({
+      value: p.phone_number_id,
+      label: p.display_phone_number,
+      hint: p.verified_name ?? undefined,
+    }));
 
   const segmentOptions = segments.map((s) => ({ value: s.id, label: s.name }));
 

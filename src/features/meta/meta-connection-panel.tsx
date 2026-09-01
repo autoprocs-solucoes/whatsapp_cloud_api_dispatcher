@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { DisconnectMetaButton } from "@/features/meta/disconnect-meta-button";
 import { EmbeddedSignupButton } from "@/features/meta/embedded-signup-button";
-import { ManualMetaConnectForm } from "@/features/meta/manual-connect-form";
 import { RegisterPhoneNumberButton } from "@/features/meta/register-phone-number-button";
 import { SyncMetaButton } from "@/features/meta/sync-meta-button";
 import type { MetaConnectionView } from "@/server/meta";
@@ -13,7 +12,7 @@ import type { MetaConnectionView } from "@/server/meta";
 type Props = {
   workspaceId: string;
   canManage: boolean;
-  connection: MetaConnectionView | null;
+  connections: MetaConnectionView[];
   metaAppId: string | undefined;
   graphApiVersion: string;
   coexistenceConfigId: string | undefined;
@@ -56,76 +55,42 @@ function tierLabel(tier: string | null): string {
   return TIER_LABEL[tier] ?? tier;
 }
 
-export function MetaConnectionPanel({
+function ConnectAccountButton({
   workspaceId,
-  canManage,
-  connection,
   metaAppId,
   graphApiVersion,
   coexistenceConfigId,
-}: Props) {
-  const coexistenceEnabled = Boolean(metaAppId && coexistenceConfigId);
+  ctaLabel,
+}: {
+  workspaceId: string;
+  metaAppId: string;
+  graphApiVersion: string;
+  coexistenceConfigId: string;
+  ctaLabel?: string;
+}) {
+  return (
+    <EmbeddedSignupButton
+      appId={metaAppId}
+      configId={coexistenceConfigId}
+      graphApiVersion={graphApiVersion}
+      workspaceId={workspaceId}
+      featureType="whatsapp_business_app_onboarding"
+      connectionMethod="coexistence"
+      ctaLabel={ctaLabel}
+    />
+  );
+}
 
-  if (!connection) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Conectar WhatsApp Business</CardTitle>
-          <CardDescription>
-            Para disparar mensagens, conecte a WhatsApp Business Account (WABA) do cliente. Use
-            login integrado com Coexistência se o cliente já usa o app WhatsApp Business e quer
-            manter os dois funcionando juntos, ou conecte manualmente via System User.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {canManage ? (
-            <>
-              {coexistenceEnabled && (
-                <div className="space-y-2 rounded-md border p-4">
-                  <p className="text-sm font-medium">
-                    Login integrado com Coexistência
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    O cliente entra com a conta Facebook/Business dele e mantém o app WhatsApp
-                    Business ativo no celular, enquanto a Cloud API passa a disparar em conjunto
-                    pelo mesmo número.
-                  </p>
-                  <EmbeddedSignupButton
-                    appId={metaAppId!}
-                    configId={coexistenceConfigId!}
-                    graphApiVersion={graphApiVersion}
-                    workspaceId={workspaceId}
-                    featureType="whatsapp_business_app_onboarding"
-                    connectionMethod="coexistence"
-                    ctaLabel="Conectar com WhatsApp Business app"
-                  />
-                </div>
-              )}
-              <div className={coexistenceEnabled ? "space-y-4 border-t pt-4" : "space-y-4"}>
-                {coexistenceEnabled && (
-                  <p className="text-muted-foreground text-xs">
-                    Ou conecte manualmente (número novo, sem app WhatsApp Business no celular):
-                  </p>
-                )}
-                <ManualMetaConnectForm workspaceId={workspaceId} />
-              </div>
-              <div className="text-muted-foreground border-t pt-4 text-xs">
-                Não sabe onde achar WABA ID + Access Token? Consulte o guia em{" "}
-                <code className="text-[10px]">docs/meta-setup-manual.md</code> e passe ao cliente
-                pra coletar via System User no Business Manager.
-              </div>
-            </>
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              Apenas owners podem conectar a conta Meta deste workspace.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const { connection: conn, phoneNumbers } = connection;
+function ConnectionCard({
+  workspaceId,
+  canManage,
+  view,
+}: {
+  workspaceId: string;
+  canManage: boolean;
+  view: MetaConnectionView;
+}) {
+  const { connection: conn, phoneNumbers } = view;
   const connectedAt = new Date(conn.connected_at).toLocaleString("pt-BR");
   const lastSyncedAt =
     phoneNumbers.length > 0
@@ -141,11 +106,10 @@ export function MetaConnectionPanel({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="text-primary size-5" />
-              <CardTitle>Conta Meta conectada</CardTitle>
+              <CardTitle>{conn.business_name ?? "Business sem nome"}</CardTitle>
             </div>
             <CardDescription>
-              {conn.business_name ?? "Business sem nome"} · WABA{" "}
-              <code className="text-[11px]">{conn.waba_id}</code>
+              WABA <code className="text-[11px]">{conn.waba_id}</code>
             </CardDescription>
             <Badge variant="outline" className="w-fit">
               {CONNECTION_METHOD_LABEL[conn.connection_method] ?? conn.connection_method}
@@ -153,8 +117,8 @@ export function MetaConnectionPanel({
           </div>
           {canManage && (
             <div className="flex items-center gap-2">
-              <SyncMetaButton workspaceId={workspaceId} />
-              <DisconnectMetaButton workspaceId={workspaceId} />
+              <SyncMetaButton workspaceId={workspaceId} connectionId={conn.id} />
+              <DisconnectMetaButton workspaceId={workspaceId} connectionId={conn.id} />
             </div>
           )}
         </CardHeader>
@@ -176,7 +140,7 @@ export function MetaConnectionPanel({
         <CardContent className="space-y-3">
           {phoneNumbers.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              Nenhum número configurado neste WABA. Adicione no painel Meta e reconecte.
+              Nenhum número configurado neste WABA. Adicione no painel Meta e sincronize.
             </p>
           ) : (
             phoneNumbers.map((p, idx) => (
@@ -225,40 +189,84 @@ export function MetaConnectionPanel({
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+export function MetaConnectionPanel({
+  workspaceId,
+  canManage,
+  connections,
+  metaAppId,
+  graphApiVersion,
+  coexistenceConfigId,
+}: Props) {
+  const coexistenceEnabled = Boolean(metaAppId && coexistenceConfigId);
+
+  if (connections.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Conectar WhatsApp Business</CardTitle>
+          <CardDescription>
+            Para disparar mensagens, conecte a WhatsApp Business Account (WABA) do cliente via
+            login integrado com Coexistência — o cliente entra com a conta Facebook/Business dele
+            e mantém o app WhatsApp Business ativo no celular, enquanto a Cloud API passa a
+            disparar em conjunto pelo mesmo número.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {canManage ? (
+            coexistenceEnabled ? (
+              <ConnectAccountButton
+                workspaceId={workspaceId}
+                metaAppId={metaAppId!}
+                graphApiVersion={graphApiVersion}
+                coexistenceConfigId={coexistenceConfigId!}
+                ctaLabel="Conectar com WhatsApp Business app"
+              />
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                Login integrado não configurado (falta META_APP_ID/META_COEXISTENCE_CONFIG_ID).
+              </p>
+            )
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Apenas owners podem conectar a conta Meta deste workspace.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {connections.map((view) => (
+        <ConnectionCard
+          key={view.connection.id}
+          workspaceId={workspaceId}
+          canManage={canManage}
+          view={view}
+        />
+      ))}
 
       {canManage && coexistenceEnabled && (
         <Card className="border-dashed">
           <CardHeader>
-            <CardTitle className="text-base">Reconectar via login integrado (Coexistência)</CardTitle>
+            <CardTitle className="text-base">Conectar outra conta</CardTitle>
             <CardDescription>
-              Troca a conexão atual por um novo número, mantendo o app WhatsApp Business
-              ativo no celular do cliente. Substitui a WABA/número conectados acima.
+              Adiciona uma nova WABA a esse workspace (não mexe nas contas já conectadas acima).
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <EmbeddedSignupButton
-              appId={metaAppId!}
-              configId={coexistenceConfigId!}
-              graphApiVersion={graphApiVersion}
+            <ConnectAccountButton
               workspaceId={workspaceId}
-              featureType="whatsapp_business_app_onboarding"
-              connectionMethod="coexistence"
+              metaAppId={metaAppId!}
+              graphApiVersion={graphApiVersion}
+              coexistenceConfigId={coexistenceConfigId!}
               ctaLabel="Conectar com WhatsApp Business app"
             />
-          </CardContent>
-        </Card>
-      )}
-
-      {canManage && (
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle className="text-base">Reconectar com novo token</CardTitle>
-            <CardDescription>
-              Use se o cliente gerou novo Access Token ou trocou de WABA.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ManualMetaConnectForm workspaceId={workspaceId} ctaLabel="Reconectar" />
           </CardContent>
         </Card>
       )}

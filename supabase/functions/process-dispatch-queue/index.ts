@@ -186,22 +186,33 @@ Deno.serve(async (_req) => {
         .eq("status", "queued");
     }
 
-    // Carrega template + token Meta em paralelo.
-    const [tplRes, connRes] = await Promise.all([
+    // Carrega template em paralelo com o phone number (pra achar a
+    // connection/WABA dona desse número — um workspace pode ter várias
+    // contas Meta conectadas, cada uma com seu próprio access_token).
+    const [tplRes, phoneRes] = await Promise.all([
       admin
         .from("template")
         .select("*")
         .eq("id", dispatch.template_id)
         .maybeSingle(),
       admin
-        .from("workspace_meta_connection")
-        .select("access_token")
+        .from("workspace_phone_number")
+        .select("connection_id")
         .eq("workspace_id", dispatch.workspace_id)
+        .eq("phone_number_id", dispatch.phone_number_id)
         .maybeSingle(),
     ]);
 
     const template = tplRes.data;
-    const connection = connRes.data;
+    const connection = phoneRes.data
+      ? (
+          await admin
+            .from("workspace_meta_connection")
+            .select("access_token")
+            .eq("id", phoneRes.data.connection_id)
+            .maybeSingle()
+        ).data
+      : null;
 
     if (!template || !connection) {
       await admin

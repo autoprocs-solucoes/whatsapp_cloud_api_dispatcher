@@ -12,18 +12,19 @@ export type MetaConnectionView = {
 };
 
 /**
- * Retorna conexão Meta + phone numbers do workspace, ou null se não conectado.
+ * Retorna todas as contas Meta conectadas do workspace (1 workspace pode ter
+ * N WABAs), cada uma com seus próprios phone numbers.
  */
-export async function getMetaConnection(workspaceId: string): Promise<MetaConnectionView | null> {
+export async function getMetaConnections(workspaceId: string): Promise<MetaConnectionView[]> {
   const admin = createAdminClient();
 
-  const { data: connection } = await admin
+  const { data: connections } = await admin
     .from("workspace_meta_connection")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .maybeSingle();
+    .order("connected_at", { ascending: true });
 
-  if (!connection) return null;
+  if (!connections || connections.length === 0) return [];
 
   const { data: phoneNumbers } = await admin
     .from("workspace_phone_number")
@@ -31,8 +32,35 @@ export async function getMetaConnection(workspaceId: string): Promise<MetaConnec
     .eq("workspace_id", workspaceId)
     .order("display_phone_number", { ascending: true });
 
-  return {
+  return connections.map((connection) => ({
     connection,
-    phoneNumbers: phoneNumbers ?? [],
-  };
+    phoneNumbers: (phoneNumbers ?? []).filter((p) => p.connection_id === connection.id),
+  }));
+}
+
+/**
+ * Resolve a connection (WABA) dona de um phone_number_id específico —
+ * essencial pra rotear o access_token certo no envio quando o workspace tem
+ * mais de uma conta Meta conectada.
+ */
+export async function getConnectionForPhoneNumber(
+  workspaceId: string,
+  phoneNumberId: string,
+): Promise<WorkspaceMetaConnection | null> {
+  const admin = createAdminClient();
+
+  const { data: phone } = await admin
+    .from("workspace_phone_number")
+    .select("connection_id")
+    .eq("workspace_id", workspaceId)
+    .eq("phone_number_id", phoneNumberId)
+    .maybeSingle();
+  if (!phone) return null;
+
+  const { data: connection } = await admin
+    .from("workspace_meta_connection")
+    .select("*")
+    .eq("id", phone.connection_id)
+    .maybeSingle();
+  return connection ?? null;
 }

@@ -16,7 +16,6 @@ import {
 } from "@/lib/meta/graph-api";
 import {
   completeMetaSignupSchema,
-  connectMetaManuallySchema,
   disconnectMetaSchema,
   registerPhoneNumberSchema,
   syncMetaConnectionSchema,
@@ -74,6 +73,10 @@ async function requireMembership(workspaceId: string) {
   return { ok: true as const, user };
 }
 
+// Conecta uma conta Meta (WABA) ao workspace. Um workspace pode ter várias
+// contas conectadas — reconectar a MESMA WABA (mesmo waba_id) atualiza a
+// linha existente (token/nome), reconectar uma WABA diferente ADICIONA uma
+// nova conexão em vez de substituir a anterior.
 export async function completeMetaSignupAction(input: unknown): Promise<ActionResult> {
   const parsed = completeMetaSignupSchema.safeParse(input);
   if (!parsed.success) {
@@ -91,7 +94,7 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
 
     const admin = createAdminClient();
 
-    const { error: upsertError } = await admin
+    const { data: connectionRow, error: upsertError } = await admin
       .from("workspace_meta_connection")
       .upsert(
         {
@@ -105,20 +108,24 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
           updated_at: new Date().toISOString(),
           connection_method: connectionMethod,
         },
-        { onConflict: "workspace_id" },
-      );
+        { onConflict: "workspace_id,waba_id" },
+      )
+      .select("id")
+      .single();
 
-    if (upsertError) {
-      return { ok: false, error: `Falha ao salvar conexão: ${upsertError.message}` };
+    if (upsertError || !connectionRow) {
+      return { ok: false, error: `Falha ao salvar conexão: ${upsertError?.message}` };
     }
+    const connectionId = connectionRow.id;
 
-    // Carrega pin/is_registered anteriores (se essa era uma reconexão) antes
-    // de apagar as linhas — reaproveitar o pin evita quebrar o /register de
-    // um número que já tem verificação em duas etapas ativada.
+    // Carrega pin/is_registered anteriores dessa MESMA conexão (se essa era
+    // uma reconexão da mesma WABA) antes de apagar as linhas — reaproveitar
+    // o pin evita quebrar o /register de um número que já tem verificação em
+    // duas etapas ativada.
     const { data: existingPhones } = await admin
       .from("workspace_phone_number")
       .select("phone_number_id, pin, is_registered")
-      .eq("workspace_id", workspaceId);
+      .eq("connection_id", connectionId);
     const existingByPhoneId = new Map(
       (existingPhones ?? []).map((p) => [p.phone_number_id, p]),
     );
@@ -137,11 +144,12 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
       registrationByPhoneId.set(phoneNumberId, { pin, registered: result.ok });
     }
 
-    // Substitui phone numbers (limpa antigos, insere atuais).
+    // Substitui os phone numbers DESSA conexão (limpa antigos, insere
+    // atuais) — não mexe nos phone numbers de outras conexões do workspace.
     const { error: deleteError } = await admin
       .from("workspace_phone_number")
       .delete()
-      .eq("workspace_id", workspaceId);
+      .eq("connection_id", connectionId);
     if (deleteError) {
       return { ok: false, error: `Falha ao limpar phones antigos: ${deleteError.message}` };
     }
@@ -153,6 +161,7 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
           const existing = existingByPhoneId.get(p.id);
           return {
             workspace_id: workspaceId,
+            connection_id: connectionId,
             phone_number_id: p.id,
             display_phone_number: p.display_phone_number,
             verified_name: p.verified_name ?? null,
@@ -205,23 +214,23 @@ export async function registerPhoneNumberAction(input: unknown): Promise<ActionR
 
   const admin = createAdminClient();
 
-  const { data: connection } = await admin
-    .from("workspace_meta_connection")
-    .select("access_token")
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
-  if (!connection) {
-    return { ok: false, error: "Workspace não tem conexão Meta" };
-  }
-
   const { data: phone } = await admin
     .from("workspace_phone_number")
-    .select("id, phone_number_id, pin")
+    .select("id, connection_id, phone_number_id, pin")
     .eq("id", phoneNumberRowId)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
   if (!phone) {
     return { ok: false, error: "Phone number não encontrado" };
+  }
+
+  const { data: connection } = await admin
+    .from("workspace_meta_connection")
+    .select("access_token")
+    .eq("id", phone.connection_id)
+    .maybeSingle();
+  if (!connection) {
+    return { ok: false, error: "Conexão Meta desse número não encontrada" };
   }
 
   const pin = phone.pin || generatePin();
@@ -245,109 +254,12 @@ export async function registerPhoneNumberAction(input: unknown): Promise<ActionR
   return { ok: true, data: undefined };
 }
 
-export async function connectMetaManuallyAction(
-  _prev: unknown,
-  formData: FormData,
-): Promise<ActionResult & { fieldErrors?: Record<string, string> }> {
-  const parsed = connectMetaManuallySchema.safeParse({
-    workspaceId: formData.get("workspaceId"),
-    wabaId: formData.get("wabaId"),
-    accessToken: formData.get("accessToken"),
-  });
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: "Verifique os campos",
-      fieldErrors: Object.fromEntries(
-        Object.entries(parsed.error.flatten().fieldErrors).map(([k, v]) => [k, v?.[0] ?? ""]),
-      ),
-    };
-  }
-  const { workspaceId, wabaId, accessToken } = parsed.data;
-
-  const auth = await requireOwnership(workspaceId);
-  if (!auth.ok) return auth;
-
-  try {
-    // Valida o token + busca info do WABA.
-    const wabaInfo = await getWabaInfo(wabaId, accessToken);
-    const phoneNumbers = await listPhoneNumbers(wabaId, accessToken);
-
-    const admin = createAdminClient();
-
-    const { error: upsertError } = await admin
-      .from("workspace_meta_connection")
-      .upsert(
-        {
-          workspace_id: workspaceId,
-          waba_id: wabaId,
-          business_id: wabaInfo.owner_business_info?.id ?? null,
-          business_name: wabaInfo.owner_business_info?.name ?? wabaInfo.name ?? null,
-          access_token: accessToken,
-          connected_at: new Date().toISOString(),
-          connected_by: auth.user.id,
-          updated_at: new Date().toISOString(),
-          connection_method: "manual",
-        },
-        { onConflict: "workspace_id" },
-      );
-
-    if (upsertError) {
-      return { ok: false, error: `Falha ao salvar conexão: ${upsertError.message}` };
-    }
-
-    await admin.from("workspace_phone_number").delete().eq("workspace_id", workspaceId);
-
-    if (phoneNumbers.length > 0) {
-      const { error: insertError } = await admin.from("workspace_phone_number").insert(
-        phoneNumbers.map((p) => ({
-          workspace_id: workspaceId,
-          phone_number_id: p.id,
-          display_phone_number: p.display_phone_number,
-          verified_name: p.verified_name ?? null,
-          quality_rating: p.quality_rating ?? null,
-          code_verification_status: p.code_verification_status ?? null,
-          messaging_limit_tier: p.messaging_limit_tier ?? null,
-          is_registered: false,
-          last_synced_at: new Date().toISOString(),
-        })),
-      );
-      if (insertError) {
-        return { ok: false, error: `Falha ao salvar phone numbers: ${insertError.message}` };
-      }
-    }
-
-    // Subscreve app pro WABA (não bloqueia em erro).
-    try {
-      await subscribeAppToWaba(wabaId, accessToken);
-    } catch (err) {
-      console.warn("subscribeAppToWaba failed", err);
-    }
-
-    revalidatePath("/configuracoes");
-    return { ok: true, data: undefined };
-  } catch (err) {
-    if (err instanceof GraphApiError) {
-      const msg = err.payload.error?.message ?? "Erro Meta Graph API";
-      if (err.status === 401 || err.status === 403) {
-        return { ok: false, error: `Token inválido ou sem permissões: ${msg}` };
-      }
-      if (err.status === 404) {
-        return { ok: false, error: `WABA ID não encontrado: ${msg}` };
-      }
-      return { ok: false, error: `Meta Graph API: ${msg}` };
-    }
-    const message = err instanceof Error ? err.message : "Erro desconhecido";
-    return { ok: false, error: message };
-  }
-}
-
 export async function syncMetaConnectionAction(input: unknown): Promise<ActionResult> {
   const parsed = syncMetaConnectionSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: "Dados inválidos" };
   }
-  const { workspaceId } = parsed.data;
+  const { workspaceId, connectionId } = parsed.data;
 
   const auth = await requireOwnership(workspaceId);
   if (!auth.ok) return auth;
@@ -357,6 +269,7 @@ export async function syncMetaConnectionAction(input: unknown): Promise<ActionRe
   const { data: connection, error: fetchError } = await admin
     .from("workspace_meta_connection")
     .select("waba_id, access_token")
+    .eq("id", connectionId)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
 
@@ -364,7 +277,7 @@ export async function syncMetaConnectionAction(input: unknown): Promise<ActionRe
     return { ok: false, error: `Falha ao buscar conexão: ${fetchError.message}` };
   }
   if (!connection) {
-    return { ok: false, error: "Workspace não tem conexão Meta" };
+    return { ok: false, error: "Conexão Meta não encontrada" };
   }
 
   try {
@@ -378,18 +291,19 @@ export async function syncMetaConnectionAction(input: unknown): Promise<ActionRe
         business_name: wabaInfo.owner_business_info?.name ?? wabaInfo.name ?? null,
         updated_at: new Date().toISOString(),
       })
-      .eq("workspace_id", workspaceId);
+      .eq("id", connectionId);
 
     if (updateError) {
       return { ok: false, error: `Falha ao atualizar conexão: ${updateError.message}` };
     }
 
-    await admin.from("workspace_phone_number").delete().eq("workspace_id", workspaceId);
+    await admin.from("workspace_phone_number").delete().eq("connection_id", connectionId);
 
     if (phoneNumbers.length > 0) {
       const { error: insertError } = await admin.from("workspace_phone_number").insert(
         phoneNumbers.map((p) => ({
           workspace_id: workspaceId,
+          connection_id: connectionId,
           phone_number_id: p.id,
           display_phone_number: p.display_phone_number,
           verified_name: p.verified_name ?? null,
@@ -425,19 +339,19 @@ export async function disconnectMetaAction(input: unknown): Promise<ActionResult
   if (!parsed.success) {
     return { ok: false, error: "Dados inválidos" };
   }
-  const { workspaceId } = parsed.data;
+  const { workspaceId, connectionId } = parsed.data;
 
   const auth = await requireOwnership(workspaceId);
   if (!auth.ok) return auth;
 
   const admin = createAdminClient();
 
-  // Phone numbers vão por cascade do workspace, mas como aqui só deletamos a
-  // connection (não o workspace), removemos explicitamente.
-  await admin.from("workspace_phone_number").delete().eq("workspace_id", workspaceId);
+  // Phone numbers e templates dessa conexão vão via cascade (connection_id
+  // ON DELETE CASCADE) — só precisa apagar a connection.
   const { error } = await admin
     .from("workspace_meta_connection")
     .delete()
+    .eq("id", connectionId)
     .eq("workspace_id", workspaceId);
 
   if (error) {

@@ -117,6 +117,7 @@ export type Database = {
       };
       workspace_meta_connection: {
         Row: {
+          id: string;
           workspace_id: string;
           waba_id: string;
           business_id: string | null;
@@ -128,6 +129,7 @@ export type Database = {
           connection_method: string;
         };
         Insert: {
+          id?: string;
           workspace_id: string;
           waba_id: string;
           business_id?: string | null;
@@ -139,6 +141,7 @@ export type Database = {
           connection_method?: string;
         };
         Update: {
+          id?: string;
           workspace_id?: string;
           waba_id?: string;
           business_id?: string | null;
@@ -153,7 +156,7 @@ export type Database = {
           {
             foreignKeyName: "workspace_meta_connection_workspace_id_fkey";
             columns: ["workspace_id"];
-            isOneToOne: true;
+            isOneToOne: false;
             referencedRelation: "workspace";
             referencedColumns: ["id"];
           },
@@ -163,6 +166,7 @@ export type Database = {
         Row: {
           id: string;
           workspace_id: string;
+          connection_id: string;
           phone_number_id: string;
           display_phone_number: string;
           verified_name: string | null;
@@ -177,6 +181,7 @@ export type Database = {
         Insert: {
           id?: string;
           workspace_id: string;
+          connection_id: string;
           phone_number_id: string;
           display_phone_number: string;
           verified_name?: string | null;
@@ -191,6 +196,7 @@ export type Database = {
         Update: {
           id?: string;
           workspace_id?: string;
+          connection_id?: string;
           phone_number_id?: string;
           display_phone_number?: string;
           verified_name?: string | null;
@@ -208,6 +214,13 @@ export type Database = {
             columns: ["workspace_id"];
             isOneToOne: false;
             referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workspace_phone_number_connection_id_fkey";
+            columns: ["connection_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace_meta_connection";
             referencedColumns: ["id"];
           },
         ];
@@ -273,6 +286,7 @@ export type Database = {
         Row: {
           id: string;
           workspace_id: string;
+          connection_id: string;
           meta_template_id: string;
           name: string;
           language: string;
@@ -290,6 +304,7 @@ export type Database = {
         Insert: {
           id?: string;
           workspace_id: string;
+          connection_id: string;
           meta_template_id: string;
           name: string;
           language: string;
@@ -307,6 +322,7 @@ export type Database = {
         Update: {
           id?: string;
           workspace_id?: string;
+          connection_id?: string;
           meta_template_id?: string;
           name?: string;
           language?: string;
@@ -327,6 +343,13 @@ export type Database = {
             columns: ["workspace_id"];
             isOneToOne: false;
             referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "template_connection_id_fkey";
+            columns: ["connection_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace_meta_connection";
             referencedColumns: ["id"];
           },
         ];

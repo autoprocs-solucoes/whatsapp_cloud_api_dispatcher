@@ -4,7 +4,7 @@ import { DispatchWizard } from "@/features/dispatch/wizard";
 import { getDispatchPreset } from "@/features/dispatch/actions";
 import { listTemplatesForWorkspace } from "@/features/templates/actions";
 import { listSegments, listCustomFieldKeys } from "@/features/segments/actions";
-import { getMetaConnection } from "@/server/meta";
+import { getMetaConnections } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 type SearchParams = Promise<{ template?: string; from?: string }>;
@@ -16,19 +16,20 @@ export default async function NovoComunicadoPage({
 }) {
   const workspace = await requireActiveWorkspace();
   const sp = await searchParams;
-  const [templates, segments, customKeys, conn, preset] = await Promise.all([
+  const [templates, segments, customKeys, connections, preset] = await Promise.all([
     listTemplatesForWorkspace(),
     listSegments(),
     listCustomFieldKeys(),
-    getMetaConnection(workspace.id),
+    getMetaConnections(workspace.id),
     sp.from ? getDispatchPreset(sp.from) : Promise.resolve(null),
   ]);
 
-  if (!conn) {
+  if (connections.length === 0) {
     redirect("/configuracoes?missing_meta=1");
   }
 
   const approvedTemplates = templates.filter((t) => t.status === "APPROVED" && t.active);
+  const phoneNumbers = connections.flatMap((c) => c.phoneNumbers);
   const isDuplicate = Boolean(preset);
 
   return (
@@ -46,7 +47,7 @@ export default async function NovoComunicadoPage({
 
       <DispatchWizard
         templates={approvedTemplates}
-        phoneNumbers={conn.phoneNumbers}
+        phoneNumbers={phoneNumbers}
         segments={segments}
         customKeys={customKeys}
         initialTemplateId={sp.template}

@@ -18,14 +18,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { disconnectMetaAction } from "@/features/meta/actions";
 
-type Props = { workspaceId: string };
+type Props = { workspaceId: string; connectionId: string };
 
-export function DisconnectMetaButton({ workspaceId }: Props) {
+export function DisconnectMetaButton({ workspaceId, connectionId }: Props) {
   const [isPending, startTransition] = useTransition();
 
   function handleDisconnect() {
     startTransition(async () => {
-      const result = await disconnectMetaAction({ workspaceId });
+      const result = await disconnectMetaAction({ workspaceId, connectionId });
       if (result.ok) {
         toast.success("Conta Meta desconectada");
       } else {

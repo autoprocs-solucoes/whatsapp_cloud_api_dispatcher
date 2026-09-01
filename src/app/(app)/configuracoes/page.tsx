@@ -13,7 +13,7 @@ import { removeMemberAction } from "@/features/workspace/actions";
 import { WorkspaceSettingsForm } from "@/features/workspace/workspace-settings-form";
 import { serverEnv } from "@/lib/env";
 import { requireUser } from "@/server/auth";
-import { getMetaConnection } from "@/server/meta";
+import { getMetaConnections } from "@/server/meta";
 import { getWorkspaceMembers } from "@/server/members";
 import { requireActiveWorkspace } from "@/server/workspace";
 
@@ -21,9 +21,9 @@ export default async function ConfiguracoesPage() {
   const user = await requireUser();
   const workspace = await requireActiveWorkspace();
   const isOwner = workspace.role === "owner";
-  const [members, metaConnection] = await Promise.all([
+  const [members, metaConnections] = await Promise.all([
     getWorkspaceMembers(workspace.id),
-    getMetaConnection(workspace.id),
+    getMetaConnections(workspace.id),
   ]);
 
   return (
@@ -93,7 +93,7 @@ export default async function ConfiguracoesPage() {
           <MetaConnectionPanel
             workspaceId={workspace.id}
             canManage={isOwner}
-            connection={metaConnection}
+            connections={metaConnections}
             metaAppId={serverEnv.META_APP_ID}
             graphApiVersion={serverEnv.META_GRAPH_API_VERSION}
             coexistenceConfigId={serverEnv.META_COEXISTENCE_CONFIG_ID}

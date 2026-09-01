@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
-import { getMetaConnection } from "@/server/meta";
+import { getConnectionForPhoneNumber } from "@/server/meta";
 import { env, serverEnv } from "@/lib/env";
 import {
   GraphApiError,
@@ -328,8 +328,8 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
     return { ok: false, error: "Template desativado pelo owner" };
   }
 
-  const conn = await getMetaConnection(ctx.workspaceId);
-  if (!conn) return { ok: false, error: "Workspace sem conexão Meta" };
+  const connection = await getConnectionForPhoneNumber(ctx.workspaceId, parsed.data.phone_number_id);
+  if (!connection) return { ok: false, error: "Número remetente sem conexão Meta" };
 
   const headerPlaceholders = extractPlaceholders(template.header_text);
   const bodyPlaceholders = extractPlaceholders(template.body_text);
@@ -348,7 +348,7 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
     const r = await sendTemplate({
       phoneNumberId: parsed.data.phone_number_id,
       to: norm.e164,
-      token: conn.connection.access_token,
+      token: connection.access_token,
       templateName: template.name,
       language: template.language,
       headerParameters,
@@ -504,8 +504,8 @@ export async function executeDispatchAction(
   const template = await loadTemplate(ctx.workspaceId, dispatch.template_id);
   if (!template) return { ok: false, error: "Template do comunicado não existe mais" };
 
-  const conn = await getMetaConnection(ctx.workspaceId);
-  if (!conn) return { ok: false, error: "Workspace sem conexão Meta" };
+  const connection = await getConnectionForPhoneNumber(ctx.workspaceId, dispatch.phone_number_id);
+  if (!connection) return { ok: false, error: "Número remetente sem conexão Meta" };
 
   // Transição atômica draft → queued. Se 0 linhas, outro request já enfileirou.
   const { data: locked, error: lockErr } = await admin

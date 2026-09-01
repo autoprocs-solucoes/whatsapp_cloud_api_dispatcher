@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { listTemplatesForWorkspace } from "@/features/templates/actions";
 import { TemplatesTable } from "@/features/templates/templates-table";
-import { getMetaConnection } from "@/server/meta";
+import { getMetaConnections } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 export default async function TemplatesPage() {
   const workspace = await requireActiveWorkspace();
-  const conn = await getMetaConnection(workspace.id);
+  const connections = await getMetaConnections(workspace.id);
   const templates = await listTemplatesForWorkspace();
 
   return (
@@ -23,7 +23,7 @@ export default async function TemplatesPage() {
         </p>
       </header>
 
-      {!conn ? (
+      {connections.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <div className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-2xl">

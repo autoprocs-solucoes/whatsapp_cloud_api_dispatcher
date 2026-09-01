@@ -10,7 +10,7 @@ import {
   type MetaTemplate,
   type MetaTemplateComponent,
 } from "@/lib/meta/graph-api";
-import { getMetaConnection } from "@/server/meta";
+import { getMetaConnections } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
 import type { Template } from "@/lib/supabase/database.types";
 
@@ -79,47 +79,55 @@ export async function syncTemplatesAction(): Promise<ActionResult<{ synced: numb
   if (!user) return { ok: false, error: "Não autenticado" };
 
   const workspace = await requireActiveWorkspace();
-  const conn = await getMetaConnection(workspace.id);
-  if (!conn) {
+  const connections = await getMetaConnections(workspace.id);
+  if (connections.length === 0) {
     return { ok: false, error: "Workspace sem conexão Meta. Conecte em Configurações." };
   }
 
-  let templates: MetaTemplate[];
-  try {
-    templates = await listTemplates(conn.connection.waba_id, conn.connection.access_token);
-  } catch (e) {
-    if (e instanceof GraphApiError) {
-      return { ok: false, error: `Meta: ${e.message}` };
-    }
-    return { ok: false, error: "Falha ao buscar templates da Meta" };
-  }
-
   const admin = createAdminClient();
-  const rows = templates.map((t) => {
-    const texts = extractTexts(t.components);
-    return {
-      workspace_id: workspace.id,
-      meta_template_id: t.id,
-      name: t.name,
-      language: t.language,
-      category: t.category,
-      status: t.status,
-      header_text: texts.header_text,
-      body_text: texts.body_text,
-      footer_text: texts.footer_text,
-      buttons: texts.buttons as never,
-      components_raw: t.components as never,
-      last_synced_at: new Date().toISOString(),
-    };
-  });
+  let totalSynced = 0;
 
-  if (rows.length > 0) {
-    const { error } = await admin
-      .from("template")
-      .upsert(rows, { onConflict: "workspace_id,meta_template_id", ignoreDuplicates: false });
-    if (error) return { ok: false, error: `Erro salvando templates: ${error.message}` };
+  // Sincroniza cada conta (WABA) conectada separadamente — templates
+  // pertencem a uma WABA específica, não ao workspace como um todo.
+  for (const { connection } of connections) {
+    let templates: MetaTemplate[];
+    try {
+      templates = await listTemplates(connection.waba_id, connection.access_token);
+    } catch (e) {
+      if (e instanceof GraphApiError) {
+        return { ok: false, error: `Meta (${connection.business_name ?? connection.waba_id}): ${e.message}` };
+      }
+      return { ok: false, error: `Falha ao buscar templates da Meta (${connection.business_name ?? connection.waba_id})` };
+    }
+
+    const rows = templates.map((t) => {
+      const texts = extractTexts(t.components);
+      return {
+        workspace_id: workspace.id,
+        connection_id: connection.id,
+        meta_template_id: t.id,
+        name: t.name,
+        language: t.language,
+        category: t.category,
+        status: t.status,
+        header_text: texts.header_text,
+        body_text: texts.body_text,
+        footer_text: texts.footer_text,
+        buttons: texts.buttons as never,
+        components_raw: t.components as never,
+        last_synced_at: new Date().toISOString(),
+      };
+    });
+
+    if (rows.length > 0) {
+      const { error } = await admin
+        .from("template")
+        .upsert(rows, { onConflict: "workspace_id,meta_template_id", ignoreDuplicates: false });
+      if (error) return { ok: false, error: `Erro salvando templates: ${error.message}` };
+      totalSynced += rows.length;
+    }
   }
 
   revalidatePath("/templates");
-  return { ok: true, data: { synced: rows.length } };
+  return { ok: true, data: { synced: totalSynced } };
 }

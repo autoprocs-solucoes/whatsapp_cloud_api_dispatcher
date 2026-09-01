@@ -7,14 +7,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { syncMetaConnectionAction } from "@/features/meta/actions";
 
-type Props = { workspaceId: string };
+type Props = { workspaceId: string; connectionId: string };
 
-export function SyncMetaButton({ workspaceId }: Props) {
+export function SyncMetaButton({ workspaceId, connectionId }: Props) {
   const [isPending, startTransition] = useTransition();
 
   function handleSync() {
     startTransition(async () => {
-      const result = await syncMetaConnectionAction({ workspaceId });
+      const result = await syncMetaConnectionAction({ workspaceId, connectionId });
       if (result.ok) {
         toast.success("Status sincronizado com a Meta");
       } else {
