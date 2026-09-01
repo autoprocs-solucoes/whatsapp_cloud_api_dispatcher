@@ -226,6 +226,29 @@ export function MetaConnectionPanel({
         </CardContent>
       </Card>
 
+      {canManage && coexistenceEnabled && (
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle className="text-base">Reconectar via login integrado (Coexistência)</CardTitle>
+            <CardDescription>
+              Troca a conexão atual por um novo número, mantendo o app WhatsApp Business
+              ativo no celular do cliente. Substitui a WABA/número conectados acima.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EmbeddedSignupButton
+              appId={metaAppId!}
+              configId={coexistenceConfigId!}
+              graphApiVersion={graphApiVersion}
+              workspaceId={workspaceId}
+              featureType="whatsapp_business_app_onboarding"
+              connectionMethod="coexistence"
+              ctaLabel="Conectar com WhatsApp Business app"
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {canManage && (
         <Card className="border-dashed">
           <CardHeader>
