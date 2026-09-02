@@ -30,3 +30,31 @@ export function extractPlaceholders(text: string | null | undefined): string[] {
 export function isNamedPlaceholder(p: string): boolean {
   return !/^\d+$/.test(p);
 }
+
+/**
+ * Templates com HEADER format IMAGE não têm placeholder de texto — o
+ * header_text fica null. Precisam de um parâmetro de imagem em toda mensagem
+ * (mesmo sem variação por contato). Reaproveita o link do exemplo aprovado
+ * pela Meta (components_raw[].example.header_handle), já hospedado no CDN
+ * da própria Meta.
+ */
+export function extractHeaderImageLink(componentsRaw: unknown): string | null {
+  if (!Array.isArray(componentsRaw)) return null;
+  for (const c of componentsRaw) {
+    if (
+      c &&
+      typeof c === "object" &&
+      (c as Record<string, unknown>).type === "HEADER" &&
+      (c as Record<string, unknown>).format === "IMAGE"
+    ) {
+      const example = (c as Record<string, unknown>).example as
+        | { header_handle?: unknown }
+        | undefined;
+      const handle = example?.header_handle;
+      if (Array.isArray(handle) && typeof handle[0] === "string") {
+        return handle[0];
+      }
+    }
+  }
+  return null;
+}

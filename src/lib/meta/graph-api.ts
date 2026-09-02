@@ -308,6 +308,9 @@ export type SendTemplateParams = {
   language: string;
   bodyParameters?: TemplateParameter[];
   headerParameters?: TemplateParameter[];
+  // Link público de imagem — usado quando o HEADER do template é format IMAGE
+  // (não tem placeholder de texto, então headerParameters não se aplica).
+  headerImageLink?: string;
 };
 
 type SendTemplateResponse = {
@@ -326,7 +329,12 @@ export async function sendTemplate(
 ): Promise<{ messageId: string }> {
   const components: Record<string, unknown>[] = [];
 
-  if (params.headerParameters && params.headerParameters.length > 0) {
+  if (params.headerImageLink) {
+    components.push({
+      type: "header",
+      parameters: [{ type: "image", image: { link: params.headerImageLink } }],
+    });
+  } else if (params.headerParameters && params.headerParameters.length > 0) {
     components.push({
       type: "header",
       parameters: params.headerParameters.map(renderParameter),

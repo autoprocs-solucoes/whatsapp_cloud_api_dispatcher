@@ -13,7 +13,7 @@ import {
   sendTemplate,
   type TemplateParameter,
 } from "@/lib/meta/graph-api";
-import { isNamedPlaceholder } from "@/lib/meta/placeholders";
+import { extractHeaderImageLink, isNamedPlaceholder } from "@/lib/meta/placeholders";
 import { normalizeBR } from "@/lib/phone/e164";
 import {
   createDispatchSchema,
@@ -343,6 +343,7 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
   const resolved = resolveVariables(syntheticRecipient, parsed.data.variable_mapping);
   const headerParameters = buildParameters(headerPlaceholders, resolved, "header");
   const bodyParameters = buildParameters(bodyPlaceholders, resolved, "body");
+  const headerImageLink = extractHeaderImageLink(template.components_raw);
 
   try {
     const r = await sendTemplate({
@@ -353,6 +354,7 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
       language: template.language,
       headerParameters,
       bodyParameters,
+      headerImageLink: headerImageLink ?? undefined,
     });
     return { ok: true, data: { messageId: r.messageId } };
   } catch (e) {

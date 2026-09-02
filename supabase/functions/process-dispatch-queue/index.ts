@@ -53,6 +53,30 @@ function isNamed(p: string): boolean {
   return !/^\d+$/.test(p);
 }
 
+// Templates com HEADER format IMAGE não têm placeholder de texto (header_text
+// null) mas exigem parâmetro de imagem em toda mensagem. Reaproveita o link
+// do exemplo aprovado pela Meta (já hospedado no CDN da própria Meta).
+function extractHeaderImageLink(componentsRaw: unknown): string | null {
+  if (!Array.isArray(componentsRaw)) return null;
+  for (const c of componentsRaw) {
+    if (
+      c &&
+      typeof c === "object" &&
+      (c as Record<string, unknown>).type === "HEADER" &&
+      (c as Record<string, unknown>).format === "IMAGE"
+    ) {
+      const example = (c as Record<string, unknown>).example as
+        | { header_handle?: unknown }
+        | undefined;
+      const handle = example?.header_handle;
+      if (Array.isArray(handle) && typeof handle[0] === "string") {
+        return handle[0];
+      }
+    }
+  }
+  return null;
+}
+
 type TplParam =
   | { type: "text"; text: string }
   | { type: "text"; parameter_name: string; text: string };
@@ -91,9 +115,15 @@ async function sendTemplate(args: {
   language: string;
   headerParams: TplParam[];
   bodyParams: TplParam[];
+  headerImageLink?: string | null;
 }): Promise<{ messageId: string }> {
   const components: Array<Record<string, unknown>> = [];
-  if (args.headerParams.length > 0) {
+  if (args.headerImageLink) {
+    components.push({
+      type: "header",
+      parameters: [{ type: "image", image: { link: args.headerImageLink } }],
+    });
+  } else if (args.headerParams.length > 0) {
     components.push({ type: "header", parameters: args.headerParams });
   }
   if (args.bodyParams.length > 0) {
@@ -233,6 +263,7 @@ Deno.serve(async (_req) => {
 
     const headerPlaceholders = extractPlaceholders(template.header_text);
     const bodyPlaceholders = extractPlaceholders(template.body_text);
+    const headerImageLink = extractHeaderImageLink(template.components_raw);
 
     let sent = 0;
     let failed = 0;
@@ -269,6 +300,7 @@ Deno.serve(async (_req) => {
             language: template.language,
             headerParams,
             bodyParams,
+            headerImageLink,
           });
           await admin
             .from("dispatch_recipient")
