@@ -11,6 +11,7 @@ import {
   GraphApiError,
   extractPlaceholders,
   sendTemplate,
+  uploadMediaFromUrl,
   type TemplateParameter,
 } from "@/lib/meta/graph-api";
 import { extractHeaderImageLink, isNamedPlaceholder } from "@/lib/meta/placeholders";
@@ -344,6 +345,20 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
   const headerParameters = buildParameters(headerPlaceholders, resolved, "header");
   const bodyParameters = buildParameters(bodyPlaceholders, resolved, "body");
   const headerImageLink = extractHeaderImageLink(template.components_raw);
+  let headerImageId: string | undefined;
+  if (headerImageLink) {
+    try {
+      const uploaded = await uploadMediaFromUrl(
+        parsed.data.phone_number_id,
+        connection.access_token,
+        headerImageLink,
+      );
+      headerImageId = uploaded.id;
+    } catch {
+      // Upload falhou — cai pro link direto como fallback (menos confiável,
+      // mas melhor que não enviar nada).
+    }
+  }
 
   try {
     const r = await sendTemplate({
@@ -354,7 +369,8 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
       language: template.language,
       headerParameters,
       bodyParameters,
-      headerImageLink: headerImageLink ?? undefined,
+      headerImageId,
+      headerImageLink: headerImageId ? undefined : (headerImageLink ?? undefined),
     });
     return { ok: true, data: { messageId: r.messageId } };
   } catch (e) {

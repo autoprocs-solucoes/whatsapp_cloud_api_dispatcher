@@ -107,6 +107,42 @@ class GraphError extends Error {
   }
 }
 
+// Reusar o link do exemplo aprovado (components_raw[].example.header_handle)
+// como `image.link` não é confiável pra entrega — a Meta aceita a mensagem
+// (devolve message id) mas ela falha silenciosamente depois. Baixa a imagem
+// e faz upload via Cloud API pra ter um media id próprio (jeito suportado
+// oficialmente). Chamado uma vez por dispatch, fora do loop de destinatários.
+async function uploadMediaFromUrl(
+  phoneNumberId: string,
+  token: string,
+  sourceUrl: string,
+): Promise<string | null> {
+  try {
+    const imgRes = await fetch(sourceUrl);
+    if (!imgRes.ok) return null;
+    const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+    const blob = await imgRes.blob();
+
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("type", contentType);
+    form.append("file", blob, "header.jpg");
+
+    const url =
+      `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${phoneNumberId}/media`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function sendTemplate(args: {
   phoneNumberId: string;
   to: string;
@@ -115,10 +151,16 @@ async function sendTemplate(args: {
   language: string;
   headerParams: TplParam[];
   bodyParams: TplParam[];
+  headerImageId?: string | null;
   headerImageLink?: string | null;
 }): Promise<{ messageId: string }> {
   const components: Array<Record<string, unknown>> = [];
-  if (args.headerImageLink) {
+  if (args.headerImageId) {
+    components.push({
+      type: "header",
+      parameters: [{ type: "image", image: { id: args.headerImageId } }],
+    });
+  } else if (args.headerImageLink) {
     components.push({
       type: "header",
       parameters: [{ type: "image", image: { link: args.headerImageLink } }],
@@ -264,6 +306,15 @@ Deno.serve(async (_req) => {
     const headerPlaceholders = extractPlaceholders(template.header_text);
     const bodyPlaceholders = extractPlaceholders(template.body_text);
     const headerImageLink = extractHeaderImageLink(template.components_raw);
+    // Upload uma vez por dispatch (não por destinatário) — o media id é
+    // reaproveitado em todos os envios deste template neste dispatch.
+    const headerImageId = headerImageLink
+      ? await uploadMediaFromUrl(
+        dispatch.phone_number_id,
+        connection.access_token,
+        headerImageLink,
+      )
+      : null;
 
     let sent = 0;
     let failed = 0;
@@ -300,7 +351,8 @@ Deno.serve(async (_req) => {
             language: template.language,
             headerParams,
             bodyParams,
-            headerImageLink,
+            headerImageId,
+            headerImageLink: headerImageId ? null : headerImageLink,
           });
           await admin
             .from("dispatch_recipient")

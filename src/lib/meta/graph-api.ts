@@ -229,6 +229,55 @@ export async function registerPhoneNumber(
 }
 
 // ----------------------------------------------------------------------------
+// Upload de mídia pro header de template com format IMAGE. Reusar o link do
+// exemplo aprovado (components_raw[].example.header_handle) como `image.link`
+// não é confiável pra entrega — a mensagem é aceita (retorna message id) mas
+// falha silenciosamente depois (sem webhook configurado, só descobrimos pelo
+// "Mensagens entregues: 0" no WhatsApp Manager). Baixa a imagem e faz upload
+// via Cloud API pra ter um media id próprio — o jeito suportado oficialmente.
+// Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media
+// ----------------------------------------------------------------------------
+export async function uploadMediaFromUrl(
+  phoneNumberId: string,
+  token: string,
+  sourceUrl: string,
+): Promise<{ id: string }> {
+  const imgRes = await fetch(sourceUrl);
+  if (!imgRes.ok) {
+    throw new GraphApiError(imgRes.status, {
+      error: { message: `Falha baixando imagem de origem (${imgRes.status})` },
+    });
+  }
+  const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+  const blob = await imgRes.blob();
+
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("type", contentType);
+  form.append("file", blob, "header.jpg");
+
+  const res = await fetch(graphUrl(`/${phoneNumberId}/media`), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let payload: GraphErrorPayload = {};
+    try {
+      payload = (await res.json()) as GraphErrorPayload;
+    } catch {
+      // ignored
+    }
+    throw new GraphApiError(res.status, payload);
+  }
+
+  const data = (await res.json()) as { id: string };
+  return { id: data.id };
+}
+
+// ----------------------------------------------------------------------------
 // Templates do WABA. Categoria e status são strings da Meta.
 // ----------------------------------------------------------------------------
 export type MetaTemplateButton = {
@@ -308,8 +357,12 @@ export type SendTemplateParams = {
   language: string;
   bodyParameters?: TemplateParameter[];
   headerParameters?: TemplateParameter[];
-  // Link público de imagem — usado quando o HEADER do template é format IMAGE
-  // (não tem placeholder de texto, então headerParameters não se aplica).
+  // Usados quando o HEADER do template é format IMAGE (não tem placeholder
+  // de texto, então headerParameters não se aplica). `headerImageId` (media
+  // id já uploadado via Cloud API) tem prioridade — é o método suportado
+  // oficialmente. `headerImageLink` é fallback (link público, menos confiável
+  // pra entrega — a Meta pode não conseguir buscar todo link externo).
+  headerImageId?: string;
   headerImageLink?: string;
 };
 
@@ -329,7 +382,12 @@ export async function sendTemplate(
 ): Promise<{ messageId: string }> {
   const components: Record<string, unknown>[] = [];
 
-  if (params.headerImageLink) {
+  if (params.headerImageId) {
+    components.push({
+      type: "header",
+      parameters: [{ type: "image", image: { id: params.headerImageId } }],
+    });
+  } else if (params.headerImageLink) {
     components.push({
       type: "header",
       parameters: [{ type: "image", image: { link: params.headerImageLink } }],
