@@ -16,6 +16,7 @@ import {
 } from "@/lib/meta/graph-api";
 import {
   completeMetaSignupSchema,
+  connectMetaManuallySchema,
   disconnectMetaSchema,
   registerPhoneNumberSchema,
   syncMetaConnectionSchema,
@@ -191,6 +192,126 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
   } catch (err) {
     if (err instanceof GraphApiError) {
       return { ok: false, error: `Meta Graph API: ${err.message}` };
+    }
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    return { ok: false, error: message };
+  }
+}
+
+// Conecta uma WABA colando WABA ID + Access Token (System User) direto,
+// sem passar pelo popup do Facebook. Único jeito de linkar ao workspace uma
+// WABA que já existe dentro do Business Manager da própria Autoprocs — o
+// Login Integrado nunca deixa escolher o negócio dono do app como destino.
+export async function connectMetaManuallyAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<ActionResult & { fieldErrors?: Record<string, string> }> {
+  const parsed = connectMetaManuallySchema.safeParse({
+    workspaceId: formData.get("workspaceId"),
+    wabaId: formData.get("wabaId"),
+    accessToken: formData.get("accessToken"),
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Verifique os campos",
+      fieldErrors: Object.fromEntries(
+        Object.entries(parsed.error.flatten().fieldErrors).map(([k, v]) => [k, v?.[0] ?? ""]),
+      ),
+    };
+  }
+  const { workspaceId, wabaId, accessToken } = parsed.data;
+
+  const auth = await requireOwnership(workspaceId);
+  if (!auth.ok) return auth;
+
+  try {
+    // Valida o token + busca info do WABA.
+    const wabaInfo = await getWabaInfo(wabaId, accessToken);
+    const phoneNumbers = await listPhoneNumbers(wabaId, accessToken);
+
+    const admin = createAdminClient();
+
+    const { data: connectionRow, error: upsertError } = await admin
+      .from("workspace_meta_connection")
+      .upsert(
+        {
+          workspace_id: workspaceId,
+          waba_id: wabaId,
+          business_id: wabaInfo.owner_business_info?.id ?? null,
+          business_name: wabaInfo.owner_business_info?.name ?? wabaInfo.name ?? null,
+          access_token: accessToken,
+          connected_at: new Date().toISOString(),
+          connected_by: auth.user.id,
+          updated_at: new Date().toISOString(),
+          connection_method: "manual",
+        },
+        { onConflict: "workspace_id,waba_id" },
+      )
+      .select("id")
+      .single();
+
+    if (upsertError || !connectionRow) {
+      return { ok: false, error: `Falha ao salvar conexão: ${upsertError?.message}` };
+    }
+    const connectionId = connectionRow.id;
+
+    const { data: existingPhones } = await admin
+      .from("workspace_phone_number")
+      .select("phone_number_id, pin, is_registered")
+      .eq("connection_id", connectionId);
+    const existingByPhoneId = new Map(
+      (existingPhones ?? []).map((p) => [p.phone_number_id, p]),
+    );
+
+    await admin.from("workspace_phone_number").delete().eq("connection_id", connectionId);
+
+    if (phoneNumbers.length > 0) {
+      const { error: insertError } = await admin.from("workspace_phone_number").insert(
+        phoneNumbers.map((p) => {
+          const existing = existingByPhoneId.get(p.id);
+          return {
+            workspace_id: workspaceId,
+            connection_id: connectionId,
+            phone_number_id: p.id,
+            display_phone_number: p.display_phone_number,
+            verified_name: p.verified_name ?? null,
+            quality_rating: p.quality_rating ?? null,
+            code_verification_status: p.code_verification_status ?? null,
+            messaging_limit_tier: p.messaging_limit_tier ?? null,
+            // Conexão manual normalmente já é um número em uso — preserva o
+            // status anterior se essa era uma reconexão; senão fica como
+            // "desconhecido" (false) até o admin confirmar via "Registrar".
+            is_registered: existing?.is_registered ?? false,
+            pin: existing?.pin ?? null,
+            last_synced_at: new Date().toISOString(),
+          };
+        }),
+      );
+      if (insertError) {
+        return { ok: false, error: `Falha ao salvar phone numbers: ${insertError.message}` };
+      }
+    }
+
+    // Subscreve app pro WABA (não bloqueia em erro).
+    try {
+      await subscribeAppToWaba(wabaId, accessToken);
+    } catch (err) {
+      console.warn("subscribeAppToWaba failed", err);
+    }
+
+    revalidatePath("/configuracoes");
+    return { ok: true, data: undefined };
+  } catch (err) {
+    if (err instanceof GraphApiError) {
+      const msg = err.payload.error?.message ?? "Erro Meta Graph API";
+      if (err.status === 401 || err.status === 403) {
+        return { ok: false, error: `Token inválido ou sem permissões: ${msg}` };
+      }
+      if (err.status === 404) {
+        return { ok: false, error: `WABA ID não encontrado: ${msg}` };
+      }
+      return { ok: false, error: `Meta Graph API: ${msg}` };
     }
     const message = err instanceof Error ? err.message : "Erro desconhecido";
     return { ok: false, error: message };

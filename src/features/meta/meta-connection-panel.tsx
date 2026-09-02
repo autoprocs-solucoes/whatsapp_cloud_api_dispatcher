@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { DisconnectMetaButton } from "@/features/meta/disconnect-meta-button";
 import { EmbeddedSignupButton } from "@/features/meta/embedded-signup-button";
+import { ManualMetaConnectForm } from "@/features/meta/manual-connect-form";
 import { RegisterPhoneNumberButton } from "@/features/meta/register-phone-number-button";
 import { SyncMetaButton } from "@/features/meta/sync-meta-button";
 import type { MetaConnectionView } from "@/server/meta";
@@ -209,27 +210,33 @@ export function MetaConnectionPanel({
         <CardHeader>
           <CardTitle>Conectar WhatsApp Business</CardTitle>
           <CardDescription>
-            Para disparar mensagens, conecte a WhatsApp Business Account (WABA) do cliente via
-            login integrado com Coexistência — o cliente entra com a conta Facebook/Business dele
-            e mantém o app WhatsApp Business ativo no celular, enquanto a Cloud API passa a
-            disparar em conjunto pelo mesmo número.
+            Use login integrado com Coexistência se o cliente vai manter a WABA no próprio
+            negócio dele (mantém o app WhatsApp Business ativo no celular enquanto a Cloud API
+            passa a disparar em conjunto). Use a conexão manual se a WABA já existe dentro do
+            Business Manager da própria Autoprocs — a Meta não deixa escolher o negócio dono do
+            app no login integrado, então esse caso só dá pra conectar colando WABA ID + token.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {canManage ? (
-            coexistenceEnabled ? (
-              <ConnectAccountButton
-                workspaceId={workspaceId}
-                metaAppId={metaAppId!}
-                graphApiVersion={graphApiVersion}
-                coexistenceConfigId={coexistenceConfigId!}
-                ctaLabel="Conectar com WhatsApp Business app"
-              />
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Login integrado não configurado (falta META_APP_ID/META_COEXISTENCE_CONFIG_ID).
-              </p>
-            )
+            <>
+              {coexistenceEnabled && (
+                <div className="space-y-2 rounded-md border p-4">
+                  <p className="text-sm font-medium">Login integrado com Coexistência</p>
+                  <ConnectAccountButton
+                    workspaceId={workspaceId}
+                    metaAppId={metaAppId!}
+                    graphApiVersion={graphApiVersion}
+                    coexistenceConfigId={coexistenceConfigId!}
+                    ctaLabel="Conectar com WhatsApp Business app"
+                  />
+                </div>
+              )}
+              <div className={coexistenceEnabled ? "space-y-2 border-t pt-4" : "space-y-2"}>
+                <p className="text-sm font-medium">Conexão manual (WABA já existe na Autoprocs)</p>
+                <ManualMetaConnectForm workspaceId={workspaceId} />
+              </div>
+            </>
           ) : (
             <p className="text-muted-foreground text-sm">
               Apenas owners podem conectar a conta Meta deste workspace.
@@ -251,7 +258,7 @@ export function MetaConnectionPanel({
         />
       ))}
 
-      {canManage && coexistenceEnabled && (
+      {canManage && (
         <Card className="border-dashed">
           <CardHeader>
             <CardTitle className="text-base">Conectar outra conta</CardTitle>
@@ -259,14 +266,23 @@ export function MetaConnectionPanel({
               Adiciona uma nova WABA a esse workspace (não mexe nas contas já conectadas acima).
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ConnectAccountButton
-              workspaceId={workspaceId}
-              metaAppId={metaAppId!}
-              graphApiVersion={graphApiVersion}
-              coexistenceConfigId={coexistenceConfigId!}
-              ctaLabel="Conectar com WhatsApp Business app"
-            />
+          <CardContent className="space-y-4">
+            {coexistenceEnabled && (
+              <div className="space-y-2 rounded-md border p-4">
+                <p className="text-sm font-medium">Login integrado com Coexistência</p>
+                <ConnectAccountButton
+                  workspaceId={workspaceId}
+                  metaAppId={metaAppId!}
+                  graphApiVersion={graphApiVersion}
+                  coexistenceConfigId={coexistenceConfigId!}
+                  ctaLabel="Conectar com WhatsApp Business app"
+                />
+              </div>
+            )}
+            <div className={coexistenceEnabled ? "space-y-2 border-t pt-4" : "space-y-2"}>
+              <p className="text-sm font-medium">Conexão manual (WABA já existe na Autoprocs)</p>
+              <ManualMetaConnectForm workspaceId={workspaceId} />
+            </div>
           </CardContent>
         </Card>
       )}

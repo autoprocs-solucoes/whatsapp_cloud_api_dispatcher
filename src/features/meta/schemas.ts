@@ -10,6 +10,21 @@ export const completeMetaSignupSchema = z.object({
 
 export type CompleteMetaSignupInput = z.infer<typeof completeMetaSignupSchema>;
 
+export const connectMetaManuallySchema = z.object({
+  workspaceId: z.string().uuid(),
+  wabaId: z
+    .string()
+    .trim()
+    .min(5, "WABA ID inválido")
+    .regex(/^\d+$/, "WABA ID precisa ser numérico"),
+  accessToken: z
+    .string()
+    .trim()
+    .min(40, "Access token muito curto — confira no Business Manager"),
+});
+
+export type ConnectMetaManuallyInput = z.infer<typeof connectMetaManuallySchema>;
+
 export const disconnectMetaSchema = z.object({
   workspaceId: z.string().uuid(),
   connectionId: z.string().uuid(),
