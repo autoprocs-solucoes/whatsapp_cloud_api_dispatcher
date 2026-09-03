@@ -77,6 +77,32 @@ function extractHeaderImageLink(componentsRaw: unknown): string | null {
   return null;
 }
 
+// Templates com botão COPY_CODE ("Copiar código da oferta") exigem um
+// componente `button` em toda mensagem com o código real — mesmo o código
+// sendo fixo/aprovado no template (a Meta não injeta ele sozinha).
+// Sem isso: (#131008) Required parameter is missing.
+function extractCopyCodeButton(
+  componentsRaw: unknown,
+): { index: number; code: string } | null {
+  if (!Array.isArray(componentsRaw)) return null;
+  for (const c of componentsRaw) {
+    if (c && typeof c === "object" && (c as Record<string, unknown>).type === "BUTTONS") {
+      const buttons = (c as Record<string, unknown>).buttons;
+      if (!Array.isArray(buttons)) continue;
+      const idx = buttons.findIndex(
+        (b) => b && typeof b === "object" && (b as Record<string, unknown>).type === "COPY_CODE",
+      );
+      if (idx === -1) continue;
+      const btn = buttons[idx] as Record<string, unknown>;
+      const example = btn.example;
+      if (Array.isArray(example) && typeof example[0] === "string") {
+        return { index: idx, code: example[0] };
+      }
+    }
+  }
+  return null;
+}
+
 type TplParam =
   | { type: "text"; text: string }
   | { type: "text"; parameter_name: string; text: string };
@@ -153,6 +179,7 @@ async function sendTemplate(args: {
   bodyParams: TplParam[];
   headerImageId?: string | null;
   headerImageLink?: string | null;
+  copyCodeButton?: { index: number; code: string } | null;
 }): Promise<{ messageId: string }> {
   const components: Array<Record<string, unknown>> = [];
   if (args.headerImageId) {
@@ -170,6 +197,14 @@ async function sendTemplate(args: {
   }
   if (args.bodyParams.length > 0) {
     components.push({ type: "body", parameters: args.bodyParams });
+  }
+  if (args.copyCodeButton) {
+    components.push({
+      type: "button",
+      sub_type: "copy_code",
+      index: String(args.copyCodeButton.index),
+      parameters: [{ type: "coupon_code", coupon_code: args.copyCodeButton.code }],
+    });
   }
 
   const body = {
@@ -315,6 +350,7 @@ Deno.serve(async (_req) => {
         headerImageLink,
       )
       : null;
+    const copyCodeButton = extractCopyCodeButton(template.components_raw);
 
     let sent = 0;
     let failed = 0;
@@ -353,6 +389,7 @@ Deno.serve(async (_req) => {
             bodyParams,
             headerImageId,
             headerImageLink: headerImageId ? null : headerImageLink,
+            copyCodeButton,
           });
           await admin
             .from("dispatch_recipient")

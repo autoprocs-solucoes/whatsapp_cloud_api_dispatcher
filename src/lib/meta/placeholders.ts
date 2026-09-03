@@ -38,6 +38,39 @@ export function isNamedPlaceholder(p: string): boolean {
  * pela Meta (components_raw[].example.header_handle), já hospedado no CDN
  * da própria Meta.
  */
+/**
+ * Templates com botão COPY_CODE ("Copiar código da oferta") exigem um
+ * componente `button` na hora do envio, com o código real — mesmo o código
+ * sendo fixo/aprovado no template (a Meta não injeta ele sozinha, é preciso
+ * mandar em toda mensagem). Sem isso: (#131008) Required parameter is missing.
+ * Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates#copy-code-button
+ */
+export function extractCopyCodeButton(
+  componentsRaw: unknown,
+): { index: number; code: string } | null {
+  if (!Array.isArray(componentsRaw)) return null;
+  for (const c of componentsRaw) {
+    if (
+      c &&
+      typeof c === "object" &&
+      (c as Record<string, unknown>).type === "BUTTONS"
+    ) {
+      const buttons = (c as Record<string, unknown>).buttons;
+      if (!Array.isArray(buttons)) continue;
+      const idx = buttons.findIndex(
+        (b) => b && typeof b === "object" && (b as Record<string, unknown>).type === "COPY_CODE",
+      );
+      if (idx === -1) continue;
+      const btn = buttons[idx] as Record<string, unknown>;
+      const example = btn.example;
+      if (Array.isArray(example) && typeof example[0] === "string") {
+        return { index: idx, code: example[0] };
+      }
+    }
+  }
+  return null;
+}
+
 export function extractHeaderImageLink(componentsRaw: unknown): string | null {
   if (!Array.isArray(componentsRaw)) return null;
   for (const c of componentsRaw) {

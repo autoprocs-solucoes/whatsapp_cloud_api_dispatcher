@@ -14,7 +14,11 @@ import {
   uploadMediaFromUrl,
   type TemplateParameter,
 } from "@/lib/meta/graph-api";
-import { extractHeaderImageLink, isNamedPlaceholder } from "@/lib/meta/placeholders";
+import {
+  extractCopyCodeButton,
+  extractHeaderImageLink,
+  isNamedPlaceholder,
+} from "@/lib/meta/placeholders";
 import { normalizeBR } from "@/lib/phone/e164";
 import {
   createDispatchSchema,
@@ -345,6 +349,7 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
   const headerParameters = buildParameters(headerPlaceholders, resolved, "header");
   const bodyParameters = buildParameters(bodyPlaceholders, resolved, "body");
   const headerImageLink = extractHeaderImageLink(template.components_raw);
+  const copyCodeButton = extractCopyCodeButton(template.components_raw) ?? undefined;
   let headerImageId: string | undefined;
   if (headerImageLink) {
     try {
@@ -371,6 +376,7 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
       bodyParameters,
       headerImageId,
       headerImageLink: headerImageId ? undefined : (headerImageLink ?? undefined),
+      copyCodeButton,
     });
     return { ok: true, data: { messageId: r.messageId } };
   } catch (e) {

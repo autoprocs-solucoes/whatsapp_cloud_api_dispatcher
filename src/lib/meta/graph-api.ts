@@ -364,6 +364,11 @@ export type SendTemplateParams = {
   // pra entrega — a Meta pode não conseguir buscar todo link externo).
   headerImageId?: string;
   headerImageLink?: string;
+  // Botão COPY_CODE ("Copiar código da oferta") — a Meta exige esse
+  // componente em toda mensagem mesmo quando o código é fixo/aprovado no
+  // template (não é injetado automaticamente). `index` é a posição do botão
+  // no array `buttons` do template (0-based).
+  copyCodeButton?: { index: number; code: string };
 };
 
 type SendTemplateResponse = {
@@ -403,6 +408,15 @@ export async function sendTemplate(
     components.push({
       type: "body",
       parameters: params.bodyParameters.map(renderParameter),
+    });
+  }
+
+  if (params.copyCodeButton) {
+    components.push({
+      type: "button",
+      sub_type: "copy_code",
+      index: String(params.copyCodeButton.index),
+      parameters: [{ type: "coupon_code", coupon_code: params.copyCodeButton.code }],
     });
   }
 
