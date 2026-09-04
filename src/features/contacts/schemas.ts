@@ -62,13 +62,18 @@ export const decidePendingUpdateSchema = z.object({
   pending_id: z.string().uuid(),
 });
 
-export const listContactsSchema = z.object({
+export const contactFiltersSchema = z.object({
   search: z.string().optional().default(""),
   optOutFilter: z.enum(["all", "active", "opt_out"]).optional().default("all"),
   pendingFilter: z
     .enum(["all", "with_pending", "without_pending"])
     .optional()
     .default("all"),
+});
+
+export type ContactFilters = z.infer<typeof contactFiltersSchema>;
+
+export const listContactsSchema = contactFiltersSchema.extend({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(10).max(200).default(50),
 });

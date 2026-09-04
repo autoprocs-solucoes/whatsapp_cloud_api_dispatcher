@@ -14,6 +14,7 @@ import {
 import { requireActiveWorkspace } from "@/server/workspace";
 import {
   bulkDeleteContactsSchema,
+  contactFiltersSchema,
   createContactSchema,
   decidePendingUpdateSchema,
   deleteContactSchema,
@@ -22,6 +23,7 @@ import {
   submitPendingUpdatesSchema,
   toggleOptOutSchema,
   updateContactSchema,
+  type ContactFilters,
   type ImportMapping,
   type ListContactsParams,
 } from "@/features/contacts/schemas";
@@ -282,6 +284,41 @@ export async function confirmImportAction(
 }
 
 // ----------------------------------------------------------------------------
+// Filtros compartilhados entre listagem e "excluir tudo que corresponde"
+// ----------------------------------------------------------------------------
+async function getPendingContactIds(
+  admin: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+): Promise<string[]> {
+  const { data } = await admin
+    .from("contact_pending_update")
+    .select("contact_id")
+    .eq("workspace_id", workspaceId);
+  return Array.from(new Set((data ?? []).map((r) => r.contact_id)));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyContactFilters(query: any, filters: ContactFilters, pendingIds: string[] | null) {
+  let q = query;
+  if (filters.optOutFilter === "active") q = q.eq("opt_out", false);
+  if (filters.optOutFilter === "opt_out") q = q.eq("opt_out", true);
+
+  if (filters.pendingFilter === "with_pending" && pendingIds) {
+    q = q.in("id", pendingIds);
+  }
+  if (filters.pendingFilter === "without_pending" && pendingIds && pendingIds.length > 0) {
+    q = q.not("id", "in", `(${pendingIds.join(",")})`);
+  }
+
+  if (filters.search.trim()) {
+    const s = filters.search.trim().replace(/[%_]/g, "\\$&");
+    q = q.or(`full_name.ilike.%${s}%,phone_e164.ilike.%${s}%`);
+  }
+
+  return q;
+}
+
+// ----------------------------------------------------------------------------
 // Listagem com busca, filtros, paginação
 // ----------------------------------------------------------------------------
 export type ListContactsResult = {
@@ -303,11 +340,7 @@ export async function listContacts(
 
   let pendingIds: string[] | null = null;
   if (parsed.pendingFilter !== "all") {
-    const { data: pend } = await admin
-      .from("contact_pending_update")
-      .select("contact_id")
-      .eq("workspace_id", ctx.workspaceId);
-    pendingIds = Array.from(new Set((pend ?? []).map((r) => r.contact_id)));
+    pendingIds = await getPendingContactIds(admin, ctx.workspaceId);
   }
 
   if (parsed.pendingFilter === "with_pending" && pendingIds && pendingIds.length === 0) {
@@ -325,20 +358,7 @@ export async function listContacts(
     .select("*", { count: "exact" })
     .eq("workspace_id", ctx.workspaceId);
 
-  if (parsed.optOutFilter === "active") query = query.eq("opt_out", false);
-  if (parsed.optOutFilter === "opt_out") query = query.eq("opt_out", true);
-
-  if (parsed.pendingFilter === "with_pending" && pendingIds) {
-    query = query.in("id", pendingIds);
-  }
-  if (parsed.pendingFilter === "without_pending" && pendingIds && pendingIds.length > 0) {
-    query = query.not("id", "in", `(${pendingIds.join(",")})`);
-  }
-
-  if (parsed.search.trim()) {
-    const s = parsed.search.trim().replace(/[%_]/g, "\\$&");
-    query = query.or(`full_name.ilike.%${s}%,phone_e164.ilike.%${s}%`);
-  }
+  query = applyContactFilters(query, parsed, pendingIds);
 
   const from = (parsed.page - 1) * parsed.pageSize;
   const to = from + parsed.pageSize - 1;
@@ -464,6 +484,41 @@ export async function bulkDeleteContactsAction(
     .in("id", parsed.data.ids)
     .eq("workspace_id", ctx.workspaceId);
 
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/contatos");
+  return { ok: true, data: { deleted: count ?? 0 } };
+}
+
+// Exclui TODOS os contatos que batem com os filtros atuais (não só a página
+// visível) — usado pelo "selecionar todos os N filtrados" na tabela.
+export async function deleteAllMatchingAction(
+  formData: FormData,
+): Promise<ActionResult<{ deleted: number }>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const parsed = contactFiltersSchema.safeParse({
+    search: formData.get("search") ?? "",
+    optOutFilter: formData.get("optOutFilter") ?? "all",
+    pendingFilter: formData.get("pendingFilter") ?? "all",
+  });
+  if (!parsed.success) return { ok: false, error: "Dados inválidos" };
+
+  const admin = createAdminClient();
+
+  let pendingIds: string[] | null = null;
+  if (parsed.data.pendingFilter !== "all") {
+    pendingIds = await getPendingContactIds(admin, ctx.workspaceId);
+  }
+  if (parsed.data.pendingFilter === "with_pending" && pendingIds && pendingIds.length === 0) {
+    return { ok: true, data: { deleted: 0 } };
+  }
+
+  let query = admin.from("contact").delete({ count: "exact" }).eq("workspace_id", ctx.workspaceId);
+  query = applyContactFilters(query, parsed.data, pendingIds);
+
+  const { error, count } = await query;
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/contatos");

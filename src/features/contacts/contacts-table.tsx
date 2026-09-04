@@ -44,6 +44,7 @@ import { EditContactDialog } from "@/features/contacts/edit-contact-dialog";
 import { cn } from "@/lib/utils";
 import {
   bulkDeleteContactsAction,
+  deleteAllMatchingAction,
   deleteContactAction,
   toggleOptOutAction,
 } from "@/features/contacts/actions";
@@ -88,16 +89,28 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState<Contact | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
+
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
+  const appliedSearch = searchParams.get("search") ?? "";
+  const optOutFilter = (searchParams.get("optOutFilter") ?? "all") as "all" | "active" | "opt_out";
+  const pendingFilter = (searchParams.get("pendingFilter") ?? "all") as
+    | "all"
+    | "with_pending"
+    | "without_pending";
 
   useEffect(() => {
     setSelected(new Set());
+    setSelectAllMatching(false);
   }, [contacts]);
 
   function toggleSelectAll(checked: boolean) {
+    setSelectAllMatching(false);
     setSelected(checked ? new Set(contacts.map((c) => c.id)) : new Set());
   }
 
   function toggleSelectOne(id: string, checked: boolean) {
+    setSelectAllMatching(false);
     setSelected((prev) => {
       const next = new Set(prev);
       if (checked) next.add(id);
@@ -108,8 +121,32 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
 
   const allSelected = contacts.length > 0 && selected.size === contacts.length;
   const someSelected = selected.size > 0 && !allSelected;
+  const selectedCount = selectAllMatching ? total : selected.size;
+
+  function handleClearSelection() {
+    setSelected(new Set());
+    setSelectAllMatching(false);
+  }
 
   function handleBulkDelete() {
+    if (selectAllMatching) {
+      const fd = new FormData();
+      fd.append("search", appliedSearch);
+      fd.append("optOutFilter", optOutFilter);
+      fd.append("pendingFilter", pendingFilter);
+      startTransition(async () => {
+        const res = await deleteAllMatchingAction(fd);
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success(`${res.data.deleted} contato(s) excluído(s)`);
+        handleClearSelection();
+        router.refresh();
+      });
+      return;
+    }
+
     const ids = Array.from(selected);
     const fd = new FormData();
     fd.append("ids", JSON.stringify(ids));
@@ -120,17 +157,10 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
         return;
       }
       toast.success(`${res.data.deleted} contato(s) excluído(s)`);
-      setSelected(new Set());
+      handleClearSelection();
       router.refresh();
     });
   }
-
-  const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
-  const optOutFilter = (searchParams.get("optOutFilter") ?? "all") as "all" | "active" | "opt_out";
-  const pendingFilter = (searchParams.get("pendingFilter") ?? "all") as
-    | "all"
-    | "with_pending"
-    | "without_pending";
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -346,39 +376,52 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
       </div>
 
       {selected.size > 0 && (
-        <div className="bg-muted/40 flex items-center justify-between rounded-md border px-3 py-2">
-          <p className="text-sm">
-            {selected.size} contato(s) selecionado(s)
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelected(new Set())}
-              disabled={isPending}
-            >
-              Limpar seleção
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" disabled={isPending}>
-                  <Trash2 className="mr-1 size-3.5" /> Excluir selecionados
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir {selected.size} contato(s)?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Essa ação não pode ser desfeita. Histórico de disparos não é afetado.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleBulkDelete}>Excluir</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+        <div className="bg-muted/40 flex flex-col gap-2 rounded-md border px-3 py-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm">
+              {selectedCount} contato(s) selecionado(s)
+              {selectAllMatching && " (todos os que batem com o filtro atual)"}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearSelection}
+                disabled={isPending}
+              >
+                Limpar seleção
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" disabled={isPending}>
+                    <Trash2 className="mr-1 size-3.5" /> Excluir selecionados
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir {selectedCount} contato(s)?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Essa ação não pode ser desfeita. Histórico de disparos não é afetado.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleBulkDelete}>Excluir</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
+          {!selectAllMatching && allSelected && total > contacts.length && (
+            <button
+              type="button"
+              onClick={() => setSelectAllMatching(true)}
+              className="text-primary text-left text-xs underline underline-offset-2"
+            >
+              Todos os {contacts.length} desta página estão selecionados. Selecionar os{" "}
+              {total} contatos que batem com o filtro atual?
+            </button>
+          )}
         </div>
       )}
 
