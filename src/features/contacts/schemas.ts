@@ -42,6 +42,10 @@ export const deleteContactSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const bulkDeleteContactsSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(500),
+});
+
 export const submitPendingUpdatesSchema = z.object({
   contact_id: z.string().uuid(),
   fields: z

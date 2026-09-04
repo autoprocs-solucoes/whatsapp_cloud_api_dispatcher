@@ -42,7 +42,11 @@ import { Input } from "@/components/ui/input";
 import { parseCustomFields } from "@/features/contacts/custom-fields";
 import { EditContactDialog } from "@/features/contacts/edit-contact-dialog";
 import { cn } from "@/lib/utils";
-import { deleteContactAction, toggleOptOutAction } from "@/features/contacts/actions";
+import {
+  bulkDeleteContactsAction,
+  deleteContactAction,
+  toggleOptOutAction,
+} from "@/features/contacts/actions";
 import type { Contact } from "@/lib/supabase/database.types";
 
 type ColumnDef = { key: string; label: string; group: "base" | "custom" };
@@ -83,6 +87,43 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState<Contact | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [contacts]);
+
+  function toggleSelectAll(checked: boolean) {
+    setSelected(checked ? new Set(contacts.map((c) => c.id)) : new Set());
+  }
+
+  function toggleSelectOne(id: string, checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  const allSelected = contacts.length > 0 && selected.size === contacts.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  function handleBulkDelete() {
+    const ids = Array.from(selected);
+    const fd = new FormData();
+    fd.append("ids", JSON.stringify(ids));
+    startTransition(async () => {
+      const res = await bulkDeleteContactsAction(fd);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`${res.data.deleted} contato(s) excluído(s)`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
 
   const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
   const optOutFilter = (searchParams.get("optOutFilter") ?? "all") as "all" | "active" | "opt_out";
@@ -148,7 +189,7 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
   }
 
   const isVisible = (key: string) => visible.has(key);
-  const visibleColCount = allColumns.filter((c) => isVisible(c.key)).length + 1;
+  const visibleColCount = allColumns.filter((c) => isVisible(c.key)).length + 2;
 
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -304,10 +345,59 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className="bg-muted/40 flex items-center justify-between rounded-md border px-3 py-2">
+          <p className="text-sm">
+            {selected.size} contato(s) selecionado(s)
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelected(new Set())}
+              disabled={isPending}
+            >
+              Limpar seleção
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isPending}>
+                  <Trash2 className="mr-1 size-3.5" /> Excluir selecionados
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir {selected.size} contato(s)?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Essa ação não pode ser desfeita. Histórico de disparos não é afetado.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleBulkDelete}>Excluir</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-md border">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 text-xs">
             <tr>
+              <th className="w-8 px-3 py-2">
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected;
+                  }}
+                  onChange={(e) => toggleSelectAll(e.target.checked)}
+                  aria-label="Selecionar todos"
+                />
+              </th>
               {isVisible("full_name") && (
                 <th className="px-3 py-2 text-left font-medium">Nome</th>
               )}
@@ -348,6 +438,15 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
             ) : (
               contacts.map((c) => (
                 <tr key={c.id} className={cn("border-t", c.opt_out && "opacity-60")}>
+                  <td className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      className="size-4"
+                      checked={selected.has(c.id)}
+                      onChange={(e) => toggleSelectOne(c.id, e.target.checked)}
+                      aria-label={`Selecionar ${c.phone_e164}`}
+                    />
+                  </td>
                   {isVisible("full_name") && (
                     <td className="px-3 py-2">{c.full_name ?? "—"}</td>
                   )}

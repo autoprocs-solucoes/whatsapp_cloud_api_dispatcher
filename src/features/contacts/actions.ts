@@ -13,6 +13,7 @@ import {
 } from "@/lib/import/parse-spreadsheet";
 import { requireActiveWorkspace } from "@/server/workspace";
 import {
+  bulkDeleteContactsSchema,
   createContactSchema,
   decidePendingUpdateSchema,
   deleteContactSchema,
@@ -438,6 +439,35 @@ export async function toggleOptOutAction(formData: FormData): Promise<ActionResu
 
   revalidatePath("/contatos");
   return { ok: true, data: undefined };
+}
+
+export async function bulkDeleteContactsAction(
+  formData: FormData,
+): Promise<ActionResult<{ deleted: number }>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  let ids: string[];
+  try {
+    ids = JSON.parse(String(formData.get("ids") ?? "[]"));
+  } catch {
+    return { ok: false, error: "Dados inválidos" };
+  }
+
+  const parsed = bulkDeleteContactsSchema.safeParse({ ids });
+  if (!parsed.success) return { ok: false, error: "Dados inválidos" };
+
+  const admin = createAdminClient();
+  const { error, count } = await admin
+    .from("contact")
+    .delete({ count: "exact" })
+    .in("id", parsed.data.ids)
+    .eq("workspace_id", ctx.workspaceId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/contatos");
+  return { ok: true, data: { deleted: count ?? 0 } };
 }
 
 export async function createContactAction(formData: FormData): Promise<ActionResult> {
