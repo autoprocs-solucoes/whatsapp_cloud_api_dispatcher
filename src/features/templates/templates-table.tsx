@@ -194,9 +194,18 @@ function TemplateCard({ template, isOwner }: { template: Template; isOwner: bool
   );
 }
 
+type ActiveFilter = "all" | "active" | "inactive";
+
+const ACTIVE_FILTER_OPTIONS: { value: ActiveFilter; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "active", label: "Ativos" },
+  { value: "inactive", label: "Desativados" },
+];
+
 export function TemplatesTable({ templates, isOwner }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("active");
 
   function handleSync() {
     startTransition(async () => {
@@ -210,34 +219,60 @@ export function TemplatesTable({ templates, isOwner }: Props) {
     });
   }
 
+  const filteredTemplates = templates.filter((t) => {
+    if (activeFilter === "active") return t.active;
+    if (activeFilter === "inactive") return !t.active;
+    return true;
+  });
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
-          {templates.length} template(s) no cache local. Hover preenche com valores de exemplo.
+          {filteredTemplates.length} de {templates.length} template(s) no cache local. Hover
+          preenche com valores de exemplo.
         </p>
-        {isOwner && (
-          <Button onClick={handleSync} disabled={isPending} size="sm">
-            {isPending ? (
-              <>
-                <Loader2 className="mr-1 size-4 animate-spin" /> Sincronizando…
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-1 size-4" /> Sincronizar
-              </>
-            )}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border p-0.5">
+            {ACTIVE_FILTER_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                onClick={() => setActiveFilter(opt.value)}
+                size="sm"
+                variant={activeFilter === opt.value ? "secondary" : "ghost"}
+                className="h-7 px-2 text-xs"
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+          {isOwner && (
+            <Button onClick={handleSync} disabled={isPending} size="sm">
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-1 size-4 animate-spin" /> Sincronizando…
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-1 size-4" /> Sincronizar
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {templates.length === 0 ? (
         <div className="text-muted-foreground rounded-md border border-dashed px-3 py-12 text-center text-sm">
           Nenhum template no cache. Clique em <strong>Sincronizar</strong> pra puxar da Meta.
         </div>
+      ) : filteredTemplates.length === 0 ? (
+        <div className="text-muted-foreground rounded-md border border-dashed px-3 py-12 text-center text-sm">
+          Nenhum template {activeFilter === "active" ? "ativo" : "desativado"} pra mostrar.
+        </div>
       ) : (
         <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {templates.map((t) => (
+          {filteredTemplates.map((t) => (
             <TemplateCard key={t.id} template={t} isOwner={isOwner} />
           ))}
         </div>
