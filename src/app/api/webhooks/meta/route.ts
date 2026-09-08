@@ -29,19 +29,6 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  // DEBUG TEMP: compara hashes (nunca o valor cru) pra diagnosticar mismatch.
-  if (searchParams.get("debug") === "1") {
-    const hash = (s: string | undefined | null) =>
-      s ? crypto.createHash("sha256").update(s).digest("hex").slice(0, 12) : null;
-    return NextResponse.json({
-      envSet: Boolean(serverEnv.META_VERIFY_TOKEN),
-      envLen: serverEnv.META_VERIFY_TOKEN?.length ?? null,
-      envHash: hash(serverEnv.META_VERIFY_TOKEN),
-      tokenParamLen: token?.length ?? null,
-      tokenParamHash: hash(token),
-    });
-  }
-
   if (mode === "subscribe" && token && serverEnv.META_VERIFY_TOKEN && token === serverEnv.META_VERIFY_TOKEN) {
     return new NextResponse(challenge ?? "", { status: 200 });
   }
