@@ -92,12 +92,41 @@ async function processReaction(admin: ReturnType<typeof createAdminClient>, reac
     .eq("meta_message_id", reaction.message_id);
 }
 
+// Repassa o payload cru pra URL antiga (se configurada) — best-effort, com
+// timeout curto, nunca bloqueia nem derruba a resposta pra Meta.
+async function forwardToLegacyUrl(rawBody: string, signatureHeader: string | null) {
+  const url = serverEnv.META_WEBHOOK_FORWARD_URL;
+  if (!url) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(signatureHeader ? { "X-Hub-Signature-256": signatureHeader } : {}),
+      },
+      body: rawBody,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+  } catch (e) {
+    console.error("[meta/webhook] forward falhou:", (e as Error).message);
+  }
+}
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
+  const signatureHeader = req.headers.get("x-hub-signature-256");
 
-  if (!isValidSignature(rawBody, req.headers.get("x-hub-signature-256"))) {
+  if (!isValidSignature(rawBody, signatureHeader)) {
     return new NextResponse(null, { status: 401 });
   }
+
+  // Awaited (não fire-and-forget): em serverless a função pode ser encerrada
+  // assim que a resposta é enviada, então precisa terminar isso antes de
+  // retornar. Tem timeout curto embutido, então não trava a resposta pra Meta.
+  await forwardToLegacyUrl(rawBody, signatureHeader);
 
   let body: { object?: string; entry?: { changes?: { value?: Record<string, unknown> }[] }[] };
   try {

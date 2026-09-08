@@ -25,4 +25,9 @@ export const serverEnv = {
   META_COEXISTENCE_CONFIG_ID: process.env.META_COEXISTENCE_CONFIG_ID,
   META_GRAPH_API_VERSION: process.env.META_GRAPH_API_VERSION ?? "v21.0",
   META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN,
+  // URL antiga que já recebia os webhooks da Meta (ex: automação em n8n) —
+  // opcional. Se setada, /api/webhooks/meta repassa cada evento pra ela
+  // também, além de processar pro dispatcher, pra não quebrar quem já
+  // dependia dela quando trocamos a Callback URL do app na Meta.
+  META_WEBHOOK_FORWARD_URL: process.env.META_WEBHOOK_FORWARD_URL,
 };
