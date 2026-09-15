@@ -40,6 +40,7 @@ import type {
   DispatchRecipient,
   Template,
 } from "@/lib/supabase/database.types";
+import type { TimelineDay } from "@/features/dashboard/queries";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -164,6 +165,78 @@ export async function listDispatches(): Promise<DispatchListItem[]> {
   });
 }
 
+export type DispatchErrorGroup = {
+  error_code: string | null;
+  error_message: string | null;
+  count: number;
+};
+
+function dateKey(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+// Bucketiza os envios do comunicado por dia (mesma lógica exclusiva do
+// dashboard: cada recipient conta uma vez, no estágio terminal atingido).
+// Janela = do primeiro ao último dia com atividade nesse comunicado (não fixa
+// em 30 dias, já que um comunicado normalmente é bem mais curto que isso).
+// Falhas no envio (rejeitadas na hora, sem sent_at) usam failed_at como data.
+function buildDispatchTimeline(
+  rows: { status: string; sent_at: string | null; failed_at: string | null }[],
+): TimelineDay[] {
+  const dated = rows
+    .map((r) => ({ status: r.status, eventDate: r.sent_at ?? r.failed_at }))
+    .filter((r): r is { status: string; eventDate: string } => !!r.eventDate);
+  if (dated.length === 0) return [];
+
+  const keys = dated.map((r) => dateKey(r.eventDate));
+  const minKey = keys.reduce((a, b) => (a < b ? a : b));
+  const maxKey = keys.reduce((a, b) => (a > b ? a : b));
+
+  const map = new Map<string, TimelineDay>();
+  const cursor = new Date(`${minKey}T00:00:00`);
+  const end = new Date(`${maxKey}T00:00:00`);
+  while (cursor <= end) {
+    const key = dateKey(cursor.toISOString());
+    map.set(key, { date: key, sent: 0, delivered: 0, read: 0, failed: 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  dated.forEach((r) => {
+    const day = map.get(dateKey(r.eventDate));
+    if (!day) return;
+    if (r.status === "sent") day.sent++;
+    else if (r.status === "delivered") {
+      day.sent++;
+      day.delivered++;
+    } else if (r.status === "read") {
+      day.sent++;
+      day.delivered++;
+      day.read++;
+    } else if (r.status === "failed") day.failed++;
+  });
+
+  return Array.from(map.values());
+}
+
+function buildErrorGroups(
+  rows: { status: string; error_code: string | null; error_message: string | null }[],
+): DispatchErrorGroup[] {
+  const groups = new Map<string, DispatchErrorGroup>();
+  rows.forEach((r) => {
+    if (r.status !== "failed") return;
+    const key = `${r.error_code ?? ""}|${r.error_message ?? ""}`;
+    const existing = groups.get(key);
+    if (existing) existing.count++;
+    else
+      groups.set(key, {
+        error_code: r.error_code,
+        error_message: r.error_message,
+        count: 1,
+      });
+  });
+  return Array.from(groups.values()).sort((a, b) => b.count - a.count);
+}
+
 export type DispatchDetail = {
   dispatch: Dispatch;
   template: Template | null;
@@ -171,6 +244,8 @@ export type DispatchDetail = {
   totalRecipients: number;
   counts: Record<string, number>;
   reactionCount: number;
+  timeline: TimelineDay[];
+  errorGroups: DispatchErrorGroup[];
 };
 
 export async function getDispatch(
@@ -211,13 +286,13 @@ export async function getDispatch(
 
   const { data: recipients, count } = await recipientsQ.range(from, to);
 
-  const { data: allStatuses } = await admin
+  const { data: allRows } = await admin
     .from("dispatch_recipient")
-    .select("status")
+    .select("status, sent_at, failed_at, error_code, error_message")
     .eq("dispatch_id", id);
 
   const counts: Record<string, number> = {};
-  (allStatuses ?? []).forEach((r) => {
+  (allRows ?? []).forEach((r) => {
     counts[r.status] = (counts[r.status] ?? 0) + 1;
   });
 
@@ -234,6 +309,8 @@ export async function getDispatch(
     totalRecipients: count ?? 0,
     counts,
     reactionCount: reactionCount ?? 0,
+    timeline: buildDispatchTimeline(allRows ?? []),
+    errorGroups: buildErrorGroups(allRows ?? []),
   };
 }
 

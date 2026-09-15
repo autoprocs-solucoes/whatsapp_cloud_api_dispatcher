@@ -13,14 +13,17 @@ import {
 
 import type { TimelineDay } from "@/features/dashboard/queries";
 
-type Props = { data: TimelineDay[] };
+type Props = { data: TimelineDay[]; emptyMessage?: string };
 
 function formatShortDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
-export function DashboardTimeline({ data }: Props) {
+export function DashboardTimeline({
+  data,
+  emptyMessage = "Sem envios nos últimos 30 dias. Crie um comunicado pra começar.",
+}: Props) {
   // Cada barra mostra a contagem terminal naquele dia.
   // sent = só sent (não delivered ainda), delivered = delivered (não read),
   // read = chegou a leitura, failed = falhou.
@@ -43,7 +46,7 @@ export function DashboardTimeline({ data }: Props) {
   if (totalAll === 0) {
     return (
       <div className="text-muted-foreground flex h-[220px] items-center justify-center text-xs">
-        Sem envios nos últimos 30 dias. Crie um comunicado pra começar.
+        {emptyMessage}
       </div>
     );
   }

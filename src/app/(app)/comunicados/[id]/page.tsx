@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DispatchExecutePanel } from "@/features/dispatch/dispatch-execute-panel";
 import { getDispatch } from "@/features/dispatch/actions";
+import { DashboardTimeline } from "@/features/dashboard/dashboard-timeline";
 import { ReadRateInfo } from "@/features/dashboard/read-rate-info";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +63,16 @@ export default async function ComunicadoDetalhe({
   const detail = await getDispatch(id, { page, pageSize: 50, statusFilter });
   if (!detail) notFound();
 
-  const { dispatch, template, recipients, totalRecipients, counts, reactionCount } = detail;
+  const {
+    dispatch,
+    template,
+    recipients,
+    totalRecipients,
+    counts,
+    reactionCount,
+    timeline,
+    errorGroups,
+  } = detail;
   const totalPages = Math.max(1, Math.ceil(totalRecipients / 50));
 
   const total = dispatch.total_recipients || 0;
@@ -188,6 +198,53 @@ export default async function ComunicadoDetalhe({
           </p>
         </div>
       </div>
+
+      {timeline.length > 0 && (
+        <section className="rounded-md border p-4">
+          <div className="mb-3">
+            <h2 className="text-sm font-medium">Tendência</h2>
+            <p className="text-muted-foreground text-xs">
+              Envios deste comunicado por dia
+            </p>
+          </div>
+          <DashboardTimeline data={timeline} emptyMessage="Sem envios ainda." />
+        </section>
+      )}
+
+      {errorGroups.length > 0 && (
+        <section className="rounded-md border p-4">
+          <div className="mb-3">
+            <h2 className="text-sm font-medium">Erros mais comuns</h2>
+            <p className="text-muted-foreground text-xs">
+              {failedCount} falha(s) agrupadas por causa
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-md border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/40 text-xs">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">Código</th>
+                  <th className="px-3 py-2 text-left font-medium">Mensagem</th>
+                  <th className="px-3 py-2 text-right font-medium">Ocorrências</th>
+                </tr>
+              </thead>
+              <tbody>
+                {errorGroups.map((g, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="text-muted-foreground px-3 py-2 font-mono text-xs">
+                      {g.error_code || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-xs">{g.error_message || "—"}</td>
+                    <td className="text-foreground px-3 py-2 text-right text-xs font-semibold">
+                      {g.count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
