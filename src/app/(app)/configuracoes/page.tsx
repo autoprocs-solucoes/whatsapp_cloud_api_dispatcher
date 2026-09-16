@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetaConnectionPanel } from "@/features/meta/meta-connection-panel";
+import { AvatarUploadForm } from "@/features/profile/avatar-upload-form";
 import { InviteMemberForm } from "@/features/workspace/invite-member-form";
 import { MembersTable } from "@/features/workspace/members-table";
 import { removeMemberAction } from "@/features/workspace/actions";
@@ -38,14 +39,33 @@ export default async function ConfiguracoesPage() {
         </p>
       </header>
 
-      <Tabs defaultValue="workspace" className="space-y-4">
+      <Tabs defaultValue="perfil" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="perfil">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
           <TabsTrigger value="meta" className="gap-1.5">
             <Image src="/meta-logo.png" alt="" width={14} height={14} /> Meta
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="perfil">
+          <Card>
+            <CardHeader>
+              <CardTitle>Foto de perfil</CardTitle>
+              <CardDescription>
+                Aparece no menu do usuário. Vale pra qualquer conta, inclusive admin master.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AvatarUploadForm
+                initialAvatarUrl={user.profile.avatar_url}
+                fullName={user.profile.full_name}
+                email={user.email}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="workspace">
           <Card>

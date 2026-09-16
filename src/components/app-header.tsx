@@ -21,7 +21,7 @@ function findPageTitle(pathname: string): string {
 }
 
 type Props = {
-  user: { fullName: string; email: string };
+  user: { fullName: string; email: string; avatarUrl: string | null };
 };
 
 export function AppHeader({ user }: Props) {
@@ -35,7 +35,7 @@ export function AppHeader({ user }: Props) {
       <h1 className="text-base font-semibold">{title}</h1>
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
-        <UserMenu fullName={user.fullName} email={user.email} />
+        <UserMenu fullName={user.fullName} email={user.email} avatarUrl={user.avatarUrl} />
       </div>
     </header>
   );

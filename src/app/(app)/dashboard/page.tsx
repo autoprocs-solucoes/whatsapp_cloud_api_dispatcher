@@ -1,20 +1,13 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
-  Send,
-  ShieldOff,
-  Users,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, Send, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DashboardAchievements } from "@/features/dashboard/dashboard-achievements";
 import { DashboardFunnel } from "@/features/dashboard/dashboard-funnel";
 import { DashboardTimeline } from "@/features/dashboard/dashboard-timeline";
 import { ReadRateInfo } from "@/features/dashboard/read-rate-info";
 import { getDashboardStats } from "@/features/dashboard/queries";
+import { listDispatches } from "@/features/dispatch/actions";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
@@ -47,7 +40,7 @@ function pct(n: number | null): string {
 }
 
 export default async function DashboardPage() {
-  const stats = await getDashboardStats();
+  const [stats, dispatches] = await Promise.all([getDashboardStats(), listDispatches()]);
 
   if (!stats) {
     return (
@@ -62,23 +55,31 @@ export default async function DashboardPage() {
     );
   }
 
-  const { contacts, dispatches, timeline_30d, funnel_30d, achievements } = stats;
-  const last = dispatches.last;
+  const { contacts, total_sent_alltime, dispatches: dispatchStats, timeline_30d, funnel_30d } =
+    stats;
+  const last = dispatchStats.last;
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">
-          Visão geral do workspace — métricas dos últimos 30 dias + conquistas.
-        </p>
+        <p className="text-muted-foreground text-sm">Visão geral do workspace.</p>
       </header>
 
-      {/* Gamificação / achievements */}
-      <DashboardAchievements data={achievements} />
-
-      {/* Linha de cards rápidos */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-card rounded-md border p-4">
+          <div className="flex items-center gap-2">
+            <Send className="text-muted-foreground size-4" />
+            <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
+              Total enviado
+            </p>
+          </div>
+          <p className="text-foreground mt-2 text-2xl font-semibold">
+            {total_sent_alltime.toLocaleString("pt-BR")}
+          </p>
+          <p className="text-muted-foreground mt-1 text-[11px]">mensagens desde sempre</p>
+        </div>
+
         <div className="bg-card rounded-md border p-4">
           <div className="flex items-center gap-2">
             <Users className="text-muted-foreground size-4" />
@@ -88,25 +89,6 @@ export default async function DashboardPage() {
           </div>
           <p className="text-foreground mt-2 text-2xl font-semibold">
             {contacts.total.toLocaleString("pt-BR")}
-          </p>
-          <p className="text-muted-foreground mt-1 text-[11px]">
-            <ShieldOff className="mr-0.5 inline size-3" />
-            {contacts.opted_out} em opt-out
-          </p>
-        </div>
-
-        <div className="bg-card rounded-md border p-4">
-          <div className="flex items-center gap-2">
-            <Loader2 className="text-muted-foreground size-4" />
-            <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-              Em execução
-            </p>
-          </div>
-          <p className="text-foreground mt-2 text-2xl font-semibold">
-            {dispatches.in_progress}
-          </p>
-          <p className="text-muted-foreground mt-1 text-[11px]">
-            comunicado(s) ativos
           </p>
         </div>
 
@@ -118,10 +100,7 @@ export default async function DashboardPage() {
             </p>
           </div>
           <p className="text-foreground mt-2 text-2xl font-semibold">
-            {pct(dispatches.delivery_rate_30d)}
-          </p>
-          <p className="text-muted-foreground mt-1 text-[11px]">
-            {dispatches.last_30d_count} disparo(s) nos últimos 30d
+            {pct(dispatchStats.delivery_rate_30d)}
           </p>
         </div>
 
@@ -134,10 +113,7 @@ export default async function DashboardPage() {
             <ReadRateInfo />
           </div>
           <p className="text-foreground mt-2 text-2xl font-semibold">
-            {pct(dispatches.read_rate_30d)}
-          </p>
-          <p className="text-muted-foreground mt-1 text-[11px]">
-            limite real depende do opt-in de leitura dos contatos
+            {pct(dispatchStats.read_rate_30d)}
           </p>
         </div>
       </div>
@@ -145,30 +121,11 @@ export default async function DashboardPage() {
       {/* Timeline + Funil lado-a-lado */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <section className="rounded-md border p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-medium">Envios por dia</h2>
-              <p className="text-muted-foreground text-xs">
-                Últimos 30 dias · status atual de cada destinatário
-              </p>
-            </div>
-            {achievements.best_day && (
-              <div className="text-right">
-                <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-                  Melhor dia
-                </p>
-                <p className="text-foreground text-sm font-semibold">
-                  {new Date(
-                    `${achievements.best_day.date}T00:00:00`,
-                  ).toLocaleDateString("pt-BR", {
-                    day: "2-digit",
-                    month: "short",
-                  })}
-                  {" · "}
-                  {achievements.best_day.sent.toLocaleString("pt-BR")} envio(s)
-                </p>
-              </div>
-            )}
+          <div className="mb-3">
+            <h2 className="text-sm font-medium">Envios por dia</h2>
+            <p className="text-muted-foreground text-xs">
+              Últimos 30 dias · status atual de cada destinatário
+            </p>
           </div>
           <DashboardTimeline data={timeline_30d} />
         </section>
@@ -226,6 +183,67 @@ export default async function DashboardPage() {
             <Badge variant={statusBadgeVariant(last.status)} className="text-xs">
               {STATUS_LABELS[last.status] ?? last.status}
             </Badge>
+          </div>
+        )}
+      </section>
+
+      {/* Dashboards por comunicado — métricas separadas de cada disparo */}
+      <section className="rounded-md border p-4">
+        <div className="mb-3">
+          <h2 className="text-sm font-medium">Comunicados enviados</h2>
+          <p className="text-muted-foreground text-xs">
+            Clique num comunicado pra ver o dashboard dele (funil, tendência diária e erros).
+          </p>
+        </div>
+
+        {dispatches.length === 0 ? (
+          <p className="text-muted-foreground py-6 text-center text-sm">
+            Nenhum comunicado enviado ainda.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-md border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/40 text-xs">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">Template</th>
+                  <th className="px-3 py-2 text-left font-medium">Status</th>
+                  <th className="px-3 py-2 text-right font-medium">Enviados</th>
+                  <th className="px-3 py-2 text-right font-medium">Entregues</th>
+                  <th className="px-3 py-2 text-right font-medium">Lidos</th>
+                  <th className="px-3 py-2 text-right font-medium">Falhas</th>
+                  <th className="px-3 py-2 text-left font-medium">Criado em</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dispatches.map((d) => {
+                  const sent = d.counts.sent ?? 0;
+                  const delivered = d.counts.delivered ?? 0;
+                  const read = d.counts.read ?? 0;
+                  const failed = d.counts.failed ?? 0;
+                  return (
+                    <tr key={d.id} className="hover:bg-muted/20 border-t">
+                      <td className="px-3 py-2 font-medium">
+                        <Link href={`/comunicados/${d.id}`} className="hover:underline">
+                          {d.template_name ?? "—"}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Badge variant={statusBadgeVariant(d.status)} className="text-[10px]">
+                          {STATUS_LABELS[d.status] ?? d.status}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-right text-xs">{sent + delivered + read}</td>
+                      <td className="px-3 py-2 text-right text-xs">{delivered + read}</td>
+                      <td className="px-3 py-2 text-right text-xs">{read}</td>
+                      <td className="text-destructive px-3 py-2 text-right text-xs">{failed}</td>
+                      <td className="text-muted-foreground px-3 py-2 text-xs">
+                        {new Date(d.created_at).toLocaleDateString("pt-BR")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </section>

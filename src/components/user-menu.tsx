@@ -2,7 +2,7 @@
 
 import { LogOut, User } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ import { signOutAction } from "@/features/auth/actions";
 type Props = {
   fullName: string;
   email: string;
+  avatarUrl?: string | null;
 };
 
 function initials(name: string): string {
@@ -28,12 +29,13 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
-export function UserMenu({ fullName, email }: Props) {
+export function UserMenu({ fullName, email, avatarUrl }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full" aria-label="Menu do usuário">
           <Avatar className="size-8">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName || email} />}
             <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
               {initials(fullName || email)}
             </AvatarFallback>
