@@ -9,6 +9,7 @@ import { UserMenu } from "@/components/user-menu";
 import { navGroups } from "@/lib/navigation";
 
 function findPageTitle(pathname: string): string {
+  if (pathname === "/master" || pathname.startsWith("/master/")) return "Master";
   for (const group of navGroups) {
     for (const item of group.items) {
       if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {

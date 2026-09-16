@@ -1,0 +1,110 @@
+import "server-only";
+
+import { notFound } from "next/navigation";
+
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireUser, type AuthenticatedUser } from "@/server/auth";
+
+/**
+ * `profile.is_superadmin` já existe desde a migration inicial
+ * (0001_init_auth_workspaces.sql) mas nunca tinha sido usado em código — é o
+ * mecanismo certo pra gate do painel master (por usuário, editável via banco,
+ * sem precisar de redeploy pra promover/revogar alguém).
+ */
+export async function requireMasterUser(): Promise<AuthenticatedUser> {
+  const user = await requireUser();
+  // 404 (não 403) — não revela que a rota existe pra quem não é master.
+  if (!user.profile.is_superadmin) notFound();
+  return user;
+}
+
+// ----------------------------------------------------------------------------
+// Listagem cross-tenant pro painel master.
+// ----------------------------------------------------------------------------
+export type MasterWorkspaceRow = {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  ownerEmail: string | null;
+  memberCount: number;
+  contactCount: number;
+  dispatchCount30d: number;
+  connections: {
+    id: string;
+    wabaId: string;
+    businessName: string | null;
+    connectionMethod: string;
+    canSendMessage: string | null;
+  }[];
+};
+
+export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
+  const admin = createAdminClient();
+
+  const { data: workspaces } = await admin
+    .from("workspace")
+    .select("id, name, slug, owner_id, created_at")
+    .order("created_at", { ascending: false });
+  if (!workspaces || workspaces.length === 0) return [];
+
+  const workspaceIds = workspaces.map((w) => w.id);
+  const ownerIds = [...new Set(workspaces.map((w) => w.owner_id))];
+  const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // profile não tem e-mail (isso vive só no auth.users) — busca via admin auth,
+  // uma chamada por owner único (lista de workspaces não costuma ser gigante).
+  const [ownersRes, membersRes, contactsRes, dispatchesRes, connectionsRes] = await Promise.all([
+    Promise.all(ownerIds.map((id) => admin.auth.admin.getUserById(id))),
+    admin.from("workspace_member").select("workspace_id").in("workspace_id", workspaceIds),
+    admin.from("contact").select("workspace_id").in("workspace_id", workspaceIds),
+    admin
+      .from("dispatch")
+      .select("workspace_id")
+      .in("workspace_id", workspaceIds)
+      .gte("created_at", since30),
+    admin
+      .from("workspace_meta_connection")
+      .select("id, workspace_id, waba_id, business_name, connection_method, health_status")
+      .in("workspace_id", workspaceIds),
+  ]);
+
+  const emailByUserId = new Map(
+    ownersRes.map((r, i) => [ownerIds[i], r.data.user?.email ?? null] as const),
+  );
+
+  const countBy = (rows: { workspace_id: string }[] | null) => {
+    const map = new Map<string, number>();
+    (rows ?? []).forEach((r) => map.set(r.workspace_id, (map.get(r.workspace_id) ?? 0) + 1));
+    return map;
+  };
+  const memberCounts = countBy(membersRes.data);
+  const contactCounts = countBy(contactsRes.data);
+  const dispatchCounts = countBy(dispatchesRes.data);
+
+  const connectionsByWorkspace = new Map<string, MasterWorkspaceRow["connections"]>();
+  for (const c of connectionsRes.data ?? []) {
+    const list = connectionsByWorkspace.get(c.workspace_id) ?? [];
+    const health = c.health_status as { can_send_message?: string } | null;
+    list.push({
+      id: c.id,
+      wabaId: c.waba_id,
+      businessName: c.business_name,
+      connectionMethod: c.connection_method,
+      canSendMessage: health?.can_send_message ?? null,
+    });
+    connectionsByWorkspace.set(c.workspace_id, list);
+  }
+
+  return workspaces.map((w) => ({
+    id: w.id,
+    name: w.name,
+    slug: w.slug,
+    createdAt: w.created_at,
+    ownerEmail: emailByUserId.get(w.owner_id) ?? null,
+    memberCount: memberCounts.get(w.id) ?? 0,
+    contactCount: contactCounts.get(w.id) ?? 0,
+    dispatchCount30d: dispatchCounts.get(w.id) ?? 0,
+    connections: connectionsByWorkspace.get(w.id) ?? [],
+  }));
+}

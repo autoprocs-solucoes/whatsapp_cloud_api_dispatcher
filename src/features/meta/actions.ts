@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   exchangeCodeForToken,
+  getWabaHealthStatus,
   getWabaInfo,
   GraphApiError,
   listPhoneNumbers,
@@ -92,6 +93,7 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
     const accessToken = await exchangeCodeForToken(code);
     const wabaInfo = await getWabaInfo(wabaId, accessToken);
     const phoneNumbers = await listPhoneNumbers(wabaId, accessToken);
+    const healthStatus = await getWabaHealthStatus(wabaId, accessToken);
 
     const admin = createAdminClient();
 
@@ -108,6 +110,8 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
           connected_by: auth.user.id,
           updated_at: new Date().toISOString(),
           connection_method: connectionMethod,
+          health_status: healthStatus as never,
+          health_synced_at: healthStatus ? new Date().toISOString() : null,
         },
         { onConflict: "workspace_id,waba_id" },
       )
@@ -229,6 +233,7 @@ export async function connectMetaManuallyAction(
     // Valida o token + busca info do WABA.
     const wabaInfo = await getWabaInfo(wabaId, accessToken);
     const phoneNumbers = await listPhoneNumbers(wabaId, accessToken);
+    const healthStatus = await getWabaHealthStatus(wabaId, accessToken);
 
     const admin = createAdminClient();
 
@@ -245,6 +250,8 @@ export async function connectMetaManuallyAction(
           connected_by: auth.user.id,
           updated_at: new Date().toISOString(),
           connection_method: "manual",
+          health_status: healthStatus as never,
+          health_synced_at: healthStatus ? new Date().toISOString() : null,
         },
         { onConflict: "workspace_id,waba_id" },
       )
@@ -404,12 +411,16 @@ export async function syncMetaConnectionAction(input: unknown): Promise<ActionRe
   try {
     const wabaInfo = await getWabaInfo(connection.waba_id, connection.access_token);
     const phoneNumbers = await listPhoneNumbers(connection.waba_id, connection.access_token);
+    // Best-effort — não bloqueia o sync se a Meta negar esse campo.
+    const healthStatus = await getWabaHealthStatus(connection.waba_id, connection.access_token);
 
     const { error: updateError } = await admin
       .from("workspace_meta_connection")
       .update({
         business_id: wabaInfo.owner_business_info?.id ?? null,
         business_name: wabaInfo.owner_business_info?.name ?? wabaInfo.name ?? null,
+        health_status: healthStatus as never,
+        health_synced_at: healthStatus ? new Date().toISOString() : null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", connectionId);

@@ -117,6 +117,49 @@ export async function getWabaInfo(wabaId: string, token: string): Promise<WabaIn
 }
 
 // ----------------------------------------------------------------------------
+// Health Status da WABA — mostra o motivo real por trás de bloqueios de envio
+// (billing, banimento, verificação de negócio pendente) que os erros de envio
+// sozinhos não explicam (ex.: "Business eligibility payment issue").
+// Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/guides/health-status
+// ----------------------------------------------------------------------------
+export type WabaHealthError = {
+  error_code?: number;
+  error_description?: string;
+  possible_solution?: string;
+};
+
+export type WabaHealthEntity = {
+  entity_type?: "APP" | "WABA" | "PHONE_NUMBER" | string;
+  id?: string;
+  can_send_message?: "AVAILABLE" | "LIMITED" | "BLOCKED" | string;
+  errors?: WabaHealthError[];
+};
+
+export type WabaHealthStatus = {
+  can_send_message?: "AVAILABLE" | "LIMITED" | "BLOCKED" | string;
+  entities?: WabaHealthEntity[];
+};
+
+// Best-effort: alguns tokens/versões de API não têm permissão pra esse campo.
+// Não deve derrubar o sync inteiro se falhar.
+export async function getWabaHealthStatus(
+  wabaId: string,
+  token: string,
+): Promise<WabaHealthStatus | null> {
+  try {
+    const data = await request<{ health_status?: WabaHealthStatus }>(`/${wabaId}`, {
+      method: "GET",
+      token,
+      query: { fields: "health_status" },
+    });
+    return data.health_status ?? null;
+  } catch (err) {
+    console.warn(`[getWabaHealthStatus] falhou pra ${wabaId}`, err);
+    return null;
+  }
+}
+
+// ----------------------------------------------------------------------------
 // Lista phone numbers do WABA.
 // ----------------------------------------------------------------------------
 export type PhoneNumberInfo = {
@@ -185,6 +228,141 @@ export async function listPhoneNumbers(
     })),
   );
   return enriched;
+}
+
+// ----------------------------------------------------------------------------
+// Analytics por template (sent/delivered/read/clicked) direto da Graph API —
+// não depende do nosso tracking local, então cobre também mensagens mandadas
+// fora do dispatcher (ex.: outra ferramenta usando a mesma WABA).
+// Docs: https://developers.facebook.com/docs/whatsapp/business-management-api/template-analytics
+// ----------------------------------------------------------------------------
+export type TemplateAnalyticsPoint = {
+  templateId: string;
+  sent: number;
+  delivered: number;
+  read: number;
+  clicked: number;
+};
+
+type TemplateAnalyticsRawClicked = { type?: string; button_content?: string; count?: number };
+type TemplateAnalyticsRawDataPoint = {
+  template_id?: string;
+  sent?: number;
+  delivered?: number;
+  read?: number;
+  clicked?: TemplateAnalyticsRawClicked[];
+};
+type TemplateAnalyticsRawResponse = {
+  data?: { data_points?: TemplateAnalyticsRawDataPoint[] }[];
+};
+
+// Best-effort — agrega por template_id somando os data_points diários do
+// período. Retorna mapa vazio (não lança) se a Meta recusar/mudar o formato.
+export async function getTemplateAnalytics(
+  wabaId: string,
+  token: string,
+  templateMetaIds: string[],
+  startUnix: number,
+  endUnix: number,
+): Promise<Map<string, TemplateAnalyticsPoint>> {
+  const out = new Map<string, TemplateAnalyticsPoint>();
+  if (templateMetaIds.length === 0) return out;
+
+  try {
+    const data = await request<TemplateAnalyticsRawResponse>(`/${wabaId}/template_analytics`, {
+      method: "GET",
+      token,
+      query: {
+        start: String(startUnix),
+        end: String(endUnix),
+        granularity: "DAILY",
+        template_ids: JSON.stringify(templateMetaIds),
+        metric_types: JSON.stringify(["sent", "delivered", "read", "clicked"]),
+      },
+    });
+
+    for (const series of data.data ?? []) {
+      for (const point of series.data_points ?? []) {
+        if (!point.template_id) continue;
+        const clickedCount = (point.clicked ?? []).reduce((acc, c) => acc + (c.count ?? 0), 0);
+        const existing = out.get(point.template_id) ?? {
+          templateId: point.template_id,
+          sent: 0,
+          delivered: 0,
+          read: 0,
+          clicked: 0,
+        };
+        existing.sent += point.sent ?? 0;
+        existing.delivered += point.delivered ?? 0;
+        existing.read += point.read ?? 0;
+        existing.clicked += clickedCount;
+        out.set(point.template_id, existing);
+      }
+    }
+  } catch (err) {
+    console.warn(`[getTemplateAnalytics] falhou pra WABA ${wabaId}`, err);
+  }
+
+  return out;
+}
+
+// ----------------------------------------------------------------------------
+// Custo/volume de conversas do WABA no período (o "Valor gasto" do WhatsApp
+// Manager). Sintaxe de edge com parâmetros embutidos no próprio `fields`.
+// Docs: https://developers.facebook.com/docs/whatsapp/business-management-api/analytics/conversation-analytics
+// ----------------------------------------------------------------------------
+export type ConversationCostSummary = {
+  totalConversations: number;
+  totalCost: number;
+  currency: string | null;
+};
+
+type ConversationAnalyticsRawDataPoint = {
+  conversation?: number;
+  cost?: number;
+};
+type ConversationAnalyticsRawResponse = {
+  conversation_analytics?: { data?: { data_points?: ConversationAnalyticsRawDataPoint[] }[] };
+};
+
+// Best-effort — soma custo/conversas de todos os data_points do período.
+// Não lança: token sem permissão pra esse campo, ou formato mudando de versão
+// pra versão da Graph API, não deve derrubar a tela de conexão.
+export async function getConversationCostSummary(
+  wabaId: string,
+  token: string,
+  startUnix: number,
+  endUnix: number,
+): Promise<ConversationCostSummary | null> {
+  try {
+    const fields =
+      `conversation_analytics.start(${startUnix}).end(${endUnix}).granularity(MONTHLY)` +
+      `.dimensions(["conversation_category"])`;
+    const data = await request<ConversationAnalyticsRawResponse>(`/${wabaId}`, {
+      method: "GET",
+      token,
+      query: { fields },
+    });
+
+    const points = data.conversation_analytics?.data?.flatMap((d) => d.data_points ?? []) ?? [];
+    if (points.length === 0) return null;
+
+    const totals = points.reduce(
+      (acc, p) => {
+        acc.totalConversations += p.conversation ?? 0;
+        acc.totalCost += p.cost ?? 0;
+        return acc;
+      },
+      { totalConversations: 0, totalCost: 0 },
+    );
+
+    // A Meta fatura conversas em USD por padrão nesse endpoint — ajustar aqui
+    // se o payload real trouxer campo de moeda explícito.
+    return { ...totals, currency: "USD" };
+  } catch (err) {
+    console.warn(`[getConversationCostSummary] falhou pra WABA ${wabaId}`, err);
+    return null;
+  }
 }
 
 // ----------------------------------------------------------------------------

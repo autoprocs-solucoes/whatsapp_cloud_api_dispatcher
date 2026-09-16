@@ -127,6 +127,8 @@ export type Database = {
           connected_by: string | null;
           updated_at: string;
           connection_method: string;
+          health_status: Json | null;
+          health_synced_at: string | null;
         };
         Insert: {
           id?: string;
@@ -139,6 +141,8 @@ export type Database = {
           connected_by?: string | null;
           updated_at?: string;
           connection_method?: string;
+          health_status?: Json | null;
+          health_synced_at?: string | null;
         };
         Update: {
           id?: string;
@@ -151,6 +155,8 @@ export type Database = {
           connected_by?: string | null;
           updated_at?: string;
           connection_method?: string;
+          health_status?: Json | null;
+          health_synced_at?: string | null;
         };
         Relationships: [
           {

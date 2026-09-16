@@ -49,7 +49,12 @@ function isValidSignature(rawBody: string, signatureHeader: string | null): bool
 type MetaStatus = {
   id?: string;
   status?: string;
-  errors?: { code?: number; title?: string; message?: string }[];
+  errors?: {
+    code?: number;
+    title?: string;
+    message?: string;
+    error_data?: { details?: string };
+  }[];
 };
 
 type MetaReaction = {
@@ -77,7 +82,12 @@ async function processStatus(admin: ReturnType<typeof createAdminClient>, status
     const err = status.errors?.[0];
     if (err) {
       patch.error_code = String(err.code ?? "");
-      patch.error_message = String(err.title ?? err.message ?? "").slice(0, 500);
+      // `error_data.details` costuma ter o motivo real e mais específico do
+      // que title/message sozinhos (ex.: "Business eligibility payment issue").
+      const base = err.title ?? err.message ?? "";
+      const details = err.error_data?.details;
+      const full = details && details !== base ? `${base} - ${details}` : base;
+      patch.error_message = String(full).slice(0, 500);
     }
   }
 

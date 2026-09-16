@@ -6,11 +6,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   GraphApiError,
+  getTemplateAnalytics,
   listTemplates,
   type MetaTemplate,
   type MetaTemplateComponent,
+  type TemplateAnalyticsPoint,
 } from "@/lib/meta/graph-api";
-import { getMetaConnections } from "@/server/meta";
+import { getMetaConnections, type MetaConnectionView } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
 import type { Template } from "@/lib/supabase/database.types";
 
@@ -47,6 +49,47 @@ export async function listTemplatesForWorkspace(): Promise<Template[]> {
     .order("status", { ascending: true })
     .order("name", { ascending: true });
   return data ?? [];
+}
+
+/**
+ * Analytics (sent/delivered/read/clicked) dos últimos 30 dias, direto da
+ * Graph API — batelado por conexão (WABA), já que o endpoint aceita vários
+ * template_ids numa chamada só. Chave do mapa é `meta_template_id`.
+ */
+export async function getTemplateAnalyticsForWorkspace(
+  templates: Template[],
+  connections: MetaConnectionView[],
+): Promise<Map<string, TemplateAnalyticsPoint>> {
+  const out = new Map<string, TemplateAnalyticsPoint>();
+  if (templates.length === 0 || connections.length === 0) return out;
+
+  const now = new Date();
+  const endUnix = Math.floor(now.getTime() / 1000);
+  const startUnix = endUnix - 30 * 24 * 60 * 60;
+
+  const templatesByConnection = new Map<string, string[]>();
+  for (const t of templates) {
+    const list = templatesByConnection.get(t.connection_id) ?? [];
+    list.push(t.meta_template_id);
+    templatesByConnection.set(t.connection_id, list);
+  }
+
+  await Promise.all(
+    connections.map(async ({ connection }) => {
+      const metaIds = templatesByConnection.get(connection.id);
+      if (!metaIds || metaIds.length === 0) return;
+      const result = await getTemplateAnalytics(
+        connection.waba_id,
+        connection.access_token,
+        metaIds,
+        startUnix,
+        endUnix,
+      );
+      for (const [id, point] of result) out.set(id, point);
+    }),
+  );
+
+  return out;
 }
 
 export async function setTemplateActiveAction(

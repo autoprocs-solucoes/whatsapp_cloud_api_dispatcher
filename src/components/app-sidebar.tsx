@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
+import { ShieldCheck } from "lucide-react";
 
 import {
   Sidebar,
@@ -25,9 +26,10 @@ import { navGroups } from "@/lib/navigation";
 type Props = {
   activeWorkspace: WorkspaceOption;
   workspaces: WorkspaceOption[];
+  isMaster?: boolean;
 };
 
-export function AppSidebar({ activeWorkspace, workspaces }: Props) {
+export function AppSidebar({ activeWorkspace, workspaces, isMaster }: Props) {
   const pathname = usePathname();
 
   return (
@@ -67,6 +69,28 @@ export function AppSidebar({ activeWorkspace, workspaces }: Props) {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+
+        {isMaster && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === "/master" || pathname.startsWith("/master/")}
+                    tooltip="Master"
+                  >
+                    <Link href={"/master" as Route}>
+                      <ShieldCheck />
+                      <span>Master</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

@@ -12,10 +12,12 @@ import { WhatsAppPreview, type PreviewButton } from "@/features/dispatch/whatsap
 import { setTemplateActiveAction, syncTemplatesAction } from "@/features/templates/actions";
 import { cn } from "@/lib/utils";
 import type { Template } from "@/lib/supabase/database.types";
+import type { TemplateAnalyticsPoint } from "@/lib/meta/graph-api";
 
 type Props = {
   templates: Template[];
   isOwner: boolean;
+  analyticsByTemplateId: Map<string, TemplateAnalyticsPoint>;
 };
 
 function statusVariant(
@@ -91,7 +93,39 @@ function extractButtons(buttons: unknown): PreviewButton[] {
     .map((b) => ({ type: b.type ?? "QUICK_REPLY", text: b.text! }));
 }
 
-function TemplateCard({ template, isOwner }: { template: Template; isOwner: boolean }) {
+function TemplateAnalyticsStats({ analytics }: { analytics: TemplateAnalyticsPoint | undefined }) {
+  if (!analytics || analytics.sent === 0) return null;
+  return (
+    <div className="text-muted-foreground grid grid-cols-4 gap-1 rounded-md border px-2 py-1.5 text-center text-[10px]">
+      <div>
+        <p className="text-foreground font-semibold">{analytics.sent}</p>
+        <p>Enviadas</p>
+      </div>
+      <div>
+        <p className="text-foreground font-semibold">{analytics.delivered}</p>
+        <p>Entregues</p>
+      </div>
+      <div>
+        <p className="text-foreground font-semibold">{analytics.read}</p>
+        <p>Lidas</p>
+      </div>
+      <div>
+        <p className="text-foreground font-semibold">{analytics.clicked}</p>
+        <p>Cliques</p>
+      </div>
+    </div>
+  );
+}
+
+function TemplateCard({
+  template,
+  isOwner,
+  analytics,
+}: {
+  template: Template;
+  isOwner: boolean;
+  analytics: TemplateAnalyticsPoint | undefined;
+}) {
   const [hovered, setHovered] = useState(false);
   const router = useRouter();
   const [isToggling, startToggle] = useTransition();
@@ -159,6 +193,8 @@ function TemplateCard({ template, isOwner }: { template: Template; isOwner: bool
         />
       </div>
 
+      <TemplateAnalyticsStats analytics={analytics} />
+
       <div className="mt-auto flex items-center justify-between gap-2">
         <span className="text-muted-foreground text-[10px]">
           {new Date(template.last_synced_at).toLocaleDateString("pt-BR")}
@@ -202,7 +238,7 @@ const ACTIVE_FILTER_OPTIONS: { value: ActiveFilter; label: string }[] = [
   { value: "inactive", label: "Desativados" },
 ];
 
-export function TemplatesTable({ templates, isOwner }: Props) {
+export function TemplatesTable({ templates, isOwner, analyticsByTemplateId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("active");
@@ -273,7 +309,12 @@ export function TemplatesTable({ templates, isOwner }: Props) {
       ) : (
         <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filteredTemplates.map((t) => (
-            <TemplateCard key={t.id} template={t} isOwner={isOwner} />
+            <TemplateCard
+              key={t.id}
+              template={t}
+              isOwner={isOwner}
+              analytics={analyticsByTemplateId.get(t.meta_template_id)}
+            />
           ))}
         </div>
       )}

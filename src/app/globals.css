@@ -2,11 +2,19 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme {
-  --font-sans:
-    var(--font-inter), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-}
+/*
+ * `--font-sans`/`--font-heading`/`--font-mono` não são declaradas aqui via
+ * `@theme` — nessa versão do Tailwind isso é ignorado (ver nota mais abaixo,
+ * antes do `.font-heading`). As fontes reais são aplicadas com regras CSS
+ * diretas (`!important`) logo depois do `@layer base`.
+ */
 
+/*
+ * Paleta baseada no azul de marca da Meta (#0866FF), a mesma cor do
+ * "infinito" usada em Meta Business Suite / WhatsApp Manager — pra dar a
+ * sensação de continuidade visual com as ferramentas oficiais que esse
+ * dispatcher complementa.
+ */
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -14,28 +22,33 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.52 0.21 263);
+  --primary: oklch(0.564 0.24 261.2);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.97 0.01 261.2);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
+  --muted: oklch(0.97 0.01 261.2);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent: oklch(0.95 0.03 261.2);
+  --accent-foreground: oklch(0.42 0.21 261.2);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.52 0.21 263);
+  --ring: oklch(0.564 0.24 261.2);
   --radius: 0.5rem;
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: oklch(0.99 0.005 261.2);
   --sidebar-foreground: oklch(0.205 0 0);
-  --sidebar-primary: oklch(0.52 0.21 263);
+  --sidebar-primary: oklch(0.564 0.24 261.2);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.95 0.03 263);
-  --sidebar-accent-foreground: oklch(0.42 0.21 263);
+  --sidebar-accent: oklch(0.95 0.03 261.2);
+  --sidebar-accent-foreground: oklch(0.42 0.21 261.2);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.52 0.21 263);
+  --sidebar-ring: oklch(0.564 0.24 261.2);
+  --chart-1: oklch(0.564 0.24 261.2);
+  --chart-2: oklch(0.614 0.205 255.3);
+  --chart-3: oklch(0.7 0.15 250);
+  --chart-4: oklch(0.75 0.18 210);
+  --chart-5: oklch(0.6 0.18 300);
 }
 
 .dark {
@@ -45,27 +58,32 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.65 0.2 263);
+  --primary: oklch(0.65 0.2 261.2);
   --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --accent: oklch(0.269 0.02 261.2);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.269 0 0);
   --input: oklch(0.269 0 0);
-  --ring: oklch(0.65 0.2 263);
-  --sidebar: oklch(0.18 0 0);
+  --ring: oklch(0.65 0.2 261.2);
+  --sidebar: oklch(0.16 0.015 261.2);
   --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.65 0.2 263);
+  --sidebar-primary: oklch(0.65 0.2 261.2);
   --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.28 0.05 263);
+  --sidebar-accent: oklch(0.28 0.05 261.2);
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.65 0.2 263);
+  --sidebar-ring: oklch(0.65 0.2 261.2);
+  --chart-1: oklch(0.65 0.2 261.2);
+  --chart-2: oklch(0.7 0.17 255.3);
+  --chart-3: oklch(0.75 0.13 250);
+  --chart-4: oklch(0.8 0.15 210);
+  --chart-5: oklch(0.7 0.16 300);
 }
 
 @theme inline {
@@ -108,6 +126,11 @@
     var(--sidebar-foreground);
   --color-sidebar:
     var(--sidebar);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 }
 
 @layer base {
@@ -120,4 +143,31 @@
       "rlig" 1,
       "calt" 1;
   }
+}
+
+/*
+ * Essa versão do Tailwind (4.0.0-beta.4, uma beta bem antiga da v4) não
+ * respeita override de `--font-sans`/`--font-mono` via `@theme` — a utility
+ * gerada continua usando o default interno dela, então as fontes do
+ * next/font (via --font-body-family/--font-heading-family/--font-mono-family,
+ * setadas no <body> em layout.tsx) nunca apareciam. Confirmado inspecionando
+ * o font-family computado no navegador. Fix: declarar direto com
+ * !important, no mesmo padrão que o design kit já documenta pra esse tipo de
+ * conflito (ver README dele, seção "Armadilhas já conhecidas").
+ */
+body {
+  font-family:
+    var(--font-body-family), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji" !important;
+}
+
+h1,
+h2,
+h3,
+.font-heading {
+  font-family: var(--font-heading-family), var(--font-body-family), sans-serif !important;
+}
+
+.font-mono {
+  font-family: var(--font-mono-family), ui-monospace, "JetBrains Mono", monospace !important;
 }

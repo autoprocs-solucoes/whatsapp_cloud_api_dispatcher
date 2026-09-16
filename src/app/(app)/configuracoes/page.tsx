@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import {
   Card,
   CardContent,
@@ -13,7 +15,7 @@ import { removeMemberAction } from "@/features/workspace/actions";
 import { WorkspaceSettingsForm } from "@/features/workspace/workspace-settings-form";
 import { serverEnv } from "@/lib/env";
 import { requireUser } from "@/server/auth";
-import { getMetaConnections } from "@/server/meta";
+import { getConnectionsCost, getMetaConnections } from "@/server/meta";
 import { getWorkspaceMembers } from "@/server/members";
 import { requireActiveWorkspace } from "@/server/workspace";
 
@@ -25,6 +27,7 @@ export default async function ConfiguracoesPage() {
     getWorkspaceMembers(workspace.id),
     getMetaConnections(workspace.id),
   ]);
+  const costByConnectionId = await getConnectionsCost(metaConnections);
 
   return (
     <div className="space-y-6">
@@ -39,7 +42,9 @@ export default async function ConfiguracoesPage() {
         <TabsList>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
-          <TabsTrigger value="meta">Meta</TabsTrigger>
+          <TabsTrigger value="meta" className="gap-1.5">
+            <Image src="/meta-logo.png" alt="" width={14} height={14} /> Meta
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="workspace">
@@ -94,9 +99,11 @@ export default async function ConfiguracoesPage() {
             workspaceId={workspace.id}
             canManage={isOwner}
             connections={metaConnections}
+            costByConnectionId={costByConnectionId}
             metaAppId={serverEnv.META_APP_ID}
             graphApiVersion={serverEnv.META_GRAPH_API_VERSION}
             coexistenceConfigId={serverEnv.META_COEXISTENCE_CONFIG_ID}
+            standardSignupConfigId={serverEnv.META_EMBEDDED_SIGNUP_CONFIG_ID}
           />
         </TabsContent>
       </Tabs>

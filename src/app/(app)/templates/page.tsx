@@ -3,7 +3,10 @@ import { MessageSquare, Plug } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { listTemplatesForWorkspace } from "@/features/templates/actions";
+import {
+  getTemplateAnalyticsForWorkspace,
+  listTemplatesForWorkspace,
+} from "@/features/templates/actions";
 import { TemplatesTable } from "@/features/templates/templates-table";
 import { getMetaConnections } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
@@ -12,6 +15,7 @@ export default async function TemplatesPage() {
   const workspace = await requireActiveWorkspace();
   const connections = await getMetaConnections(workspace.id);
   const templates = await listTemplatesForWorkspace();
+  const analyticsByTemplateId = await getTemplateAnalyticsForWorkspace(templates, connections);
 
   return (
     <div className="space-y-6">
@@ -43,7 +47,11 @@ export default async function TemplatesPage() {
           </CardContent>
         </Card>
       ) : (
-        <TemplatesTable templates={templates} isOwner={workspace.role === "owner"} />
+        <TemplatesTable
+          templates={templates}
+          isOwner={workspace.role === "owner"}
+          analyticsByTemplateId={analyticsByTemplateId}
+        />
       )}
     </div>
   );
