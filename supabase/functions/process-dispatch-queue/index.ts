@@ -72,16 +72,6 @@ const PERMANENT_META_CODES = new Set([
   133010, // Número não registrado
 ]);
 
-// Bater no limite da Meta não é erro do destinatário, é fila. O teto de
-// conversas é por 24h, e o backoff normal se esgota em ~2h — então o excedente
-// de um comunicado grande morria como falha sem nunca ter chance. Aqui a linha
-// espera uma hora e tenta de novo, sem gastar tentativa, até a janela virar.
-const RATE_LIMIT_PAUSE_SECONDS = 3600;
-
-// Teto de segurança: se nem depois disso o limite liberou, o problema não é a
-// janela de 24h — é a conta. Aí vira falha pra não retentar pra sempre.
-const RATE_LIMIT_GIVE_UP_MS = 3 * 24 * 60 * 60 * 1000;
-
 /** Espera antes da próxima tentativa: 30s, 2min, 8min, 32min… com teto de 1h. */
 function backoffSeconds(attempts: number): number {
   const base = 30 * Math.pow(4, Math.max(0, attempts - 1));
@@ -388,7 +378,6 @@ Deno.serve(async (_req) => {
       sent: number;
       failed: number;
       retrying: number;
-      waitingOnLimit: number;
       left: number;
       rateLimitHit: boolean;
       finalStatus?: string;
@@ -447,7 +436,6 @@ Deno.serve(async (_req) => {
         sent: 0,
         failed: 0,
         retrying: 0,
-        waitingOnLimit: 0,
         left: 0,
         rateLimitHit: false,
         finalStatus: "failed",
@@ -472,7 +460,6 @@ Deno.serve(async (_req) => {
     let sent = 0;
     let failed = 0;
     let retrying = 0;
-    let waitingOnLimit = 0;
     // Rate limit é do número, não do destinatário: insistir nos próximos da
     // fila só piora. Ao bater, larga este dispatch e deixa o backoff cuidar.
     let rateLimitHit = false;
@@ -524,26 +511,6 @@ Deno.serve(async (_req) => {
           sent++;
         } catch (e) {
           const err = e as GraphError;
-
-          // Limite da Meta: espera a janela virar em vez de gastar tentativa.
-          // O disparo inteiro para por aqui — o teto é do número, insistir nos
-          // próximos da fila só queimaria as tentativas deles também.
-          const dispatchAgeMs = Date.now() - new Date(dispatch.created_at).getTime();
-          if (err?.rateLimited === true && dispatchAgeMs < RATE_LIMIT_GIVE_UP_MS) {
-            await admin.rpc("reschedule_dispatch_recipient", {
-              p_id: r.id,
-              p_delay_seconds: RATE_LIMIT_PAUSE_SECONDS,
-              p_error_code: err.storedCode,
-              p_error_message:
-                `Limite da Meta atingido — aguardando a janela de 24h liberar. ${err.message}`,
-              p_consume_attempt: false,
-            });
-            waitingOnLimit++;
-            rateLimitHit = true;
-            totalProcessed++;
-            break;
-          }
-
           // `attempts` já foi incrementado pelo claim, então este é o número de
           // tentativas gastas até aqui.
           const willRetry = err?.retriable === true && r.attempts < MAX_ATTEMPTS;
@@ -614,15 +581,7 @@ Deno.serve(async (_req) => {
         .eq("id", dispatch.id);
     }
 
-    report[dispatch.id] = {
-      sent,
-      failed,
-      retrying,
-      waitingOnLimit,
-      left,
-      rateLimitHit,
-      finalStatus,
-    };
+    report[dispatch.id] = { sent, failed, retrying, left, rateLimitHit, finalStatus };
   }
 
   return new Response(
