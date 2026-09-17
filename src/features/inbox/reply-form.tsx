@@ -28,7 +28,7 @@ export function ReplyForm({ phone, window: win }: Props) {
 
   if (win.open === false) {
     return (
-      <div className="space-y-2 border-t border-line bg-amber-soft px-4 py-3">
+      <div className="shrink-0 space-y-2 bg-amber-soft px-4 py-3">
         <p className="text-[13px] font-semibold text-amber">Janela de 24 horas fechada</p>
         <p className="text-xs text-ink-2">
           O contato não escreve desde{" "}
@@ -66,9 +66,9 @@ export function ReplyForm({ phone, window: win }: Props) {
   }
 
   return (
-    <div className="space-y-2 border-t border-line bg-card p-3">
+    <div className="shrink-0 space-y-1.5 bg-wa-panel px-4 py-2.5">
       {win.open === null && (
-        <p className="text-[11px] text-ink-3">
+        <p className="text-[11px] text-wa-ink-2">
           Sem histórico de mensagens recebidas deste contato — não dá pra confirmar se a janela de
           24 horas está aberta.
         </p>
@@ -85,21 +85,25 @@ export function ReplyForm({ phone, window: win }: Props) {
               submit();
             }
           }}
-          rows={2}
+          rows={1}
           maxLength={4096}
-          placeholder="Escreva uma resposta… (Enter envia, Shift+Enter quebra linha)"
+          placeholder="Digite uma mensagem"
           aria-label="Resposta"
-          className="min-h-[44px] flex-1 resize-y rounded-md border border-line-2 bg-card px-3 py-2 text-[13px] text-ink outline-none placeholder:text-ink-4 focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand-line"
+          className="max-h-32 min-h-[42px] flex-1 resize-none rounded-lg border-0 bg-wa-in px-4 py-2.5 text-[15px] leading-tight text-wa-ink outline-none placeholder:text-wa-ink-2 focus-visible:ring-2 focus-visible:ring-wa-accent"
         />
-        <Button onClick={submit} disabled={isPending || !text.trim()} size="sm">
-          <Send className="size-4" />
-          {isPending ? "Enviando…" : "Enviar"}
-        </Button>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={isPending || !text.trim()}
+          aria-label="Enviar"
+          title="Enviar"
+          className="flex size-[42px] shrink-0 items-center justify-center rounded-full bg-wa-accent text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          <Send className="size-5" />
+        </button>
       </div>
       {win.hoursLeft !== null && win.hoursLeft <= 4 && (
-        <p className="text-[11px] text-amber">
-          A janela fecha em cerca de {win.hoursLeft}h.
-        </p>
+        <p className="text-[11px] text-amber">A janela fecha em cerca de {win.hoursLeft}h.</p>
       )}
     </div>
   );

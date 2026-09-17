@@ -189,27 +189,62 @@ type PhoneNumbersResponse = {
 // individual em /{phone_number_id}. Mantemos fallback no field antigo pra
 // contas em versões anteriores da Graph API.
 // Docs: https://developers.facebook.com/docs/whatsapp/messaging-limits/
-async function getPhoneNumberTier(
+type PhoneNumberDetails = {
+  tier?: string;
+  status?: string;
+  platformType?: string;
+  isOnBizApp?: boolean;
+};
+
+const BASE_DETAIL_FIELDS = "whatsapp_business_manager_messaging_limit,messaging_limit_tier";
+// `status`, `platform_type` e `is_on_biz_app` não vêm pela borda
+// /{waba}/phone_numbers — só no nó do número. É `is_on_biz_app` que confirma
+// Coexistência; sem ele a tela caía na nossa flag `is_registered`, que a Meta
+// nunca liga pra número de app.
+const STATE_DETAIL_FIELDS = "status,platform_type,is_on_biz_app";
+
+function pickString(value: unknown): string | undefined {
+  return typeof value === "string" && value ? value : undefined;
+}
+
+async function getPhoneNumberDetails(
   phoneNumberId: string,
   token: string,
-): Promise<string | undefined> {
-  try {
-    const data = await request<Record<string, unknown>>(`/${phoneNumberId}`, {
+): Promise<PhoneNumberDetails> {
+  async function fetchFields(fields: string) {
+    return request<Record<string, unknown>>(`/${phoneNumberId}`, {
       method: "GET",
       token,
-      query: {
-        fields: "whatsapp_business_manager_messaging_limit,messaging_limit_tier",
-      },
+      query: { fields },
     });
-    const next = data.whatsapp_business_manager_messaging_limit;
-    if (typeof next === "string" && next) return next;
-    const legacy = data.messaging_limit_tier;
-    if (typeof legacy === "string" && legacy) return legacy;
-    return undefined;
-  } catch (err) {
-    console.warn(`[getPhoneNumberTier] falhou pro ${phoneNumberId}`, err);
-    return undefined;
   }
+
+  let data: Record<string, unknown>;
+  try {
+    data = await fetchFields(`${BASE_DETAIL_FIELDS},${STATE_DETAIL_FIELDS}`);
+  } catch (err) {
+    // Se a Graph recusar algum dos campos de estado, não vale perder o tier
+    // junto — repete só com os campos que já funcionavam.
+    console.warn(
+      `[getPhoneNumberDetails] campos de estado recusados pro ${phoneNumberId}, tentando sem eles`,
+      err,
+    );
+    try {
+      data = await fetchFields(BASE_DETAIL_FIELDS);
+    } catch (err2) {
+      console.warn(`[getPhoneNumberDetails] falhou pro ${phoneNumberId}`, err2);
+      return {};
+    }
+  }
+
+  return {
+    tier:
+      pickString(data.whatsapp_business_manager_messaging_limit) ??
+      pickString(data.messaging_limit_tier),
+    status: pickString(data.status),
+    platformType: pickString(data.platform_type),
+    isOnBizApp: typeof data.is_on_biz_app === "boolean" ? data.is_on_biz_app : undefined,
+  };
 }
 
 export async function listPhoneNumbers(
@@ -220,23 +255,25 @@ export async function listPhoneNumbers(
     method: "GET",
     token,
     query: {
-      // `status`, `platform_type` e `is_on_biz_app` são o estado real do
-      // número. Sem eles a tela dependia da nossa flag `is_registered`, que a
-      // Coexistência nunca liga — a Meta recusa /register pra número de app
-      // ("Register endpoint is not available for SMB businesses") — e um
-      // número funcionando aparecia como "Não registrado".
       fields:
-        "id,display_phone_number,verified_name,quality_rating,code_verification_status,is_pin_enabled,throughput,status,platform_type,is_on_biz_app",
+        "id,display_phone_number,verified_name,quality_rating,code_verification_status,is_pin_enabled,throughput",
     },
   });
 
   const phones = data.data ?? [];
-  // Enriquece cada número com messaging_limit_tier (chamada individual).
+  // Enriquece cada número com o que só existe no nó individual: limite de
+  // mensagens e o estado real (status / platform_type / is_on_biz_app).
   const enriched = await Promise.all(
-    phones.map(async (p) => ({
-      ...p,
-      messaging_limit_tier: await getPhoneNumberTier(p.id, token),
-    })),
+    phones.map(async (p) => {
+      const details = await getPhoneNumberDetails(p.id, token);
+      return {
+        ...p,
+        messaging_limit_tier: details.tier,
+        status: details.status,
+        platform_type: details.platformType,
+        is_on_biz_app: details.isOnBizApp,
+      };
+    }),
   );
   return enriched;
 }

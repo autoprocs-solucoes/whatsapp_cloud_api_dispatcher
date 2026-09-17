@@ -67,6 +67,21 @@
   --d-read: #0866ff;
   --d-fail: #e24234;
 
+  /* Conversas — paleta do próprio WhatsApp. Vive só nessa tela: é o único
+   * lugar do app que imita outro produto, porque quem atende compara lado a
+   * lado com o celular. O resto da plataforma segue o azul da Meta. */
+  --wa-bg: #efeae2;
+  --wa-panel: #f0f2f5;
+  --wa-in: #ffffff;
+  --wa-out: #d9fdd3;
+  --wa-ink: #111b21;
+  --wa-ink-2: #667781;
+  --wa-line: #e9edef;
+  --wa-tick: #53bdeb;
+  --wa-accent: #25d366;
+  --wa-hover: #f5f6f6;
+  --wa-active: #e9edef;
+
   /* raios pequenos + sombra rasa */
   --r-card: 8px;
   --r-el: 6px;
@@ -180,6 +195,19 @@
   --d-read: #5c9dff;
   --d-fail: #e8564a;
 
+  /* Conversas no escuro — os mesmos tons do WhatsApp dark. */
+  --wa-bg: #0b141a;
+  --wa-panel: #202c33;
+  --wa-in: #202c33;
+  --wa-out: #005c4b;
+  --wa-ink: #e9edef;
+  --wa-ink-2: #8696a0;
+  --wa-line: #2a3942;
+  --wa-tick: #53bdeb;
+  --wa-accent: #00a884;
+  --wa-hover: #202c33;
+  --wa-active: #2a3942;
+
   --primary-foreground: #ffffff;
   --destructive-foreground: #ffffff;
   --sh-card: 0 1px 2px rgba(0, 0, 0, 0.45);
@@ -258,6 +286,18 @@
   --color-d-deliv: var(--d-deliv);
   --color-d-read: var(--d-read);
   --color-d-fail: var(--d-fail);
+
+  --color-wa-bg: var(--wa-bg);
+  --color-wa-panel: var(--wa-panel);
+  --color-wa-in: var(--wa-in);
+  --color-wa-out: var(--wa-out);
+  --color-wa-ink: var(--wa-ink);
+  --color-wa-ink-2: var(--wa-ink-2);
+  --color-wa-line: var(--wa-line);
+  --color-wa-tick: var(--wa-tick);
+  --color-wa-accent: var(--wa-accent);
+  --color-wa-hover: var(--wa-hover);
+  --color-wa-active: var(--wa-active);
 
   --radius-sm: var(--r-sm);
   --radius-md: var(--r-el);
