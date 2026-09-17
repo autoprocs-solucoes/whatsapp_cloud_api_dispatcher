@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -180,4 +181,23 @@ h3,
 
 .font-mono {
   font-family: var(--font-mono-family), ui-monospace, "JetBrains Mono", monospace !important;
+}
+
+/*
+ * Fundo animado das telas de auth (login/signup/etc.) — só transform+opacity
+ * (compositor-friendly), pausa sozinho com `prefers-reduced-motion` porque a
+ * classe que dispara a animação é `motion-safe:` (Tailwind só aplica sob
+ * `@media (prefers-reduced-motion: no-preference)`).
+ */
+@keyframes blob-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(24px, -18px) scale(1.06);
+  }
+  66% {
+    transform: translate(-18px, 16px) scale(0.94);
+  }
 }

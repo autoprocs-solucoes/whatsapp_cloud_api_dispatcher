@@ -121,10 +121,12 @@ function TemplateCard({
   template,
   isOwner,
   analytics,
+  index,
 }: {
   template: Template;
   isOwner: boolean;
   analytics: TemplateAnalyticsPoint | undefined;
+  index: number;
 }) {
   const [hovered, setHovered] = useState(false);
   const router = useRouter();
@@ -156,9 +158,10 @@ function TemplateCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
-        "group relative flex h-full flex-col gap-3 rounded-lg border bg-card p-3 transition-shadow hover:shadow-md",
+        "group animate-in fade-in slide-in-from-bottom-1 relative flex h-full flex-col gap-3 rounded-lg border bg-card p-3 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md",
         (!isApproved || !isActive) && "opacity-70",
       )}
+      style={{ animationDelay: `${Math.min(index, 12) * 60}ms`, animationFillMode: "backwards" }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -308,12 +311,13 @@ export function TemplatesTable({ templates, isOwner, analyticsByTemplateId }: Pr
         </div>
       ) : (
         <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredTemplates.map((t) => (
+          {filteredTemplates.map((t, i) => (
             <TemplateCard
               key={t.id}
               template={t}
               isOwner={isOwner}
               analytics={analyticsByTemplateId.get(t.meta_template_id)}
+              index={i}
             />
           ))}
         </div>
