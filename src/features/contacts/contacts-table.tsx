@@ -443,7 +443,7 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
                         </span>
                         <span className="min-w-0">
                           <span className="block truncate font-medium text-ink">
-                            {c.full_name ?? "—"}
+                            {c.full_name ?? ""}
                           </span>
                         </span>
                       </div>
@@ -456,7 +456,7 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {c.tags.length === 0 ? (
-                          <span className="text-xs text-ink-4">—</span>
+                          null
                         ) : (
                           c.tags.map((t) => (
                             <Badge key={t} variant="secondary">
@@ -487,7 +487,7 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
                     const val = cf[col.label];
                     return (
                       <TableCell key={col.key} className="text-xs text-ink-2">
-                        {val ? val : <span className="text-ink-4">—</span>}
+                        {val ?? ""}
                       </TableCell>
                     );
                   })}

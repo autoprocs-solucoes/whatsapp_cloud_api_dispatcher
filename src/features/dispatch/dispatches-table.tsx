@@ -156,13 +156,13 @@ export function DispatchesTable({ dispatches }: { dispatches: DispatchListItem[]
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-line bg-card-2 text-[10px] font-semibold text-ink-2">
-                          {initials(d.template_name ?? "—")}
+                          {initials(d.template_name ?? "")}
                         </span>
                         <Link
                           href={`/comunicados/${d.id}`}
                           className="truncate font-medium text-ink hover:text-brand hover:underline"
                         >
-                          {d.template_name ?? "—"}
+                          {d.template_name ?? "Sem template"}
                         </Link>
                       </div>
                     </TableCell>

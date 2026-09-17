@@ -541,7 +541,7 @@ export function DispatchWizard({
                           value={v?.columnId ?? ""}
                           onChange={(id) => updateMapping(key, { columnId: id })}
                           groups={columnGroups}
-                          placeholder="— sem coluna —"
+                          placeholder="Sem coluna"
                           searchPlaceholder="Buscar coluna…"
                           triggerClassName="w-full flex-1"
                         />
@@ -674,7 +674,7 @@ export function DispatchWizard({
                                       ))}
                                     </div>
                                   ) : (
-                                    <span className="text-muted-foreground">—</span>
+                                    null
                                   )}
                                 </td>
                               </tr>

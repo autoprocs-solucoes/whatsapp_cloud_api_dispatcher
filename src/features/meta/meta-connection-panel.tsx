@@ -31,7 +31,7 @@ const TIER_LABEL: Record<string, string> = {
 };
 
 function tierLabel(tier: string | null): string {
-  if (!tier) return "—";
+  if (!tier) return "";
   return TIER_LABEL[tier] ?? tier;
 }
 
@@ -123,7 +123,7 @@ function WabaHealthBanner({ health }: { health: WabaHealthStatus | null }) {
       <div className="flex items-center gap-2">
         <AlertTriangle className="size-4 text-red" />
         <span className="font-semibold text-ink">Envio limitado pela Meta</span>
-        <StatusBadge tone="danger">{health.can_send_message ?? "—"}</StatusBadge>
+        <StatusBadge tone="danger">{health.can_send_message ?? ""}</StatusBadge>
       </div>
       {problemEntities.map((entity, i) => (
         <div key={i} className="space-y-1 pl-6">
@@ -292,7 +292,7 @@ function ConnectionCard({
                 <div className="grid grid-cols-2 divide-x divide-line border-t border-line bg-card-2 sm:grid-cols-3">
                   <StatusCell label="Qualidade">
                     <StatusBadge tone={qualityTone(p.quality_rating)}>
-                      {p.quality_rating ?? "—"}
+                      {p.quality_rating ?? "Sem dado"}
                     </StatusBadge>
                   </StatusCell>
                   <StatusCell label="Situação">
@@ -305,7 +305,7 @@ function ConnectionCard({
                           className="text-xs text-ink-4"
                           title="A Meta ainda não informou o estado deste número. Sincronize para atualizar."
                         >
-                          —
+                          Sem dado
                         </span>
                       );
                     })()}
@@ -421,7 +421,7 @@ export function MetaConnectionPanel({
         icon={Sparkles}
         title="Criar do zero"
         badge="Embedded Signup"
-        description="Pro cliente que ainda não tem número no WhatsApp Business — a Meta cria a WABA e o número no fluxo integrado."
+        description="Pro cliente que ainda não tem número no WhatsApp Business. A Meta cria a WABA e o número no fluxo integrado."
       >
         {standardSignupEnabled ? (
           <EmbeddedSignupButton
@@ -441,7 +441,7 @@ export function MetaConnectionPanel({
       <ChoiceCard
         icon={Link2}
         title="Login com Coexistência"
-        description="Pro cliente que já usa o app WhatsApp Business no celular e quer manter os dois: app + Cloud API. A Meta mostra um código de verificação pra confirmar dentro do app — exige WhatsApp Business 2.24.17 ou mais novo."
+        description="Pro cliente que já usa o app WhatsApp Business no celular e quer manter os dois: app + Cloud API. A Meta mostra um código de verificação pra confirmar dentro do app. Exige WhatsApp Business 2.24.17 ou mais novo."
       >
         {coexistenceEnabled ? (
           <EmbeddedSignupButton
@@ -468,7 +468,7 @@ export function MetaConnectionPanel({
             <div className="space-y-1">
               <p className="text-sm font-semibold text-ink">Conexão manual</p>
               <p className="max-w-prose text-xs text-ink-2">
-                WABA já dentro da Autoprocs — token gerado via System User, sem expiração.
+                WABA já dentro da Autoprocs. Token gerado via System User, sem expiração.
               </p>
             </div>
             <ManualMetaConnectForm workspaceId={workspaceId} />
@@ -518,7 +518,7 @@ export function MetaConnectionPanel({
                 <Plus className="size-4 text-ink-3" /> Conectar outra conta
               </CardTitle>
               <CardDescription>
-                Adiciona uma nova WABA a este workspace — não mexe nas contas já conectadas.
+                Adiciona uma nova WABA a este workspace. Não mexe nas contas já conectadas.
               </CardDescription>
             </div>
           </CardHeader>

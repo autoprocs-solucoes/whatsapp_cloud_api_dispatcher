@@ -138,11 +138,7 @@ export function SegmentsTable({ segments }: Props) {
                       </div>
                     </TableCell>
                     <TableCell className="num text-right text-[13px]">
-                      {s.contact_count === null ? (
-                        <span className="text-ink-4">—</span>
-                      ) : (
-                        s.contact_count.toLocaleString("pt-BR")
-                      )}
+                      {s.contact_count?.toLocaleString("pt-BR")}
                     </TableCell>
                     <TableCell className="text-xs text-ink-2">
                       {count} regra{count === 1 ? "" : "s"}

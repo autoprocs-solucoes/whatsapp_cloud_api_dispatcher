@@ -31,7 +31,7 @@ export async function updateAvatarAction(formData: FormData): Promise<ActionResu
     return { ok: false, error: "Selecione uma imagem" };
   }
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return { ok: false, error: "Formato inválido — use PNG, JPEG ou WebP" };
+    return { ok: false, error: "Formato inválido. Use PNG, JPEG ou WebP" };
   }
   if (file.size > MAX_SIZE_BYTES) {
     return { ok: false, error: "Imagem muito grande (máx. 5MB)" };

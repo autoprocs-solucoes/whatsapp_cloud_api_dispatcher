@@ -169,7 +169,7 @@ export async function updateWorkspaceLogoAction(formData: FormData): Promise<Act
     return { ok: false, error: "Selecione uma imagem" };
   }
   if (!LOGO_TYPES.includes(file.type)) {
-    return { ok: false, error: "Formato inválido — use PNG, JPEG ou WebP" };
+    return { ok: false, error: "Formato inválido. Use PNG, JPEG ou WebP" };
   }
   if (file.size > LOGO_MAX_BYTES) {
     return { ok: false, error: "Imagem muito grande (máx. 5MB)" };

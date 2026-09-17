@@ -49,14 +49,14 @@ export function DispatchExecutePanel({ dispatchId, total, status }: Props) {
           <div>
             <p className="text-sm font-medium">Comunicado em rascunho</p>
             <p className="text-muted-foreground text-xs">
-              {total} destinatário(s). Worker em background dispara em lotes —
-              pode fechar essa aba que continua.
+              {total} destinatário(s). Worker em background dispara em lotes. Pode
+              fechar essa aba que continua.
             </p>
           </div>
           <Button onClick={handleRun} disabled={isPending}>
             {isPending ? (
               <>
-                <Loader2 className="mr-1 size-4 animate-spin" /> Enfileirando…
+                <Loader2 className="mr-1 size-4 animate-spin" /> Enfileirando...
               </>
             ) : (
               <>
@@ -78,7 +78,7 @@ export function DispatchExecutePanel({ dispatchId, total, status }: Props) {
             {status === "queued" ? "Na fila do worker" : "Em execução"}
           </p>
           <p className="text-muted-foreground text-xs">
-            Worker processa em background. Pode fechar a aba — atualizamos
+            Worker processa em background. Pode fechar a aba. Atualizamos
             a tela a cada {Math.round(REFRESH_INTERVAL_MS / 1000)}s enquanto
             estiver aqui.
           </p>

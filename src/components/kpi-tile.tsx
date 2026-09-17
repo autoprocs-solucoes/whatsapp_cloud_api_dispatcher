@@ -42,7 +42,7 @@ export function KpiTile({
           tone === "danger" && "text-red",
         )}
       >
-        {value === null ? "—" : value}
+        {value === null ? "" : value}
         {value !== null && suffix ? (
           <span className="text-[20px] text-ink-2">{suffix}</span>
         ) : null}

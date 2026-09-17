@@ -134,7 +134,7 @@ export function rate(value: number, base: number): number | null {
 
 /** "95,5%" — uma casa decimal só quando ela muda a leitura. */
 export function formatPct(value: number | null): string {
-  if (value === null) return "—";
+  if (value === null) return "";
   const rounded = Math.round(value * 10) / 10;
   return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1).replace(".", ",")}%`;
 }

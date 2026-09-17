@@ -264,9 +264,9 @@ export default async function ComunicadoDetalhe({
                 {errorGroups.map((g, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-mono text-xs text-ink-2">
-                      {g.error_code || "—"}
+                      {g.error_code || ""}
                     </TableCell>
-                    <TableCell className="text-xs text-ink-2">{g.error_message || "—"}</TableCell>
+                    <TableCell className="text-xs text-ink-2">{g.error_message || ""}</TableCell>
                     <TableCell className="num text-right text-[13px]">{g.count}</TableCell>
                   </TableRow>
                 ))}
@@ -284,7 +284,7 @@ export default async function ComunicadoDetalhe({
               palavras evita a leitura errada de "só 11 foram enviadas". */}
           <p className="text-xs text-ink-2">
             Cada pessoa aparece uma vez, no estágio mais avançado que alcançou. Quem leu está em
-            &quot;Lida&quot;, não em &quot;Entregue&quot; — por isso estes números são menores que os
+            &quot;Lida&quot;, não em &quot;Entregue&quot;. Por isso estes números são menores que os
             dos cards acima, que são acumulados.
           </p>
         </div>
@@ -350,13 +350,13 @@ export default async function ComunicadoDetalhe({
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-3">
-                      {r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR") : "—"}
+                      {r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR") : ""}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-3">
-                      {r.delivered_at ? new Date(r.delivered_at).toLocaleString("pt-BR") : "—"}
+                      {r.delivered_at ? new Date(r.delivered_at).toLocaleString("pt-BR") : ""}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-3">
-                      {r.read_at ? new Date(r.read_at).toLocaleString("pt-BR") : "—"}
+                      {r.read_at ? new Date(r.read_at).toLocaleString("pt-BR") : ""}
                     </TableCell>
                     <TableCell>
                       {r.reaction_emoji ? (
@@ -371,10 +371,10 @@ export default async function ComunicadoDetalhe({
                           {r.reaction_emoji}
                         </span>
                       ) : (
-                        <span className="text-ink-4">—</span>
+                        null
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-ink-3">{r.error_message ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-ink-3">{r.error_message ?? ""}</TableCell>
                   </TableRow>
                 ))
               )}

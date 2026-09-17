@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateWorkspaceForm } from "@/features/workspace/create-workspace-form";
 
-export const metadata = { title: "Novo cliente — Autoprocs Dispatcher" };
+export const metadata = { title: "Novo cliente | Autoprocs Dispatcher" };
 
 /**
  * Cadastro de cliente pelo painel master.
@@ -34,7 +34,7 @@ export default function NovoClientePage() {
         <CardHeader>
           <CardTitle>Dados do cliente</CardTitle>
           <CardDescription>
-            Só o nome por enquanto — logo, membros e conexão com a Meta são configurados dentro do
+            Só o nome por enquanto. Logo, membros e conexão com a Meta são configurados dentro do
             workspace.
           </CardDescription>
         </CardHeader>

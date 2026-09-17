@@ -22,7 +22,7 @@ export default async function TemplatesPage() {
     <div className="space-y-5">
       <PageHeader
         title="Templates"
-        description="Sincronizados da Meta. A criação é no WhatsApp Manager — aqui espelhamos status e conteúdo."
+        description="Sincronizados da Meta. A criação é no WhatsApp Manager; aqui espelhamos status e conteúdo."
       />
 
       {connections.length === 0 ? (

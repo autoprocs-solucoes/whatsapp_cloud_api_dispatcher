@@ -35,7 +35,7 @@ export function ReplyForm({ phone, window: win }: Props) {
           {win.lastInboundAt
             ? new Date(win.lastInboundAt).toLocaleString("pt-BR")
             : "muito tempo"}
-          . Fora dessa janela o WhatsApp só entrega template aprovado — texto livre é aceito e
+          . Fora dessa janela o WhatsApp só entrega template aprovado; texto livre é aceito e
           descartado sem aviso.
         </p>
         <Button asChild size="sm" variant="outline">
@@ -69,7 +69,7 @@ export function ReplyForm({ phone, window: win }: Props) {
     <div className="shrink-0 space-y-1.5 bg-wa-panel px-4 py-2.5">
       {win.open === null && (
         <p className="text-[11px] text-wa-ink-2">
-          Sem histórico de mensagens recebidas deste contato — não dá pra confirmar se a janela de
+          Sem histórico de mensagens recebidas deste contato. Não dá pra confirmar se a janela de
           24 horas está aberta.
         </p>
       )}

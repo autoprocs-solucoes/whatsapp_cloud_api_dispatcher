@@ -91,9 +91,9 @@ function ClientCard({ w }: { w: MasterWorkspaceRow }) {
 
       <div className="flex items-end justify-between gap-3 p-3">
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="truncate font-mono text-[11px] text-ink-2">{w.ownerEmail ?? "—"}</p>
+          <p className="truncate font-mono text-[11px] text-ink-2">{w.ownerEmail ?? "Sem owner"}</p>
           <p className="truncate text-[11px] text-ink-3">
-            Meta: {conn ? (conn.businessName ?? conn.wabaId) : "—"} · desde{" "}
+            Meta: {conn ? (conn.businessName ?? conn.wabaId) : "sem conexão"} · desde{" "}
             {new Date(w.createdAt).toLocaleDateString("pt-BR")} · coexist.:{" "}
             {hasCoexistence ? "sim" : "não"}
           </p>

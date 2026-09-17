@@ -277,7 +277,7 @@ export function ContactsImportWizard() {
                 onChange={(e) => setPhoneColumn(e.target.value)}
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
               >
-                <option value="">— selecione —</option>
+                <option value="">Selecione</option>
                 {preview.headers.map((h) => (
                   <option key={h} value={h}>
                     {h}
@@ -293,7 +293,7 @@ export function ContactsImportWizard() {
                 onChange={(e) => setFullNameColumn(e.target.value)}
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
               >
-                <option value="">— nenhum —</option>
+                <option value="">Nenhum</option>
                 {preview.headers.map((h) => (
                   <option key={h} value={h}>
                     {h}

@@ -11,7 +11,7 @@ import { CreateWorkspaceForm } from "@/features/workspace/create-workspace-form"
 import { requireUser } from "@/server/auth";
 import { getUserWorkspaces } from "@/server/workspace";
 
-export const metadata = { title: "Criar workspace — Autoprocs Dispatcher" };
+export const metadata = { title: "Criar workspace | Autoprocs Dispatcher" };
 
 export default async function OnboardingPage() {
   await requireUser();

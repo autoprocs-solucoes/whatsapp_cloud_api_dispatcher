@@ -20,7 +20,7 @@ export const connectMetaManuallySchema = z.object({
   accessToken: z
     .string()
     .trim()
-    .min(40, "Access token muito curto — confira no Business Manager"),
+    .min(40, "Access token muito curto. Confira no Business Manager"),
 });
 
 export type ConnectMetaManuallyInput = z.infer<typeof connectMetaManuallySchema>;

@@ -548,7 +548,7 @@ export function SegmentEditor(props: Props) {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        null
                       )}
                     </td>
                   </tr>
@@ -559,7 +559,7 @@ export function SegmentEditor(props: Props) {
         )}
 
         <p className="text-muted-foreground text-[10px]">
-          Contagem já desconta opt-outs. Lista limitada a 200 — total mostra o número real.
+          Contagem já desconta opt-outs. Lista limitada a 200; o total mostra o número real.
         </p>
       </div>
     </div>

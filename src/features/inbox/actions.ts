@@ -39,7 +39,7 @@ export async function sendReplyAction(formData: FormData): Promise<ActionResult>
     return {
       ok: false,
       error:
-        "A janela de 24 horas fechou. Só é possível retomar com um template aprovado — envie um comunicado.",
+        "A janela de 24 horas fechou. Só é possível retomar com um template aprovado. Envie um comunicado.",
     };
   }
 
