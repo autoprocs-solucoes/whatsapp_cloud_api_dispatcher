@@ -8,7 +8,7 @@ import { DispatchExecutePanel } from "@/features/dispatch/dispatch-execute-panel
 import { getDispatch } from "@/features/dispatch/actions";
 import { DashboardTimeline } from "@/features/dashboard/dashboard-timeline";
 import { ReadRateInfo } from "@/features/dashboard/read-rate-info";
-import { cn } from "@/lib/utils";
+import { StatTile } from "@/components/stat-tile";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
@@ -132,71 +132,62 @@ export default async function ComunicadoDetalhe({
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {(["queued", "sent", "delivered", "read", "failed"] as const).map((s) => (
-          <div
+        {(["queued", "sent", "delivered", "read", "failed"] as const).map((s, i) => (
+          <StatTile
             key={s}
-            className={cn(
-              "rounded-md border bg-background p-3 text-center",
-              s === "failed" && "border-destructive/30",
-            )}
-          >
-            <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-              {RECIPIENT_STATUS_LABELS[s]}
-            </p>
-            <p className="text-foreground text-xl font-semibold">{counts[s] ?? 0}</p>
-          </div>
+            label={RECIPIENT_STATUS_LABELS[s] ?? s}
+            value={counts[s] ?? 0}
+            tone={s === "failed" ? "destructive" : "default"}
+            delayMs={i * 50}
+          />
         ))}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <div className="bg-muted/40 rounded-md border p-3">
-          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            Taxa de envio
-          </p>
-          <p className="text-foreground text-lg font-semibold">{pct(sentLike)}%</p>
-          <p className="text-muted-foreground text-[10px]">
-            {sentLike} de {total}
-          </p>
-        </div>
-        <div className="bg-muted/40 rounded-md border p-3">
-          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            Taxa de entrega
-          </p>
-          <p className="text-foreground text-lg font-semibold">{pct(deliveredLike)}%</p>
-          <p className="text-muted-foreground text-[10px]">
-            {deliveredLike} de {total}
-          </p>
-        </div>
-        <div className="bg-muted/40 rounded-md border p-3">
-          <div className="flex items-center justify-center gap-1">
-            <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-              Taxa de leitura
-            </p>
-            <ReadRateInfo />
-          </div>
-          <p className="text-foreground text-lg font-semibold">{pct(readCount)}%</p>
-          <p className="text-muted-foreground text-[10px]">
-            {readCount} de {total}
-          </p>
-        </div>
-        <div className="bg-muted/40 rounded-md border p-3">
-          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            Reações
-          </p>
-          <p className="text-foreground text-lg font-semibold">{pct(reactionCount)}%</p>
-          <p className="text-muted-foreground text-[10px]">
-            {reactionCount} de {total}
-          </p>
-        </div>
-        <div className="border-destructive/30 bg-destructive/5 rounded-md border p-3">
-          <p className="text-muted-foreground text-[10px] uppercase tracking-wider">
-            Taxa de falha
-          </p>
-          <p className="text-destructive text-lg font-semibold">{pct(failedCount)}%</p>
-          <p className="text-muted-foreground text-[10px]">
-            {failedCount} de {total}
-          </p>
-        </div>
+        <StatTile
+          label="Taxa de envio"
+          value={pct(sentLike)}
+          suffix="%"
+          tone="muted"
+          caption={`${sentLike} de ${total}`}
+          delayMs={250}
+        />
+        <StatTile
+          label="Taxa de entrega"
+          value={pct(deliveredLike)}
+          suffix="%"
+          tone="muted"
+          caption={`${deliveredLike} de ${total}`}
+          delayMs={300}
+        />
+        <StatTile
+          label="Taxa de leitura"
+          value={pct(readCount)}
+          suffix="%"
+          tone="muted"
+          caption={
+            <span className="inline-flex items-center gap-1">
+              {readCount} de {total} <ReadRateInfo />
+            </span>
+          }
+          delayMs={350}
+        />
+        <StatTile
+          label="Reações"
+          value={pct(reactionCount)}
+          suffix="%"
+          tone="muted"
+          caption={`${reactionCount} de ${total}`}
+          delayMs={400}
+        />
+        <StatTile
+          label="Taxa de falha"
+          value={pct(failedCount)}
+          suffix="%"
+          tone="destructive"
+          caption={`${failedCount} de ${total}`}
+          delayMs={450}
+        />
       </div>
 
       {timeline.length > 0 && (

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, BarChart3, CheckCircle2, Send, Users } from "lucide-react";
 
-import { AnimatedNumber } from "@/components/animated-number";
+import { StatTile } from "@/components/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardFunnel } from "@/features/dashboard/dashboard-funnel";
@@ -38,33 +38,6 @@ function statusBadgeVariant(
 function pctValue(n: number | null): number | null {
   if (n === null) return null;
   return Math.round(n * 100);
-}
-
-type StatTileProps = {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number | null;
-  suffix?: string;
-  caption?: React.ReactNode;
-  delayMs: number;
-};
-
-function StatTile({ icon: Icon, label, value, suffix, caption, delayMs }: StatTileProps) {
-  return (
-    <div
-      className="bg-card animate-in fade-in slide-in-from-bottom-1 rounded-md border p-4 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md"
-      style={{ animationDelay: `${delayMs}ms`, animationFillMode: "backwards" }}
-    >
-      <div className="flex items-center gap-2">
-        <Icon className="text-muted-foreground size-4" />
-        <p className="text-muted-foreground text-[10px] uppercase tracking-wider">{label}</p>
-      </div>
-      <p className="text-foreground mt-2 text-2xl font-semibold">
-        {value === null ? "—" : <AnimatedNumber value={value} suffix={suffix} />}
-      </p>
-      {caption && <p className="text-muted-foreground mt-1 text-[11px]">{caption}</p>}
-    </div>
-  );
 }
 
 export default async function DashboardPage() {
