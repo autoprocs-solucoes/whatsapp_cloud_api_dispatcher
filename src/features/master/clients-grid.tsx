@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { LogIn, Plus, Search } from "lucide-react";
 
@@ -61,9 +62,21 @@ function ClientCard({ w }: { w: MasterWorkspaceRow }) {
     <div className="flex flex-col rounded-lg border border-line bg-card shadow-card transition-colors hover:border-line-3">
       <div className="flex items-start justify-between gap-2 border-b border-line p-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-line bg-card-2 text-[11px] font-semibold text-ink-2">
-            {initials(w.name)}
-          </span>
+          {/* Mesma logo que o cliente vê no topo do menu dele. Iniciais só
+              quando ele ainda não subiu nenhuma. */}
+          {w.logoUrl ? (
+            <Image
+              src={w.logoUrl}
+              alt=""
+              width={36}
+              height={36}
+              className="size-9 shrink-0 rounded-md border border-line object-cover"
+            />
+          ) : (
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-line bg-card-2 text-[11px] font-semibold text-ink-2">
+              {initials(w.name)}
+            </span>
+          )}
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-ink">{w.name}</p>
             <p className="truncate font-mono text-[11px] text-ink-3">{w.slug}</p>

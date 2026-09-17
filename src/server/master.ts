@@ -40,6 +40,8 @@ export type MasterWorkspaceRow = {
   id: string;
   name: string;
   slug: string;
+  /** Logo da empresa, a mesma que o cliente vê no topo do menu dele. */
+  logoUrl: string | null;
   createdAt: string;
   ownerEmail: string | null;
   memberCount: number;
@@ -71,7 +73,7 @@ export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
 
   const { data: workspaces } = await admin
     .from("workspace")
-    .select("id, name, slug, owner_id, created_at")
+    .select("id, name, slug, logo_url, owner_id, created_at")
     .order("created_at", { ascending: false });
   if (!workspaces || workspaces.length === 0) return [];
 
@@ -129,6 +131,7 @@ export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
     id: w.id,
     name: w.name,
     slug: w.slug,
+    logoUrl: w.logo_url,
     createdAt: w.created_at,
     ownerEmail: emailByUserId.get(w.owner_id) ?? null,
     memberCount: memberCounts.get(w.id) ?? 0,
