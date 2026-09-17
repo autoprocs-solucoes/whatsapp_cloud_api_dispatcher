@@ -6,13 +6,20 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
+/** Rotas que exigem sessão. Cada página também se protege por conta própria
+ * (`requireUser`/`requireActiveWorkspace`), mas barrar aqui evita renderizar e
+ * consultar o banco à toa. `/api/webhooks/*` fica de fora de propósito: quem
+ * chama é a Meta, sem cookie, e a autenticação ali é por assinatura. */
 const PROTECTED_PREFIXES = [
   "/dashboard",
+  "/conversas",
   "/contatos",
   "/segmentos",
   "/templates",
   "/comunicados",
   "/configuracoes",
+  "/perfil",
+  "/master",
   "/onboarding",
   "/aceitar-convite",
 ];
