@@ -248,7 +248,7 @@ async function getPhoneNumberDetails(
 
   // Registra o que a Meta devolveu de fato. Sem isso, um campo ausente é
   // indistinguível de um campo vazio, e a tela mente sem deixar rastro.
-  console.log(
+  console.warn(
     `[getPhoneNumberDetails] ${phoneNumberId} status=${details.status ?? "ausente"} ` +
       `platform_type=${details.platformType ?? "ausente"} ` +
       `is_on_biz_app=${details.isOnBizApp ?? "ausente"} ` +
