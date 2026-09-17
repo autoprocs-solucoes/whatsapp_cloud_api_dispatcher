@@ -237,7 +237,7 @@ async function getPhoneNumberDetails(
     }
   }
 
-  return {
+  const details = {
     tier:
       pickString(data.whatsapp_business_manager_messaging_limit) ??
       pickString(data.messaging_limit_tier),
@@ -245,6 +245,17 @@ async function getPhoneNumberDetails(
     platformType: pickString(data.platform_type),
     isOnBizApp: typeof data.is_on_biz_app === "boolean" ? data.is_on_biz_app : undefined,
   };
+
+  // Registra o que a Meta devolveu de fato. Sem isso, um campo ausente é
+  // indistinguível de um campo vazio, e a tela mente sem deixar rastro.
+  console.log(
+    `[getPhoneNumberDetails] ${phoneNumberId} status=${details.status ?? "ausente"} ` +
+      `platform_type=${details.platformType ?? "ausente"} ` +
+      `is_on_biz_app=${details.isOnBizApp ?? "ausente"} ` +
+      `chaves=${Object.keys(data).join("|")}`,
+  );
+
+  return details;
 }
 
 export async function listPhoneNumbers(
