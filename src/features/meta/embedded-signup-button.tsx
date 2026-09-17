@@ -162,19 +162,20 @@ export function EmbeddedSignupButton({
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
+        // Forma documentada pela Meta pro Cadastro Incorporado. Pra
+        // Coexistência muda só o `featureType`.
+        //
+        // Aqui havia um `features: [{name: "marketing_messages_lite"}, ...]`
+        // adicionado como contorno de um erro de business_id. Ele trocava o
+        // fluxo inteiro: em vez do pareamento por QR code com o app do
+        // celular, a Meta abria o cadastro do Marketing Messages Lite, que
+        // pede pra digitar um número de envio — e oferecia o número de teste
+        // americano, reinterpretado como brasileiro. Nunca dava pra conectar
+        // um número que já existe no app.
         extras: {
           setup: {},
           featureType,
           sessionInfoVersion: "3",
-          // Sem "version"/"features" a Meta cai num bug ("<business_id> não é
-          // um ID comercial válido") ao registrar o número na Coexistência —
-          // achado testando manualmente no fluxo de Cadastro Incorporado.
-          ...(connectionMethod === "coexistence"
-            ? {
-                version: "v3",
-                features: [{ name: "marketing_messages_lite" }, { name: "app_only_install" }],
-              }
-            : {}),
         },
       },
     );
