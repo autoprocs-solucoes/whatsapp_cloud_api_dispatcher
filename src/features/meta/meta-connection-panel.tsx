@@ -8,7 +8,6 @@ import { EmbeddedSignupButton } from "@/features/meta/embedded-signup-button";
 import { ManualMetaConnectForm } from "@/features/meta/manual-connect-form";
 import { RegisterPhoneNumberButton } from "@/features/meta/register-phone-number-button";
 import { SyncMetaButton } from "@/features/meta/sync-meta-button";
-import { cn } from "@/lib/utils";
 import type { MetaConnectionView } from "@/server/meta";
 import type { ConversationCostSummary, WabaHealthStatus } from "@/lib/meta/graph-api";
 
@@ -49,19 +48,6 @@ function qualityTone(rating: string | null): StatusTone {
   }
 }
 
-function verificationTone(status: string | null): StatusTone {
-  switch (status) {
-    case "VERIFIED":
-      return "ok";
-    case "EXPIRED":
-      return "pending";
-    case "NOT_VERIFIED":
-      return "danger";
-    default:
-      return "neutral";
-  }
-}
-
 /** Rótulos do campo `status` da Meta. */
 const META_STATUS_LABEL: Record<string, string> = {
   CONNECTED: "Conectado",
@@ -77,19 +63,22 @@ const META_STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * Situação real do número, na ordem de confiança:
- * 1. `is_on_biz_app` — Coexistência ativa, é o que o cliente quer saber.
- * 2. `meta_status` — o estado que a própria Meta reporta.
- * 3. `is_registered` — flag nossa, último recurso: a Meta recusa /register
- *    para número de app ("Register endpoint is not available for SMB
- *    businesses"), então ela fica falsa mesmo com tudo funcionando.
+ * Situação do número. `null` quando não dá pra afirmar nada — melhor um
+ * travessão do que um vermelho inventado.
+ *
+ * Só usa fonte confiável: `is_on_biz_app`/método de conexão pra Coexistência e
+ * `meta_status` pro resto. `is_registered` ficou de fora de propósito: é flag
+ * nossa, marcada só quando a NOSSA chamada de /register roda. Conexão manual
+ * nunca roda e a Meta recusa o endpoint em coexistência, então ela reportava
+ * "Não registrado" em números com centenas de envios.
  */
-function numberState(p: {
-  is_on_biz_app?: boolean | null;
-  meta_status?: string | null;
-  is_registered?: boolean;
-}): { label: string; tone: StatusTone } {
-  if (p.is_on_biz_app) return { label: "Coexistência ativa", tone: "ok" };
+function numberState(
+  p: { is_on_biz_app?: boolean | null; meta_status?: string | null },
+  isCoexistence: boolean,
+): { label: string; tone: StatusTone } | null {
+  if (isCoexistence || p.is_on_biz_app) {
+    return { label: "Coexistência ativa", tone: "ok" };
+  }
 
   if (p.meta_status) {
     const label = META_STATUS_LABEL[p.meta_status] ?? p.meta_status;
@@ -98,16 +87,8 @@ function numberState(p: {
     return { label, tone: "danger" };
   }
 
-  return p.is_registered
-    ? { label: "Registrado", tone: "ok" }
-    : { label: "Não registrado", tone: "danger" };
+  return null;
 }
-
-const VERIFICATION_LABEL: Record<string, string> = {
-  VERIFIED: "Verificado",
-  EXPIRED: "Expirada",
-  NOT_VERIFIED: "Não verificado",
-};
 
 function MetaLogo({ size = 18 }: { size?: number }) {
   return <Image src="/meta-logo.png" alt="Meta" width={size} height={size} className="shrink-0" />;
@@ -287,54 +268,48 @@ function ConnectionCard({
                       </p>
                     </div>
                   </div>
-                  {!p.is_registered && !isCoexistence && (
-                    /* Qualquer membro pode registrar — não é gerenciar a
-                       conexão, só corrige um estado inconsistente do número.
-                       Em Coexistência o botão só produziria erro: a Meta
-                       recusa o endpoint ("Register endpoint is not available
-                       for SMB businesses") porque o pareamento já registrou. */
+                  {!isCoexistence && p.meta_status && p.meta_status !== "CONNECTED" && (
+                    /* Só aparece quando a META diz que o número não está
+                       conectado. Antes bastava `is_registered` ser false, que
+                       é o padrão em conexão manual — o botão ficava exposto em
+                       número funcionando e, se clicado, só produziria erro. Em
+                       Coexistência a Meta recusa o endpoint de qualquer jeito
+                       ("Register endpoint is not available for SMB
+                       businesses"). */
                     <RegisterPhoneNumberButton workspaceId={workspaceId} phoneNumberRowId={p.id} />
                   )}
                 </div>
 
-                {/* Em Coexistência, "Registro" e "Verificação" nunca saem do
-                    vermelho por desenho da Meta: ela recusa o /register e o
-                    número não passa por SMS. Mostrar os dois só gera alarme
-                    sobre algo que não tem ação nem consequência, então a
-                    grade encolhe pra duas colunas e some com eles. Em conexão
-                    padrão eles continuam valendo: lá, número não registrado
-                    de fato não envia. */}
-                <div
-                  className={cn(
-                    "grid grid-cols-2 divide-x divide-line border-t border-line bg-card-2",
-                    isCoexistence ? "sm:grid-cols-2" : "sm:grid-cols-4",
-                  )}
-                >
+                {/* "Verificação" saiu de vez: `code_verification_status` só
+                    diz respeito ao código de onboarding e continua EXPIRED ou
+                    NOT_VERIFIED em número que funciona há meses — deu alarme
+                    falso tanto em coexistência quanto em conexão manual.
+                    "Situação" agora só existe quando a Meta respondeu: antes
+                    caía em `is_registered`, flag nossa que só liga quando a
+                    NOSSA chamada de /register roda. Conexão manual e
+                    coexistência nunca rodam, então um número com centenas de
+                    envios aparecia em vermelho como "Não registrado". */}
+                <div className="grid grid-cols-2 divide-x divide-line border-t border-line bg-card-2 sm:grid-cols-3">
                   <StatusCell label="Qualidade">
                     <StatusBadge tone={qualityTone(p.quality_rating)}>
                       {p.quality_rating ?? "—"}
                     </StatusBadge>
                   </StatusCell>
-                  {!isCoexistence && (
-                    <>
-                      <StatusCell label="Situação">
-                        {(() => {
-                          const s = numberState(p);
-                          return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>;
-                        })()}
-                      </StatusCell>
-                      <StatusCell label="Verificação">
-                        {p.code_verification_status ? (
-                          <StatusBadge tone={verificationTone(p.code_verification_status)}>
-                            {VERIFICATION_LABEL[p.code_verification_status] ??
-                              p.code_verification_status}
-                          </StatusBadge>
-                        ) : (
-                          <span className="text-xs text-ink-4">—</span>
-                        )}
-                      </StatusCell>
-                    </>
-                  )}
+                  <StatusCell label="Situação">
+                    {(() => {
+                      const s = numberState(p, isCoexistence);
+                      return s ? (
+                        <StatusBadge tone={s.tone}>{s.label}</StatusBadge>
+                      ) : (
+                        <span
+                          className="text-xs text-ink-4"
+                          title="A Meta ainda não informou o estado deste número. Sincronize para atualizar."
+                        >
+                          —
+                        </span>
+                      );
+                    })()}
+                  </StatusCell>
                   <StatusCell label="Limite portfólio">
                     <p
                       className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"
