@@ -41,11 +41,11 @@ export function AcceptInviteForm({ email, defaultFullName }: Props) {
       <CardHeader>
         <CardTitle>Aceitar convite</CardTitle>
         <CardDescription>
-          Você foi convidado para o Autoprocs Dispatcher como <strong>{email}</strong>. Defina seu
+          Você foi convidado para o Dispatcher como <strong>{email}</strong>. Defina seu
           nome e uma senha para começar.
         </CardDescription>
       </CardHeader>
-      <form action={formAction} className="space-y-4">
+      <form action={formAction}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Nome completo</Label>

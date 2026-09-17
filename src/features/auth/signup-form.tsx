@@ -34,10 +34,10 @@ export function SignupForm() {
       <CardHeader>
         <CardTitle>Criar conta</CardTitle>
         <CardDescription>
-          Cadastre-se para começar a usar o Autoprocs Dispatcher.
+          Cadastre-se para começar a usar o Dispatcher.
         </CardDescription>
       </CardHeader>
-      <form action={formAction} className="space-y-4">
+      <form action={formAction}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Nome completo</Label>

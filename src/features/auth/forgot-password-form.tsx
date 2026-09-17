@@ -40,7 +40,7 @@ export function ForgotPasswordForm() {
           Informe seu email e enviaremos um link para redefinir a senha.
         </CardDescription>
       </CardHeader>
-      <form action={formAction} className="space-y-4">
+      <form action={formAction}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>

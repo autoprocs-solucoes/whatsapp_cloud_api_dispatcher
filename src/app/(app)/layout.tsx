@@ -23,6 +23,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           email: user.email,
           avatarUrl: user.profile.avatar_url,
         }}
+        canManageWorkspace={activeWorkspace.role === "owner" || user.profile.is_superadmin}
+        isMaster={user.profile.is_superadmin}
       />
       <SidebarInset className="min-w-0 bg-paper">
         <AppHeader />

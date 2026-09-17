@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { notFound } from "next/navigation";
 
 import {
   Card,
@@ -10,8 +11,6 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetaConnectionPanel } from "@/features/meta/meta-connection-panel";
-import { AvatarUploadForm } from "@/features/profile/avatar-upload-form";
-import { ProfileNameForm } from "@/features/profile/profile-name-form";
 import { WorkspaceLogoForm } from "@/features/workspace/workspace-logo-form";
 import { InviteMemberForm } from "@/features/workspace/invite-member-form";
 import { MembersTable } from "@/features/workspace/members-table";
@@ -23,10 +22,17 @@ import { getConnectionsCost, getMetaConnections } from "@/server/meta";
 import { getWorkspaceMembers } from "@/server/members";
 import { requireActiveWorkspace } from "@/server/workspace";
 
+/**
+ * Configurações do workspace: logo da empresa, membros e conexão Meta. É área
+ * de administração — quem não é owner (nem master) não entra. Os dados
+ * pessoais de cada usuário ficam em /perfil.
+ */
 export default async function ConfiguracoesPage() {
   const user = await requireUser();
   const workspace = await requireActiveWorkspace();
-  const isOwner = workspace.role === "owner";
+  const canManage = workspace.role === "owner" || user.profile.is_superadmin;
+  if (!canManage) notFound();
+
   const [members, metaConnections] = await Promise.all([
     getWorkspaceMembers(workspace.id),
     getMetaConnections(workspace.id),
@@ -37,12 +43,11 @@ export default async function ConfiguracoesPage() {
     <div className="space-y-5">
       <PageHeader
         title="Configurações"
-        description="Edite o workspace, gerencie membros e conecte sua conta Meta."
+        description="Dados da empresa, membros e conexão com a Meta."
       />
 
-      <Tabs defaultValue="perfil" className="space-y-4">
+      <Tabs defaultValue="workspace" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="perfil">Perfil</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
           <TabsTrigger value="meta" className="gap-1.5">
@@ -50,72 +55,55 @@ export default async function ConfiguracoesPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="perfil">
-          <Card>
-            <CardHeader>
-              <CardTitle>Seus dados</CardTitle>
-              <CardDescription>
-                Nome e foto que aparecem no rodapé do menu lateral.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <AvatarUploadForm
-                initialAvatarUrl={user.profile.avatar_url}
-                fullName={user.profile.full_name}
-                email={user.email}
-              />
-              <ProfileNameForm initialName={user.profile.full_name} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="workspace">
           <Card>
             <CardHeader>
-              <CardTitle>Dados do workspace</CardTitle>
-              <CardDescription>Nome e logo exibidos para todos os membros.</CardDescription>
+              <CardTitle>Dados da empresa</CardTitle>
+              <CardDescription>
+                Logo e nome exibidos no topo do menu para todos os membros.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <WorkspaceLogoForm
                 workspaceId={workspace.id}
                 workspaceName={workspace.name}
                 initialLogoUrl={workspace.logo_url}
-                canEdit={isOwner}
+                canEdit={canManage}
               />
               <WorkspaceSettingsForm
                 workspaceId={workspace.id}
                 initialName={workspace.name}
-                canEdit={isOwner}
+                canEdit={canManage}
               />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="members" className="space-y-4">
-          {isOwner && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Convidar membro</CardTitle>
-                <CardDescription>
-                  O convidado recebe email com link para definir senha e entrar.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <InviteMemberForm workspaceId={workspace.id} />
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Convidar membro</CardTitle>
+              <CardDescription>
+                O convidado recebe e-mail com link para definir senha e entrar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <InviteMemberForm workspaceId={workspace.id} />
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Membros</CardTitle>
-              <CardDescription>{members.length} no total</CardDescription>
+              <CardDescription>
+                {members.length} no total · clique na foto pra ver ampliada
+              </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <MembersTable
                 members={members}
                 workspaceId={workspace.id}
                 currentUserId={user.id}
-                canManage={isOwner}
+                canManage={canManage}
                 onRemove={removeMemberAction as unknown as (fd: FormData) => Promise<void>}
               />
             </CardContent>
@@ -125,7 +113,7 @@ export default async function ConfiguracoesPage() {
         <TabsContent value="meta">
           <MetaConnectionPanel
             workspaceId={workspace.id}
-            canManage={isOwner}
+            canManage={canManage}
             connections={metaConnections}
             costByConnectionId={costByConnectionId}
             metaAppId={serverEnv.META_APP_ID}

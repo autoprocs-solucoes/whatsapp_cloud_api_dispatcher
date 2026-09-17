@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
+import { ShieldCheck } from "lucide-react";
 
 import {
   Sidebar,
@@ -38,6 +39,12 @@ type Props = {
   activeWorkspace: WorkspaceOption;
   workspaces: WorkspaceOption[];
   user: { name: string; email: string; avatarUrl: string | null };
+  /** Configurações é do workspace (logo, membros, Meta) — só quem administra
+   * vê o item no menu. Perfil, que é do usuário, fica no rodapé. */
+  canManageWorkspace: boolean;
+  /** Superadmin que entrou num cliente precisa de caminho de volta; pro
+   * cliente esta seção não existe. */
+  isMaster: boolean;
 };
 
 /**
@@ -45,8 +52,23 @@ type Props = {
  * mesmo pra quem é superadmin: quem entra num cliente vê exatamente o que o
  * cliente vê.
  */
-export function AppSidebar({ activeWorkspace, workspaces, user }: Props) {
+export function AppSidebar({
+  activeWorkspace,
+  workspaces,
+  user,
+  canManageWorkspace,
+  isMaster,
+}: Props) {
   const pathname = usePathname();
+
+  const groups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => canManageWorkspace || item.href !== "/configuracoes",
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <Sidebar collapsible="icon">
@@ -57,7 +79,7 @@ export function AppSidebar({ activeWorkspace, workspaces, user }: Props) {
       </SidebarHeader>
 
       <SidebarContent className="gap-4 px-2 py-3">
-        {navGroups.map((group) => (
+        {groups.map((group) => (
           <SidebarGroup key={group.label} className="gap-1 p-0">
             <SidebarGroupLabel className={navGroupLabelClass}>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -85,30 +107,59 @@ export function AppSidebar({ activeWorkspace, workspaces, user }: Props) {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+
+        {isMaster && (
+          <SidebarGroup className="gap-1 p-0">
+            <SidebarGroupLabel className={navGroupLabelClass}>Master</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Voltar ao Master" className={navItemClass}>
+                    <Link href={"/master" as Route}>
+                      <ShieldCheck />
+                      <span>Voltar ao Master</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-nav-line p-3">
-        <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:hidden">
-          {user.avatarUrl ? (
-            <Image
-              src={user.avatarUrl}
-              alt=""
-              width={28}
-              height={28}
-              className="size-7 shrink-0 rounded-md object-cover"
-            />
-          ) : (
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-nav-active text-[11px] font-semibold text-nav-active-ink">
-              {(user.name || user.email).slice(0, 2).toUpperCase()}
-            </span>
-          )}
-          <div className="grid min-w-0 flex-1 leading-tight">
-            <span className="truncate text-xs font-medium text-nav-ink">
-              {user.name || "Sem nome"}
-            </span>
-            <span className="truncate text-[11px] text-nav-ink-2">{user.email}</span>
-          </div>
-        </div>
+      <SidebarFooter className="border-t border-nav-line p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname.startsWith("/perfil")}
+              tooltip="Perfil"
+              className={cn(navItemClass, "h-auto py-1.5")}
+            >
+              <Link href={"/perfil" as Route}>
+                {user.avatarUrl ? (
+                  <Image
+                    src={user.avatarUrl}
+                    alt=""
+                    width={28}
+                    height={28}
+                    className="size-7 shrink-0 rounded-md object-cover"
+                  />
+                ) : (
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-nav-active text-[11px] font-semibold text-nav-active-ink">
+                    {(user.name || user.email).slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                <span className="grid min-w-0 flex-1 leading-tight">
+                  <span className="truncate text-xs font-medium">
+                    {user.name || "Sem nome"}
+                  </span>
+                  <span className="truncate text-[11px] text-nav-ink-2">{user.email}</span>
+                </span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

@@ -37,6 +37,7 @@ export type Breadcrumb = { section: string; page: string };
 /** "Seção › Página" da topbar. Rotas do Master não vivem em `navGroups`
  * (grupo de rotas separado), então entram como caso explícito. */
 export function resolveBreadcrumb(pathname: string): Breadcrumb | null {
+  if (pathname.startsWith("/perfil")) return { section: "Conta", page: "Perfil" };
   if (pathname.startsWith("/master/perfil")) return { section: "Master", page: "Perfil" };
   if (pathname === "/master" || pathname.startsWith("/master/")) {
     return { section: "Master", page: "Clientes" };

@@ -33,9 +33,9 @@ export function LoginForm() {
     <Card>
       <CardHeader>
         <CardTitle>Entrar</CardTitle>
-        <CardDescription>Acesse sua conta da Autoprocs Dispatcher.</CardDescription>
+        <CardDescription>Acesse sua conta do Dispatcher.</CardDescription>
       </CardHeader>
-      <form action={formAction} className="space-y-4">
+      <form action={formAction}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
