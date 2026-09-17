@@ -8,6 +8,7 @@ import { EmbeddedSignupButton } from "@/features/meta/embedded-signup-button";
 import { ManualMetaConnectForm } from "@/features/meta/manual-connect-form";
 import { RegisterPhoneNumberButton } from "@/features/meta/register-phone-number-button";
 import { SyncMetaButton } from "@/features/meta/sync-meta-button";
+import { cn } from "@/lib/utils";
 import type { MetaConnectionView } from "@/server/meta";
 import type { ConversationCostSummary, WabaHealthStatus } from "@/lib/meta/graph-api";
 
@@ -192,6 +193,10 @@ function ConnectionCard({
         ).toLocaleString("pt-BR")
       : null;
   const health = conn.health_status as WabaHealthStatus | null;
+  // Vem do método guardado na conexão, não de um campo da Meta: o
+  // `is_on_biz_app` que confirmaria isso não está sendo devolvido pra esta
+  // conta, e o método a gente já sabe desde o signup.
+  const isCoexistence = conn.connection_method === "coexistence";
 
   return (
     <div className="space-y-4">
@@ -282,40 +287,54 @@ function ConnectionCard({
                       </p>
                     </div>
                   </div>
-                  {!p.is_registered && (
+                  {!p.is_registered && !isCoexistence && (
                     /* Qualquer membro pode registrar — não é gerenciar a
-                       conexão, só corrige um estado inconsistente do número. */
+                       conexão, só corrige um estado inconsistente do número.
+                       Em Coexistência o botão só produziria erro: a Meta
+                       recusa o endpoint ("Register endpoint is not available
+                       for SMB businesses") porque o pareamento já registrou. */
                     <RegisterPhoneNumberButton workspaceId={workspaceId} phoneNumberRowId={p.id} />
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 divide-x divide-line border-t border-line bg-card-2 sm:grid-cols-4">
+                {/* Em Coexistência, "Registro" e "Verificação" nunca saem do
+                    vermelho por desenho da Meta: ela recusa o /register e o
+                    número não passa por SMS. Mostrar os dois só gera alarme
+                    sobre algo que não tem ação nem consequência, então a
+                    grade encolhe pra duas colunas e some com eles. Em conexão
+                    padrão eles continuam valendo: lá, número não registrado
+                    de fato não envia. */}
+                <div
+                  className={cn(
+                    "grid grid-cols-2 divide-x divide-line border-t border-line bg-card-2",
+                    isCoexistence ? "sm:grid-cols-2" : "sm:grid-cols-4",
+                  )}
+                >
                   <StatusCell label="Qualidade">
                     <StatusBadge tone={qualityTone(p.quality_rating)}>
                       {p.quality_rating ?? "—"}
                     </StatusBadge>
                   </StatusCell>
-                  <StatusCell label="Situação">
-                    {(() => {
-                      const s = numberState(p);
-                      return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>;
-                    })()}
-                  </StatusCell>
-                  <StatusCell label="Verificação">
-                    {/* Em Coexistência o número nunca passa por SMS/ligação —
-                        o pareamento é pelo app — então NOT_VERIFIED é o
-                        esperado e não merece alarme vermelho. */}
-                    {p.is_on_biz_app && p.code_verification_status !== "VERIFIED" ? (
-                      <StatusBadge tone="neutral">Não se aplica</StatusBadge>
-                    ) : p.code_verification_status ? (
-                      <StatusBadge tone={verificationTone(p.code_verification_status)}>
-                        {VERIFICATION_LABEL[p.code_verification_status] ??
-                          p.code_verification_status}
-                      </StatusBadge>
-                    ) : (
-                      <span className="text-xs text-ink-4">—</span>
-                    )}
-                  </StatusCell>
+                  {!isCoexistence && (
+                    <>
+                      <StatusCell label="Situação">
+                        {(() => {
+                          const s = numberState(p);
+                          return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>;
+                        })()}
+                      </StatusCell>
+                      <StatusCell label="Verificação">
+                        {p.code_verification_status ? (
+                          <StatusBadge tone={verificationTone(p.code_verification_status)}>
+                            {VERIFICATION_LABEL[p.code_verification_status] ??
+                              p.code_verification_status}
+                          </StatusBadge>
+                        ) : (
+                          <span className="text-xs text-ink-4">—</span>
+                        )}
+                      </StatusCell>
+                    </>
+                  )}
                   <StatusCell label="Limite portfólio">
                     <p
                       className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"
