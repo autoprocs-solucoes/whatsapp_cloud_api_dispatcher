@@ -29,6 +29,58 @@ const INTER_MESSAGE_DELAY_MS = 200;
 const MAX_ATTEMPTS = 5;
 
 // ---------------------------------------------------------------------------
+// Classificação de erro da Meta
+//
+// O status HTTP sozinho não basta: a Cloud API devolve 400 tanto pra "número
+// não existe no WhatsApp" (definitivo — insistir é desperdício e conta como
+// spam) quanto pra "limite de throughput atingido" (temporário — insistir é
+// exatamente o certo). Antes o worker só olhava 429/5xx, então todo rate limit
+// que chegava como 400 virava falha permanente e a mensagem nunca saía.
+//
+// Referência: Cloud API — Error Codes.
+// ---------------------------------------------------------------------------
+
+/** Vale a pena tentar de novo: limite, instabilidade ou erro genérico da Meta. */
+const RETRYABLE_META_CODES = new Set([
+  1, // API Unknown — erro temporário do lado da Meta
+  2, // API Service — serviço indisponível
+  4, // Application request limit reached
+  80007, // Rate limit issues
+  130429, // Cloud API message throughput reached
+  131000, // Something went wrong (genérico da Meta)
+  131048, // Spam rate limit hit
+  131056, // (Business, Consumer) pair rate limit hit
+  133016, // Rate limit em restauração de conta
+]);
+
+/** Não adianta repetir: o problema é a mensagem, o número ou a conta. */
+const PERMANENT_META_CODES = new Set([
+  100, // Invalid parameter
+  131008, // Required parameter is missing
+  131021, // Recipient e sender são o mesmo número
+  131026, // Message undeliverable (número não recebe / não existe)
+  131047, // Re-engagement message (fora da janela de 24h)
+  131049, // Meta optou por não entregar (saúde do ecossistema)
+  131051, // Unsupported message type
+  132000, // Template param count mismatch
+  132001, // Template não existe
+  132005, // Template texto muito longo
+  132007, // Template format character policy violated
+  132012, // Template parameter format mismatch
+  132015, // Template pausado
+  132016, // Template desabilitado
+  133010, // Número não registrado
+]);
+
+/** Espera antes da próxima tentativa: 30s, 2min, 8min, 32min… com teto de 1h. */
+function backoffSeconds(attempts: number): number {
+  const base = 30 * Math.pow(4, Math.max(0, attempts - 1));
+  const capped = Math.min(base, 3600);
+  // Jitter de ±20% pra não sincronizar todos os destinatários do mesmo lote.
+  return Math.round(capped * (0.8 + Math.random() * 0.4));
+}
+
+// ---------------------------------------------------------------------------
 // Util: extrai placeholders {{name}} / {{1}} (espelha src/lib/meta/placeholders)
 // ---------------------------------------------------------------------------
 function extractPlaceholders(text: string | null | undefined): string[] {
@@ -125,11 +177,45 @@ function buildParams(
 // ---------------------------------------------------------------------------
 class GraphError extends Error {
   status: number;
+  /** Código de erro da Meta (`error.code`), quando veio no corpo. */
+  code: number | null;
   retriable: boolean;
-  constructor(status: number, message: string) {
+  /** Rate limit: além de repetir, vale parar o disparo por esta invocação. */
+  rateLimited: boolean;
+
+  constructor(
+    status: number,
+    message: string,
+    code: number | null = null,
+    isTransient: boolean | null = null,
+  ) {
     super(message);
     this.status = status;
-    this.retriable = status === 429 || status >= 500;
+    this.code = code;
+
+    // Ordem de confiança:
+    // 1. `is_transient` — a própria Meta dizendo se vale repetir. É o sinal
+    //    mais confiável e não envelhece quando ela cria códigos novos.
+    // 2. Listas de código conhecidas — cobrem o caso de `is_transient` ausente.
+    // 3. Status HTTP — último recurso.
+    if (isTransient !== null) {
+      this.retriable = isTransient;
+    } else if (code !== null && PERMANENT_META_CODES.has(code)) {
+      this.retriable = false;
+    } else if (code !== null && RETRYABLE_META_CODES.has(code)) {
+      this.retriable = true;
+    } else {
+      this.retriable = status === 429 || status >= 500;
+    }
+
+    this.rateLimited =
+      status === 429 ||
+      (code !== null && [4, 80007, 130429, 131048, 131056].includes(code));
+  }
+
+  /** Código que vai pro banco: o da Meta quando existe, senão o HTTP. */
+  get storedCode(): string {
+    return String(this.code ?? this.status);
   }
 }
 
@@ -231,11 +317,21 @@ async function sendTemplate(args: {
 
   if (!res.ok) {
     let msg = `Graph error ${res.status}`;
+    let code: number | null = null;
+    let isTransient: boolean | null = null;
     try {
       const payload = await res.json();
-      msg = payload?.error?.message ?? msg;
+      const err = payload?.error;
+      code = typeof err?.code === "number" ? err.code : null;
+      isTransient = typeof err?.is_transient === "boolean" ? err.is_transient : null;
+      // `error_user_msg` é o texto que a Meta escreveu pro usuário final;
+      // `error_data.details` traz o motivo específico. Ambos são melhores que
+      // o `message` genérico pra quem vai ler isso na tela.
+      const base = err?.error_user_msg ?? err?.message ?? msg;
+      const details = err?.error_data?.details;
+      msg = details && details !== base ? `${base} - ${details}` : base;
     } catch { /* ignore */ }
-    throw new GraphError(res.status, msg);
+    throw new GraphError(res.status, msg, code, isTransient);
   }
 
   const data = await res.json();
@@ -278,7 +374,14 @@ Deno.serve(async (_req) => {
   let totalProcessed = 0;
   const report: Record<
     string,
-    { sent: number; failed: number; left: number; finalStatus?: string }
+    {
+      sent: number;
+      failed: number;
+      retrying: number;
+      left: number;
+      rateLimitHit: boolean;
+      finalStatus?: string;
+    }
   > = {};
 
   for (const dispatch of dispatches ?? []) {
@@ -332,7 +435,9 @@ Deno.serve(async (_req) => {
       report[dispatch.id] = {
         sent: 0,
         failed: 0,
+        retrying: 0,
         left: 0,
+        rateLimitHit: false,
         finalStatus: "failed",
       };
       continue;
@@ -354,8 +459,12 @@ Deno.serve(async (_req) => {
 
     let sent = 0;
     let failed = 0;
+    let retrying = 0;
+    // Rate limit é do número, não do destinatário: insistir nos próximos da
+    // fila só piora. Ao bater, larga este dispatch e deixa o backoff cuidar.
+    let rateLimitHit = false;
 
-    while (totalProcessed < MAX_PER_INVOCATION) {
+    while (totalProcessed < MAX_PER_INVOCATION && !rateLimitHit) {
       const { data: claimed, error: claimErr } = await admin.rpc(
         "claim_dispatch_recipients",
         { p_dispatch_id: dispatch.id, p_limit: BATCH_SIZE },
@@ -402,25 +511,34 @@ Deno.serve(async (_req) => {
           sent++;
         } catch (e) {
           const err = e as GraphError;
-          const retriable = err?.retriable && r.attempts < MAX_ATTEMPTS;
-          if (retriable) {
-            // Não mexe em status — claimed_at expira no stale interval e
-            // próxima rodada pega de novo.
-            console.warn(
-              "[worker] retriable error",
-              dispatch.id,
-              r.id,
-              err?.status,
-              err?.message,
-            );
+          // `attempts` já foi incrementado pelo claim, então este é o número de
+          // tentativas gastas até aqui.
+          const willRetry = err?.retriable === true && r.attempts < MAX_ATTEMPTS;
+
+          if (willRetry) {
+            // Volta pra fila com espera crescente. Grava o erro mesmo assim:
+            // sem isso o destinatário fica "na fila" sem explicação nenhuma.
+            await admin.rpc("reschedule_dispatch_recipient", {
+              p_id: r.id,
+              p_delay_seconds: backoffSeconds(r.attempts),
+              p_error_code: err.storedCode,
+              p_error_message: `Tentativa ${r.attempts}/${MAX_ATTEMPTS}: ${err.message}`,
+            });
+            retrying++;
+            if (err.rateLimited) rateLimitHit = true;
           } else {
+            const exhausted = err?.retriable === true;
             await admin
               .from("dispatch_recipient")
               .update({
                 status: "failed",
-                error_code: String(err?.status ?? "exception"),
-                error_message: String(err?.message ?? "").slice(0, 500),
+                error_code: String(err?.storedCode ?? "exception"),
+                error_message: (exhausted
+                  ? `Desistiu após ${MAX_ATTEMPTS} tentativas: ${err?.message ?? ""}`
+                  : String(err?.message ?? "")
+                ).slice(0, 500),
                 failed_at: new Date().toISOString(),
+                last_error_at: new Date().toISOString(),
               })
               .eq("id", r.id);
             failed++;
@@ -443,14 +561,17 @@ Deno.serve(async (_req) => {
     let finalStatus: string | undefined;
 
     if (left === 0) {
-      // Determina sucesso: ao menos 1 sent → done; senão failed.
-      const { count: sentCount } = await admin
+      // Sucesso = ao menos um destinatário saiu. Precisa contar delivered e
+      // read também: o webhook da Meta promove 'sent' assim que a mensagem
+      // chega, então num disparo rápido e bem-sucedido a contagem de 'sent'
+      // pode ser zero aqui — e o comunicado inteiro era marcado como 'failed'.
+      const { count: deliveredCount } = await admin
         .from("dispatch_recipient")
         .select("*", { count: "exact", head: true })
         .eq("dispatch_id", dispatch.id)
-        .eq("status", "sent");
+        .in("status", ["sent", "delivered", "read"]);
 
-      finalStatus = (sentCount ?? 0) > 0 ? "done" : "failed";
+      finalStatus = (deliveredCount ?? 0) > 0 ? "done" : "failed";
       await admin
         .from("dispatch")
         .update({
@@ -460,7 +581,7 @@ Deno.serve(async (_req) => {
         .eq("id", dispatch.id);
     }
 
-    report[dispatch.id] = { sent, failed, left, finalStatus };
+    report[dispatch.id] = { sent, failed, retrying, left, rateLimitHit, finalStatus };
   }
 
   return new Response(

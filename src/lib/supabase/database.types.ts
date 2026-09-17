@@ -543,6 +543,8 @@ export type Database = {
           failed_at: string | null;
           claimed_at: string | null;
           attempts: number;
+          next_attempt_at: string | null;
+          last_error_at: string | null;
           reaction_emoji: string | null;
           reaction_at: string | null;
         };
@@ -562,6 +564,8 @@ export type Database = {
           failed_at?: string | null;
           claimed_at?: string | null;
           attempts?: number;
+          next_attempt_at?: string | null;
+          last_error_at?: string | null;
           reaction_emoji?: string | null;
           reaction_at?: string | null;
         };
@@ -581,6 +585,8 @@ export type Database = {
           failed_at?: string | null;
           claimed_at?: string | null;
           attempts?: number;
+          next_attempt_at?: string | null;
+          last_error_at?: string | null;
           reaction_emoji?: string | null;
           reaction_at?: string | null;
         };

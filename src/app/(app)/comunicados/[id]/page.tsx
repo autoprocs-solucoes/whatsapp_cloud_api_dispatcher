@@ -333,9 +333,21 @@ export default async function ComunicadoDetalhe({
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.phone_e164}</TableCell>
                     <TableCell>
-                      <StatusBadge tone={statusTone(r.status)}>
-                        {RECIPIENT_STATUS_LABELS[r.status] ?? r.status}
-                      </StatusBadge>
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusBadge tone={statusTone(r.status)}>
+                          {RECIPIENT_STATUS_LABELS[r.status] ?? r.status}
+                        </StatusBadge>
+                        {/* Reenvio agendado: sem isso o destinatário parecia
+                            parado "na fila" sem explicação. */}
+                        {r.status === "queued" && r.attempts > 0 && (
+                          <span className="text-[10px] whitespace-nowrap text-amber">
+                            {r.attempts}ª tentativa
+                            {r.next_attempt_at
+                              ? ` · nova às ${new Date(r.next_attempt_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                              : ""}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-3">
                       {r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR") : "—"}
