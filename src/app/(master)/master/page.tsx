@@ -1,6 +1,8 @@
-import Link from "next/link";
+import { LogIn } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { enterClientWorkspaceAction } from "@/features/master/actions";
 import { listWorkspacesForMaster } from "@/server/master";
 
 function healthBadgeVariant(status: string | null): "default" | "secondary" | "destructive" {
@@ -24,8 +26,8 @@ export default async function MasterClientesPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
         <p className="text-muted-foreground text-sm">
-          Visão cross-tenant de todos os clientes (workspaces) da plataforma. Clique num cliente
-          pra ver o overview completo.
+          Visão cross-tenant de todos os clientes (workspaces) da plataforma. Clique em
+          &quot;Entrar&quot; pra acessar o workspace do cliente com o menu completo dele.
         </p>
       </header>
 
@@ -44,12 +46,13 @@ export default async function MasterClientesPage() {
               <th className="px-3 py-2 text-left font-medium">Conexão Meta</th>
               <th className="px-3 py-2 text-left font-medium">Coexistência</th>
               <th className="px-3 py-2 text-left font-medium">Criado desde</th>
+              <th className="px-3 py-2 text-right font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {workspaces.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-muted-foreground px-3 py-8 text-center">
+                <td colSpan={8} className="text-muted-foreground px-3 py-8 text-center">
                   Nenhum workspace cadastrado.
                 </td>
               </tr>
@@ -59,9 +62,7 @@ export default async function MasterClientesPage() {
                 return (
                   <tr key={w.id} className="hover:bg-muted/20 border-t align-top">
                     <td className="px-3 py-2">
-                      <Link href={`/master/${w.id}`} className="font-medium hover:underline">
-                        {w.name}
-                      </Link>
+                      <p className="font-medium">{w.name}</p>
                       <p className="text-muted-foreground text-[10px]">{w.slug}</p>
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs">
@@ -97,6 +98,14 @@ export default async function MasterClientesPage() {
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs">
                       {new Date(w.createdAt).toLocaleDateString("pt-BR")}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <form action={enterClientWorkspaceAction}>
+                        <input type="hidden" name="workspaceId" value={w.id} />
+                        <Button type="submit" size="sm">
+                          <LogIn className="mr-1.5 size-3.5" /> Entrar
+                        </Button>
+                      </form>
                     </td>
                   </tr>
                 );

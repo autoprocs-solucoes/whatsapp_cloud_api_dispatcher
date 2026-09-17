@@ -4,9 +4,6 @@ import { notFound } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser, type AuthenticatedUser } from "@/server/auth";
-import { getDashboardStatsForWorkspace, type DashboardStats } from "@/features/dashboard/queries";
-import { getMetaConnections, type MetaConnectionView } from "@/server/meta";
-import type { WorkspaceMember } from "@/lib/supabase/database.types";
 
 /**
  * `profile.is_superadmin` já existe desde a migration inicial
@@ -135,58 +132,6 @@ export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
     totalSent: sentCountByWorkspace.get(w.id) ?? 0,
     connections: connectionsByWorkspace.get(w.id) ?? [],
   }));
-}
-
-// ----------------------------------------------------------------------------
-// Visão geral de um workspace específico (drill-down do painel master).
-// ----------------------------------------------------------------------------
-export type MasterWorkspaceDetail = {
-  workspace: { id: string; name: string; slug: string; createdAt: string; ownerEmail: string | null };
-  members: (WorkspaceMember & { email: string | null })[];
-  connections: MetaConnectionView[];
-  stats: DashboardStats;
-};
-
-export async function getWorkspaceDetailForMaster(
-  workspaceId: string,
-): Promise<MasterWorkspaceDetail | null> {
-  const admin = createAdminClient();
-
-  const { data: workspace } = await admin
-    .from("workspace")
-    .select("id, name, slug, owner_id, created_at")
-    .eq("id", workspaceId)
-    .maybeSingle();
-  if (!workspace) return null;
-
-  const [ownerRes, membersRes, connections, stats] = await Promise.all([
-    admin.auth.admin.getUserById(workspace.owner_id),
-    admin.from("workspace_member").select("*").eq("workspace_id", workspaceId),
-    getMetaConnections(workspaceId),
-    getDashboardStatsForWorkspace(workspaceId),
-  ]);
-
-  const members = membersRes.data ?? [];
-  const memberUserIds = members.map((m) => m.user_id);
-  const memberEmails = await Promise.all(
-    memberUserIds.map((id) => admin.auth.admin.getUserById(id)),
-  );
-  const emailByUserId = new Map(
-    memberUserIds.map((id, i) => [id, memberEmails[i]?.data.user?.email ?? null] as const),
-  );
-
-  return {
-    workspace: {
-      id: workspace.id,
-      name: workspace.name,
-      slug: workspace.slug,
-      createdAt: workspace.created_at,
-      ownerEmail: ownerRes.data.user?.email ?? null,
-    },
-    members: members.map((m) => ({ ...m, email: emailByUserId.get(m.user_id) ?? null })),
-    connections,
-    stats,
-  };
 }
 
 // ----------------------------------------------------------------------------

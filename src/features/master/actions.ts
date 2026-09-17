@@ -1,11 +1,14 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 import { requireMasterUser } from "@/server/master";
+import { ACTIVE_WORKSPACE_COOKIE } from "@/server/workspace";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -67,6 +70,44 @@ export async function promoteMasterMemberAction(
 
   revalidatePath("/master/perfil");
   return { ok: true, data: undefined };
+}
+
+/**
+ * "Entrar" num cliente a partir do Master: troca o workspace ativo do
+ * próprio master pra esse cliente e manda pro dashboard normal — o menu
+ * completo do cliente (Dashboard/Contatos/Segmentos/Templates/Comunicados/
+ * Configurações) aparece porque é literalmente o app do cliente, não uma
+ * página paralela. Garante membership como owner antes de trocar (o master
+ * pode não ser membro de todo workspace ainda).
+ */
+export async function enterClientWorkspaceAction(formData: FormData): Promise<void> {
+  const user = await requireMasterUser();
+
+  const workspaceId = z.string().uuid().parse(formData.get("workspaceId"));
+
+  const admin = createAdminClient();
+  const { data: membership } = await admin
+    .from("workspace_member")
+    .select("workspace_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!membership) {
+    await admin
+      .from("workspace_member")
+      .insert({ workspace_id: workspaceId, user_id: user.id, role: "owner" });
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(ACTIVE_WORKSPACE_COOKIE, workspaceId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+
+  redirect("/dashboard");
 }
 
 const demoteSchema = z.object({ userId: z.string().uuid() });
