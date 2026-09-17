@@ -26,13 +26,3 @@ export function parseCustomFields(value: unknown): Record<string, string> {
   }
   return out;
 }
-
-// Item da fila de solicitações externas (IA) p/ alterar custom_fields.
-// Persistido em tabela própria: public.contact_pending_update.
-export type PendingUpdateItem = {
-  id: string;
-  field: string;
-  value: string;
-  source: string | null;
-  created_at: string;
-};

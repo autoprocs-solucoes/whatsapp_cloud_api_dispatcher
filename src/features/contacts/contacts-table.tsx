@@ -2,17 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Bell,
-  ChevronLeft,
-  ChevronRight,
-  Columns3,
-  ListFilter,
-  Pencil,
-  Search,
-  Trash2,
-  UserX,
-} from "lucide-react";
+import { Columns3, ListFilter, Pencil, Search, Trash2, UserX } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -37,8 +27,8 @@ import {
   TableHeader,
   TableRow,
   TableShell,
-  TableToolbar,
 } from "@/components/ui/table";
+import { TablePager } from "@/components/table-pager";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -81,21 +71,14 @@ const OPT_OUT_LABELS: Record<"all" | "active" | "opt_out", string> = {
   opt_out: "Opt-out",
 };
 
-const PENDING_LABELS: Record<"all" | "with_pending" | "without_pending", string> = {
-  all: "Todas",
-  with_pending: "Com pendência",
-  without_pending: "Sem pendência",
-};
-
 type Props = {
   contacts: Contact[];
   total: number;
   page: number;
   pageSize: number;
-  pendingCounts: Record<string, number>;
 };
 
-export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }: Props) {
+export function ContactsTable({ contacts, total, page, pageSize }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -106,10 +89,6 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
   const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
   const appliedSearch = searchParams.get("search") ?? "";
   const optOutFilter = (searchParams.get("optOutFilter") ?? "all") as "all" | "active" | "opt_out";
-  const pendingFilter = (searchParams.get("pendingFilter") ?? "all") as
-    | "all"
-    | "with_pending"
-    | "without_pending";
 
   useEffect(() => {
     setSelected(new Set());
@@ -145,7 +124,6 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
       const fd = new FormData();
       fd.append("search", appliedSearch);
       fd.append("optOutFilter", optOutFilter);
-      fd.append("pendingFilter", pendingFilter);
       startTransition(async () => {
         const res = await deleteAllMatchingAction(fd);
         if (!res.ok) {
@@ -173,8 +151,6 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
       router.refresh();
     });
   }
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const customColumns = useMemo<ColumnDef[]>(() => {
     const keys = new Set<string>();
@@ -310,35 +286,6 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
                 {(["all", "active", "opt_out"] as const).map((f) => (
                   <DropdownMenuRadioItem key={f} value={f}>
                     {OPT_OUT_LABELS[f]}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant={pendingFilter === "all" ? "outline" : "default"}
-                size="sm"
-                title="Filtrar por pendência de custom fields"
-              >
-                <Bell className="mr-1 size-3.5" />
-                Pendência: {PENDING_LABELS[pendingFilter]}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Pendência de custom fields</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuRadioGroup
-                value={pendingFilter}
-                onValueChange={(v) =>
-                  updateParams({ pendingFilter: v === "all" ? null : v, page: "1" })
-                }
-              >
-                {(["all", "with_pending", "without_pending"] as const).map((f) => (
-                  <DropdownMenuRadioItem key={f} value={f}>
-                    {PENDING_LABELS[f]}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -503,24 +450,7 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
                     </TableCell>
                   )}
                   {isVisible("phone_e164") && (
-                    <TableCell className="font-mono text-xs text-ink-2">
-                      <div className="flex items-center gap-2">
-                        <span>{c.phone_e164}</span>
-                        {(() => {
-                          const n = pendingCounts[c.id] ?? 0;
-                          if (n === 0) return null;
-                          return (
-                            <Badge
-                              variant="pending"
-                              title={`${n} atualização(ões) de custom fields pendente(s)`}
-                            >
-                              <Bell className="size-3" />
-                              {n} pendente{n > 1 ? "s" : ""}
-                            </Badge>
-                          );
-                        })()}
-                      </div>
-                    </TableCell>
+                    <TableCell className="font-mono text-xs text-ink-2">{c.phone_e164}</TableCell>
                   )}
                   {isVisible("tags") && (
                     <TableCell>
@@ -626,32 +556,14 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
           </TableBody>
         </Table>
 
-        <TableToolbar>
-          <p>
-            Mostrando {contacts.length} de {total.toLocaleString("pt-BR")} contatos
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1 || isPending}
-              onClick={() => updateParams({ page: String(page - 1) })}
-            >
-              <ChevronLeft className="size-3.5" /> Anterior
-            </Button>
-            <span className="px-2 font-mono text-ink-2">
-              {page} / {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages || isPending}
-              onClick={() => updateParams({ page: String(page + 1) })}
-            >
-              Próxima <ChevronRight className="size-3.5" />
-            </Button>
-          </div>
-        </TableToolbar>
+        <TablePager
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          unit="contatos"
+          disabled={isPending}
+          onPageChange={(next) => updateParams({ page: String(next) })}
+        />
       </TableShell>
 
       <EditContactDialog

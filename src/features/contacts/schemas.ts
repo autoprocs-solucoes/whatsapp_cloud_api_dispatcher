@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/** Itens por página na listagem de contatos. Mesmo passo usado em segmentos e
+ * comunicados. */
+export const CONTACTS_PAGE_SIZE = 10;
+
 export const mappingSchema = z.object({
   phoneColumn: z.string().min(1, "Selecione a coluna do telefone"),
   fullNameColumn: z.string().nullable().optional(),
@@ -46,36 +50,16 @@ export const bulkDeleteContactsSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(500),
 });
 
-export const submitPendingUpdatesSchema = z.object({
-  contact_id: z.string().uuid(),
-  fields: z
-    .record(
-      z.string().min(1).max(64).regex(/^[a-z0-9_]+$/i, "Use só letras, números e underscore"),
-      z.string().max(2000),
-    )
-    .refine((r) => Object.keys(r).length > 0, "Envie ao menos um campo"),
-  source: z.string().min(1).max(120).nullable().optional(),
-});
-
-export const decidePendingUpdateSchema = z.object({
-  contact_id: z.string().uuid(),
-  pending_id: z.string().uuid(),
-});
-
 export const contactFiltersSchema = z.object({
   search: z.string().optional().default(""),
   optOutFilter: z.enum(["all", "active", "opt_out"]).optional().default("all"),
-  pendingFilter: z
-    .enum(["all", "with_pending", "without_pending"])
-    .optional()
-    .default("all"),
 });
 
 export type ContactFilters = z.infer<typeof contactFiltersSchema>;
 
 export const listContactsSchema = contactFiltersSchema.extend({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(10).max(200).default(50),
+  pageSize: z.coerce.number().int().min(10).max(200).default(CONTACTS_PAGE_SIZE),
 });
 
 export type ListContactsParams = z.infer<typeof listContactsSchema>;

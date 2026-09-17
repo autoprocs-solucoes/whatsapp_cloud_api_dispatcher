@@ -6,24 +6,22 @@ import { Button } from "@/components/ui/button";
 import { ContactsTable } from "@/features/contacts/contacts-table";
 import { NewContactButton } from "@/features/contacts/new-contact-button";
 import { listContacts } from "@/features/contacts/actions";
+import { CONTACTS_PAGE_SIZE } from "@/features/contacts/schemas";
 
 type SearchParams = Promise<{
   search?: string;
   optOutFilter?: string;
-  pendingFilter?: string;
   page?: string;
   pageSize?: string;
 }>;
 
 export default async function ContatosPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const { contacts, total, page, pageSize, pendingCounts } = await listContacts({
+  const { contacts, total, page, pageSize } = await listContacts({
     search: sp.search,
     optOutFilter: (sp.optOutFilter as "all" | "active" | "opt_out" | undefined) ?? "all",
-    pendingFilter:
-      (sp.pendingFilter as "all" | "with_pending" | "without_pending" | undefined) ?? "all",
     page: sp.page ? Number(sp.page) : 1,
-    pageSize: sp.pageSize ? Number(sp.pageSize) : 50,
+    pageSize: sp.pageSize ? Number(sp.pageSize) : CONTACTS_PAGE_SIZE,
   });
 
   const exportParams = new URLSearchParams();
@@ -57,13 +55,7 @@ export default async function ContatosPage({ searchParams }: { searchParams: Sea
         }
       />
 
-      <ContactsTable
-        contacts={contacts}
-        total={total}
-        page={page}
-        pageSize={pageSize}
-        pendingCounts={pendingCounts}
-      />
+      <ContactsTable contacts={contacts} total={total} page={page} pageSize={pageSize} />
     </div>
   );
 }

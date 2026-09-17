@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Copy, Search } from "lucide-react";
 
@@ -17,8 +17,8 @@ import {
   TableHeader,
   TableRow,
   TableShell,
-  TableToolbar,
 } from "@/components/ui/table";
+import { PAGE_SIZE, TablePager } from "@/components/table-pager";
 import type { DispatchListItem } from "@/features/dispatch/actions";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +67,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 export function DispatchesTable({ dispatches }: { dispatches: DispatchListItem[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const rows = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -85,6 +86,13 @@ export function DispatchesTable({ dispatches }: { dispatches: DispatchListItem[]
       );
     });
   }, [dispatches, filter, search]);
+
+  // Mudou o filtro ou a busca, o conjunto é outro — voltar pra primeira página.
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search]);
+
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -133,10 +141,10 @@ export function DispatchesTable({ dispatches }: { dispatches: DispatchListItem[]
             </tr>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 ? (
+            {pageRows.length === 0 ? (
               <TableEmpty colSpan={8}>Nenhum comunicado neste filtro.</TableEmpty>
             ) : (
-              rows.map((d) => {
+              pageRows.map((d) => {
                 const sent =
                   (d.counts.sent ?? 0) + (d.counts.delivered ?? 0) + (d.counts.read ?? 0);
                 const failed = d.counts.failed ?? 0;
@@ -211,11 +219,13 @@ export function DispatchesTable({ dispatches }: { dispatches: DispatchListItem[]
             )}
           </TableBody>
         </Table>
-        <TableToolbar>
-          <p>
-            Mostrando {rows.length} de {dispatches.length} comunicados
-          </p>
-        </TableToolbar>
+        <TablePager
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={rows.length}
+          unit="comunicados"
+          onPageChange={setPage}
+        />
       </TableShell>
     </div>
   );

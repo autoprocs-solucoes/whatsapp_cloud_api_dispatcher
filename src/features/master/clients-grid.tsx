@@ -22,16 +22,18 @@ function healthLabel(status: string | null): string {
   return HEALTH_LABEL[status] ?? status;
 }
 
+/** Conectada é verde e sem conexão é vermelho. Os estados intermediários que a
+ * Meta reporta (LIMITED / BLOCKED) mantêm âmbar e vermelho — o workspace está
+ * conectado, mas não manda mensagem normalmente. Health ainda não sincronizada
+ * (null) conta como conectada: existe conexão. */
 function healthTone(status: string | null): StatusTone {
   switch (status) {
-    case "AVAILABLE":
-      return "ok";
     case "LIMITED":
       return "pending";
     case "BLOCKED":
       return "danger";
     default:
-      return "neutral";
+      return "ok";
   }
 }
 
@@ -67,7 +69,7 @@ function ClientCard({ w }: { w: MasterWorkspaceRow }) {
             <p className="truncate font-mono text-[11px] text-ink-3">{w.slug}</p>
           </div>
         </div>
-        <StatusBadge tone={conn ? healthTone(conn.canSendMessage) : "neutral"}>
+        <StatusBadge tone={conn ? healthTone(conn.canSendMessage) : "danger"}>
           {conn ? healthLabel(conn.canSendMessage) : "Sem conexão"}
         </StatusBadge>
       </div>
