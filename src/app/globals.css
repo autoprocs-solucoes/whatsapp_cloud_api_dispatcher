@@ -118,41 +118,71 @@
   --chart-5: var(--amber);
 }
 
-/* Tema escuro: mantido como variação dos mesmos tokens (o app abre em claro,
-   sem toggle na topbar). */
+/*
+ * Tema escuro — mesmos papéis, steps próprios. Só os tokens primitivos são
+ * redefinidos: os nomes semânticos do shadcn apontam pra eles via var(), então
+ * o mapeamento inteiro acompanha sozinho.
+ * Superfícies seguem o cinza escuro da Meta; o azul de marca sobe um passo
+ * porque #0866FF sobre quase-preto fica pesado demais pra texto e ícone.
+ */
 .dark {
+  /* superfícies */
   --paper: #18191a;
   --surface-card: #242526;
-  --card-2: #303233;
-  --surface-input: #242526;
+  --card-2: #2f3031;
+  --surface-input: #1c1d1e;
 
+  /* linhas */
   --line: #3a3b3c;
   --line-2: #4a4b4d;
-  --line-3: #5a5b5e;
+  --line-3: #5c5e60;
 
+  /* texto */
   --ink: #e4e6eb;
   --ink-2: #b0b3b8;
   --ink-3: #8a8d91;
   --ink-4: #6a6d71;
 
-  --brand-soft: #16233a;
-  --brand-line: #24395e;
+  /* sidebar — navy um passo acima do claro, pra não sumir no fundo */
+  --nav: #10192b;
+  --nav-line: #243352;
+  --nav-active: #1b2942;
+  --nav-ink: #c4ccda;
+  --nav-ink-2: #7e889c;
 
-  --ok-soft: #16281c;
-  --ok-line: #24422c;
+  /* marca */
+  --brand: #3b87ff;
+  --brand-strong: #0866ff;
+  --brand-2: #6ba5ff;
+  --brand-soft: #16233a;
+  --brand-line: #27405f;
+
+  /* status — um passo mais claro pra legibilidade sobre o escuro */
+  --ok: #40b563;
+  --ok-soft: #15281c;
+  --ok-line: #26462f;
   --ok-ink: #5cc47a;
 
+  --red: #f0645a;
   --red-soft: #2c1a18;
-  --red-line: #4a2823;
+  --red-line: #4d2a26;
+  --amber: #e0a13a;
   --amber-soft: #2a2114;
-  --amber-line: #453720;
+  --amber-line: #473821;
 
+  --violet: #a48bf0;
   --violet-soft: #1f1833;
-  --violet-line: #33275a;
+  --violet-line: #352a5c;
+
+  /* sequência de entrega — no escuro, "mais avançado" = mais claro */
+  --d-sent: #5c5e60;
+  --d-deliv: #2a6ed4;
+  --d-read: #5c9dff;
+  --d-fail: #e8564a;
 
   --primary-foreground: #ffffff;
   --destructive-foreground: #ffffff;
-  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 @theme inline {

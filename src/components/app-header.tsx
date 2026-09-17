@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { ChevronRight, LogOut } from "lucide-react";
 
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/user-menu";
@@ -31,6 +32,7 @@ export function AppHeader({ user }: Props) {
       )}
 
       <div className="ml-auto flex items-center gap-1">
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="sm"
