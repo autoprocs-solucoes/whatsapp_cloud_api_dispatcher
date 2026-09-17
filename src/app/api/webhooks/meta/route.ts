@@ -1,7 +1,7 @@
 import "server-only";
 
 import crypto from "node:crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -346,10 +346,12 @@ export async function POST(req: NextRequest) {
     return new NextResponse(null, { status: 401 });
   }
 
-  // Awaited (não fire-and-forget): em serverless a função pode ser encerrada
-  // assim que a resposta é enviada, então precisa terminar isso antes de
-  // retornar. Tem timeout curto embutido, então não trava a resposta pra Meta.
-  await forwardToLegacyUrl(rawBody, signatureHeader);
+  // `after` roda depois da resposta ir embora, sem a função serverless ser
+  // encerrada no meio — que era o motivo do await aqui antes. Importa mais
+  // agora que a Meta entrega TODO o tráfego neste endpoint: aguardar o repasse
+  // somava até 4s em cada evento, e um destino lento ou fora do ar empurraria
+  // a resposta pro timeout da Meta, que então reenvia o evento.
+  after(() => forwardToLegacyUrl(rawBody, signatureHeader));
 
   let body: {
     object?: string;
