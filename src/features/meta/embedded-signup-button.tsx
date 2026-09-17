@@ -63,6 +63,13 @@ type SessionInfo = {
   };
 };
 
+/** Payload do evento CANCEL — traz o motivo quando a Meta interrompe o fluxo. */
+type CancelInfo = {
+  current_step?: string;
+  error_message?: string;
+  error_code?: string | number;
+};
+
 type Props = {
   appId: string;
   configId: string;
@@ -84,17 +91,41 @@ export function EmbeddedSignupButton({
   const [sdkReady, setSdkReady] = React.useState(false);
   const [isPending, startTransition] = useTransition();
   const sessionInfoRef = React.useRef<SessionInfo["data"] | null>(null);
+  const cancelInfoRef = React.useRef<CancelInfo | null>(null);
 
   // Listener pra capturar `session_info_response` antes do callback do login.
   React.useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") {
-        return;
+    function isFacebookOrigin(origin: string): boolean {
+      try {
+        const host = new URL(origin).hostname;
+        // Compara por host, não por sufixo de string: "evilfacebook.com"
+        // passaria num endsWith("facebook.com").
+        return host === "facebook.com" || host.endsWith(".facebook.com");
+      } catch {
+        return false;
       }
+    }
+
+    function handleMessage(event: MessageEvent) {
+      if (!isFacebookOrigin(event.origin)) return;
       try {
         const parsed = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (parsed?.type === "WA_EMBEDDED_SIGNUP" && parsed?.event === "FINISH") {
+        if (parsed?.type !== "WA_EMBEDDED_SIGNUP") return;
+
+        // A Meta tem um evento de término por tipo de fluxo — FINISH,
+        // FINISH_ONLY_WABA, FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING,
+        // FINISH_OBO_MIGRATION, FINISH_GRANT_ONLY_API_ACCESS. Só "FINISH" era
+        // aceito aqui, então a Coexistência concluía na Meta e o resultado era
+        // descartado: o cliente terminava o fluxo e o workspace continuava
+        // "Sem conexão", sem nada explicando.
+        if (typeof parsed.event === "string" && parsed.event.startsWith("FINISH")) {
           sessionInfoRef.current = parsed.data ?? null;
+          return;
+        }
+
+        // CANCEL carrega o motivo real quando o fluxo falha do lado da Meta.
+        if (parsed.event === "CANCEL") {
+          cancelInfoRef.current = parsed.data ?? null;
         }
       } catch {
         // Ignora mensagens não-JSON.
@@ -137,18 +168,32 @@ export function EmbeddedSignupButton({
         const code = response.authResponse?.code;
         const session = sessionInfoRef.current;
 
+        const cancel = cancelInfoRef.current;
+        // A Meta explica o que deu errado no evento CANCEL; sem isso o usuário
+        // só via "não foi possível" e não tinha o que investigar.
+        const metaReason = cancel?.error_message
+          ? `${cancel.error_message}${cancel.error_code ? ` (${cancel.error_code})` : ""}`
+          : cancel?.current_step
+            ? `Interrompido na etapa ${cancel.current_step}.`
+            : null;
+
         if (!code) {
-          if (response.status === "not_authorized") {
+          if (metaReason) {
+            toast.error(metaReason);
+          } else if (response.status === "not_authorized") {
             toast.error("Você cancelou o Embedded Signup.");
           } else {
             toast.error("Não foi possível concluir o login. Tente de novo.");
           }
+          cancelInfoRef.current = null;
           return;
         }
         if (!session?.waba_id) {
           toast.error(
-            "Embedded Signup terminou sem informar o WABA. Verifique permissões da configuração no painel Meta.",
+            metaReason ??
+              "Embedded Signup terminou sem informar o WABA. Verifique permissões da configuração no painel Meta.",
           );
+          cancelInfoRef.current = null;
           return;
         }
 
@@ -167,6 +212,7 @@ export function EmbeddedSignupButton({
             toast.error(result.error);
           }
           sessionInfoRef.current = null;
+          cancelInfoRef.current = null;
         });
       },
       {
