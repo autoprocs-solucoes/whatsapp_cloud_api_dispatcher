@@ -81,9 +81,8 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-full bg-wa-accent text-white">
-          <WhatsAppMark size={22} filled />
-        </span>
+        {/* Sem círculo por trás: a própria logo já é o balão verde. */}
+        <WhatsAppMark size={34} filled />
         <div>
           <h1 className="text-[23px] leading-tight font-semibold tracking-tight text-ink">
             Conversas
@@ -97,9 +96,7 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
       {conversations.length === 0 && !sp.q ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-wa-accent text-white">
-              <WhatsAppMark size={26} filled />
-            </span>
+            <WhatsAppMark size={48} filled />
             <div className="space-y-1">
               <h2 className="text-base font-semibold text-ink">Nenhuma conversa ainda</h2>
               <p className="max-w-md text-sm text-ink-2">
