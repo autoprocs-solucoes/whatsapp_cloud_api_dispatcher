@@ -171,6 +171,12 @@ export type PhoneNumberInfo = {
   is_pin_enabled?: boolean;
   messaging_limit_tier?: string;
   throughput?: { level?: string };
+  /** CONNECTED | PENDING | FLAGGED | RESTRICTED … */
+  status?: string;
+  /** CLOUD_API | ON_PREMISE | NOT_APPLICABLE */
+  platform_type?: string;
+  /** true = número em Coexistência (segue no app e na Cloud API). */
+  is_on_biz_app?: boolean;
 };
 
 type PhoneNumbersResponse = {
@@ -214,8 +220,13 @@ export async function listPhoneNumbers(
     method: "GET",
     token,
     query: {
+      // `status`, `platform_type` e `is_on_biz_app` são o estado real do
+      // número. Sem eles a tela dependia da nossa flag `is_registered`, que a
+      // Coexistência nunca liga — a Meta recusa /register pra número de app
+      // ("Register endpoint is not available for SMB businesses") — e um
+      // número funcionando aparecia como "Não registrado".
       fields:
-        "id,display_phone_number,verified_name,quality_rating,code_verification_status,is_pin_enabled,throughput",
+        "id,display_phone_number,verified_name,quality_rating,code_verification_status,is_pin_enabled,throughput,status,platform_type,is_on_biz_app",
     },
   });
 

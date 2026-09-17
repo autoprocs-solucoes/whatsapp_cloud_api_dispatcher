@@ -173,6 +173,9 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
             quality_rating: p.quality_rating ?? null,
             code_verification_status: p.code_verification_status ?? null,
             messaging_limit_tier: p.messaging_limit_tier ?? null,
+            meta_status: p.status ?? null,
+            platform_type: p.platform_type ?? null,
+            is_on_biz_app: p.is_on_biz_app ?? null,
             is_registered: registration?.registered ?? existing?.is_registered ?? false,
             pin: registration?.pin ?? existing?.pin ?? null,
             last_synced_at: new Date().toISOString(),
@@ -286,6 +289,9 @@ export async function connectMetaManuallyAction(
             quality_rating: p.quality_rating ?? null,
             code_verification_status: p.code_verification_status ?? null,
             messaging_limit_tier: p.messaging_limit_tier ?? null,
+            meta_status: p.status ?? null,
+            platform_type: p.platform_type ?? null,
+            is_on_biz_app: p.is_on_biz_app ?? null,
             // Conexão manual normalmente já é um número em uso — preserva o
             // status anterior se essa era uma reconexão; senão fica como
             // "desconhecido" (false) até o admin confirmar via "Registrar".

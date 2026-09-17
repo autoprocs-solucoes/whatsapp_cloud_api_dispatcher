@@ -236,29 +236,37 @@ async function mirrorMessage(
   const normalized = contactPhone.startsWith("+") ? contactPhone : `+${contactPhone}`;
   const { type, body, mediaId, mediaMime } = extractContent(msg);
 
-  await admin.from("whatsapp_message").upsert(
-    {
-      workspace_id: tenant.workspaceId,
-      connection_id: tenant.connectionId,
-      phone_number_id: tenant.phoneNumberId,
-      contact_phone_e164: normalized,
-      contact_id: await findContactId(admin, tenant.workspaceId, normalized),
-      contact_name: contactName,
-      direction,
-      type,
-      body,
-      media_id: mediaId,
-      media_mime: mediaMime,
-      meta_message_id: msg.id ?? null,
-      // Echo veio do celular: já saiu, mas a plataforma não acompanha o status.
-      status: direction === "out" ? "sent" : null,
-      // Recebida entra como não lida; o que sai já nasce lido.
-      read_internally: direction === "out",
-      sent_at: messageTimestamp(msg),
-      raw: msg as never,
-    },
-    { onConflict: "workspace_id,meta_message_id", ignoreDuplicates: true },
-  );
+  // Insert simples em vez de upsert: o índice único de (workspace, message_id)
+  // é PARCIAL (`where meta_message_id is not null`), e o Postgres recusa um
+  // ON CONFLICT cujo alvo não carregue o mesmo predicado — coisa que o
+  // supabase-js não sabe expressar. O upsert falhava em toda mensagem, e como
+  // ninguém olhava o erro, a conversa sumia sem deixar rastro.
+  const { error } = await admin.from("whatsapp_message").insert({
+    workspace_id: tenant.workspaceId,
+    connection_id: tenant.connectionId,
+    phone_number_id: tenant.phoneNumberId,
+    contact_phone_e164: normalized,
+    contact_id: await findContactId(admin, tenant.workspaceId, normalized),
+    contact_name: contactName,
+    direction,
+    type,
+    body,
+    media_id: mediaId,
+    media_mime: mediaMime,
+    meta_message_id: msg.id ?? null,
+    // Echo veio do celular: já saiu, mas a plataforma não acompanha o status.
+    status: direction === "out" ? "sent" : null,
+    // Recebida entra como não lida; o que sai já nasce lido.
+    read_internally: direction === "out",
+    sent_at: messageTimestamp(msg),
+    raw: msg as never,
+  });
+
+  // 23505 = violação de unicidade: a Meta reentregou um evento que já temos.
+  // É o funcionamento esperado do índice, não erro.
+  if (error && error.code !== "23505") {
+    console.error("[meta/webhook] falha gravando mensagem:", error.code, error.message);
+  }
 }
 
 async function processStatus(admin: ReturnType<typeof createAdminClient>, status: MetaStatus) {

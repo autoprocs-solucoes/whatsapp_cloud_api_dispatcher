@@ -178,6 +178,9 @@ export type Database = {
           verified_name: string | null;
           quality_rating: string | null;
           code_verification_status: string | null;
+          meta_status: string | null;
+          platform_type: string | null;
+          is_on_biz_app: boolean | null;
           messaging_limit_tier: string | null;
           is_registered: boolean;
           pin: string | null;
@@ -193,6 +196,9 @@ export type Database = {
           verified_name?: string | null;
           quality_rating?: string | null;
           code_verification_status?: string | null;
+          meta_status?: string | null;
+          platform_type?: string | null;
+          is_on_biz_app?: boolean | null;
           messaging_limit_tier?: string | null;
           is_registered?: boolean;
           pin?: string | null;
@@ -208,6 +214,9 @@ export type Database = {
           verified_name?: string | null;
           quality_rating?: string | null;
           code_verification_status?: string | null;
+          meta_status?: string | null;
+          platform_type?: string | null;
+          is_on_biz_app?: boolean | null;
           messaging_limit_tier?: string | null;
           is_registered?: boolean;
           pin?: string | null;

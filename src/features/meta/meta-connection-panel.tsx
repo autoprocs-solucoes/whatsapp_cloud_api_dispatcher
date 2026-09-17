@@ -61,6 +61,47 @@ function verificationTone(status: string | null): StatusTone {
   }
 }
 
+/** Rótulos do campo `status` da Meta. */
+const META_STATUS_LABEL: Record<string, string> = {
+  CONNECTED: "Conectado",
+  PENDING: "Pendente",
+  FLAGGED: "Sinalizado",
+  RESTRICTED: "Restrito",
+  RATE_LIMITED: "Limitado",
+  BANNED: "Banido",
+  MIGRATED: "Migrado",
+  DELETED: "Excluído",
+  UNVERIFIED: "Não verificado",
+  UNKNOWN: "Desconhecido",
+};
+
+/**
+ * Situação real do número, na ordem de confiança:
+ * 1. `is_on_biz_app` — Coexistência ativa, é o que o cliente quer saber.
+ * 2. `meta_status` — o estado que a própria Meta reporta.
+ * 3. `is_registered` — flag nossa, último recurso: a Meta recusa /register
+ *    para número de app ("Register endpoint is not available for SMB
+ *    businesses"), então ela fica falsa mesmo com tudo funcionando.
+ */
+function numberState(p: {
+  is_on_biz_app?: boolean | null;
+  meta_status?: string | null;
+  is_registered?: boolean;
+}): { label: string; tone: StatusTone } {
+  if (p.is_on_biz_app) return { label: "Coexistência ativa", tone: "ok" };
+
+  if (p.meta_status) {
+    const label = META_STATUS_LABEL[p.meta_status] ?? p.meta_status;
+    if (p.meta_status === "CONNECTED") return { label, tone: "ok" };
+    if (p.meta_status === "PENDING") return { label, tone: "pending" };
+    return { label, tone: "danger" };
+  }
+
+  return p.is_registered
+    ? { label: "Registrado", tone: "ok" }
+    : { label: "Não registrado", tone: "danger" };
+}
+
 const VERIFICATION_LABEL: Record<string, string> = {
   VERIFIED: "Verificado",
   EXPIRED: "Expirada",
@@ -254,15 +295,19 @@ function ConnectionCard({
                       {p.quality_rating ?? "—"}
                     </StatusBadge>
                   </StatusCell>
-                  <StatusCell label="Registro">
-                    {p.is_registered ? (
-                      <StatusBadge tone="ok">Registrado</StatusBadge>
-                    ) : (
-                      <StatusBadge tone="danger">Não registrado</StatusBadge>
-                    )}
+                  <StatusCell label="Situação">
+                    {(() => {
+                      const s = numberState(p);
+                      return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>;
+                    })()}
                   </StatusCell>
                   <StatusCell label="Verificação">
-                    {p.code_verification_status ? (
+                    {/* Em Coexistência o número nunca passa por SMS/ligação —
+                        o pareamento é pelo app — então NOT_VERIFIED é o
+                        esperado e não merece alarme vermelho. */}
+                    {p.is_on_biz_app && p.code_verification_status !== "VERIFIED" ? (
+                      <StatusBadge tone="neutral">Não se aplica</StatusBadge>
+                    ) : p.code_verification_status ? (
                       <StatusBadge tone={verificationTone(p.code_verification_status)}>
                         {VERIFICATION_LABEL[p.code_verification_status] ??
                           p.code_verification_status}
