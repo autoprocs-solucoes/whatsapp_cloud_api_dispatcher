@@ -342,6 +342,16 @@ pre {
 /* Em `@layer components` de propósito: assim qualquer utility (text-nav-ink-2,
    text-xs...) continua ganhando destas classes quando precisar variar. */
 @layer components {
+  /* Rolagem sem a barra do navegador. Usada dentro da prévia do iPhone: a
+   * barra cinza do sistema operacional denuncia que não é um aparelho. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Números: Inter 700, pretos, largura de dígito fixa. */
   .num {
     font-variant-numeric: tabular-nums;
