@@ -290,6 +290,25 @@ function ConnectionCard({
   );
 }
 
+/**
+ * Ocupa o lugar do botão quando falta configuração.
+ *
+ * Antes o card inteiro sumia da tela: quem estivesse procurando a opção não
+ * tinha como saber se ela não existia, se era falta de permissão, ou se era
+ * env faltando. Dizer qual variável está ausente transforma meia hora de
+ * investigação numa linha de leitura.
+ */
+function NotConfigured({ envName }: { envName: string }) {
+  return (
+    <div className="rounded-md border border-amber-line bg-amber-soft px-2.5 py-2">
+      <p className="text-[11px] leading-snug text-ink-2">
+        Indisponível: falta a variável{" "}
+        <code className="font-mono text-[10px] text-amber">{envName}</code> no ambiente.
+      </p>
+    </div>
+  );
+}
+
 function ChoiceCard({
   icon: Icon,
   title,
@@ -352,15 +371,22 @@ export function MetaConnectionPanel({
   const coexistenceEnabled = Boolean(metaAppId && coexistenceConfigId);
   const standardSignupEnabled = Boolean(metaAppId && standardSignupConfigId);
 
+  /** Qual variável está faltando — o card some sem isso e ninguém descobre por quê. */
+  function missingEnv(configId: string | undefined, name: string): string | null {
+    if (!metaAppId) return "META_APP_ID";
+    if (!configId) return name;
+    return null;
+  }
+
   const connectOptions = canManage ? (
     <div className="space-y-3">
-      {standardSignupEnabled && (
-        <ChoiceCard
-          icon={Sparkles}
-          title="Criar do zero"
-          badge="Embedded Signup"
-          description="Pro cliente que ainda não tem número no WhatsApp Business — a Meta cria a WABA e o número no fluxo integrado."
-        >
+      <ChoiceCard
+        icon={Sparkles}
+        title="Criar do zero"
+        badge="Embedded Signup"
+        description="Pro cliente que ainda não tem número no WhatsApp Business — a Meta cria a WABA e o número no fluxo integrado."
+      >
+        {standardSignupEnabled ? (
           <EmbeddedSignupButton
             appId={metaAppId!}
             configId={standardSignupConfigId!}
@@ -369,15 +395,19 @@ export function MetaConnectionPanel({
             connectionMethod="embedded_signup"
             ctaLabel="Criar número"
           />
-        </ChoiceCard>
-      )}
+        ) : (
+          <NotConfigured
+            envName={missingEnv(standardSignupConfigId, "META_EMBEDDED_SIGNUP_CONFIG_ID")!}
+          />
+        )}
+      </ChoiceCard>
 
-      {coexistenceEnabled && (
-        <ChoiceCard
-          icon={Link2}
-          title="Login com Coexistência"
-          description="Pro cliente que já usa o app WhatsApp Business no celular e quer manter os dois: app + Cloud API."
-        >
+      <ChoiceCard
+        icon={Link2}
+        title="Login com Coexistência"
+        description="Pro cliente que já usa o app WhatsApp Business no celular e quer manter os dois: app + Cloud API. A Meta mostra um QR code pra parear com o celular."
+      >
+        {coexistenceEnabled ? (
           <EmbeddedSignupButton
             appId={metaAppId!}
             configId={coexistenceConfigId!}
@@ -387,8 +417,12 @@ export function MetaConnectionPanel({
             connectionMethod="coexistence"
             ctaLabel="Conectar app"
           />
-        </ChoiceCard>
-      )}
+        ) : (
+          <NotConfigured
+            envName={missingEnv(coexistenceConfigId, "META_COEXISTENCE_CONFIG_ID")!}
+          />
+        )}
+      </ChoiceCard>
 
       <div className="rounded-md border border-line p-3">
         <div className="flex gap-3">
