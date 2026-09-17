@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Copy, Download } from "lucide-react";
 
-import { KpiTile } from "@/components/kpi-tile";
+import { StageCard } from "@/components/stage-card";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,8 +19,11 @@ import {
 } from "@/components/ui/table";
 import { DispatchExecutePanel } from "@/features/dispatch/dispatch-execute-panel";
 import { getDispatch } from "@/features/dispatch/actions";
+import { BiggestLossCard } from "@/features/dashboard/biggest-loss-card";
 import { DashboardTimeline } from "@/features/dashboard/dashboard-timeline";
+import { DeliveryFunnel } from "@/features/dashboard/delivery-funnel";
 import { ReadRateInfo } from "@/features/dashboard/read-rate-info";
+import { buildFunnel, formatInt, formatPct, rate } from "@/lib/metrics/funnel";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -32,11 +35,13 @@ const STATUS_LABELS: Record<string, string> = {
   canceled: "Cancelado",
 };
 
+/** Estado de UMA pessoa — exclusivo. "Enviada" aqui quer dizer "saiu, mas
+ * ainda sem confirmação de entrega"; quem já entregou está em "Entregue". */
 const RECIPIENT_STATUS_LABELS: Record<string, string> = {
-  queued: "Aguardando",
-  sent: "Enviado",
+  queued: "Na fila",
+  sent: "Enviada",
   delivered: "Entregue",
-  read: "Lido",
+  read: "Lida",
   failed: "Falhou",
 };
 
@@ -89,12 +94,22 @@ export default async function ComunicadoDetalhe({
   } = detail;
   const totalPages = Math.max(1, Math.ceil(totalRecipients / 50));
 
-  const total = dispatch.total_recipients || 0;
-  const sentLike = (counts.sent ?? 0) + (counts.delivered ?? 0) + (counts.read ?? 0);
-  const deliveredLike = (counts.delivered ?? 0) + (counts.read ?? 0);
-  const readCount = counts.read ?? 0;
-  const failedCount = counts.failed ?? 0;
-  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+  // Um único funil alimenta toda a tela. Os status no banco são exclusivos
+  // (quem leu não está em "entregue"), então acumular aqui é obrigatório —
+  // antes cada card fazia essa conta por conta própria e eles divergiam.
+  const funnel = buildFunnel(
+    {
+      queued: counts.queued ?? 0,
+      sent: counts.sent ?? 0,
+      delivered: counts.delivered ?? 0,
+      read: counts.read ?? 0,
+      failed: counts.failed ?? 0,
+    },
+    dispatch.total_recipients || 0,
+    reactionCount,
+  );
+  const failedCount = funnel.failed;
+  const ofPlanned = (n: number) => `${formatPct(rate(n, funnel.planned))} do total`;
 
   return (
     <div className="space-y-5">
@@ -147,70 +162,88 @@ export default async function ComunicadoDetalhe({
         />
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-        {(["queued", "sent", "delivered", "read", "failed"] as const).map((s) => (
-          <KpiTile
-            key={s}
-            label={RECIPIENT_STATUS_LABELS[s] ?? s}
-            value={(counts[s] ?? 0).toLocaleString("pt-BR")}
-            tone={s === "failed" ? "danger" : "default"}
-          />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-        <KpiTile
-          label="Taxa de envio"
-          value={pct(sentLike)}
-          suffix="%"
-          tone="muted"
-          caption={`${sentLike} de ${total}`}
+      {/* A jornada da mensagem, etapa por etapa. Cada card traz numerador,
+          denominador e a conta pronta — nenhuma calculadora. */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StageCard label="Programadas" value={funnel.planned} baseLabel="destinatários" />
+        <StageCard
+          label="Enviadas"
+          value={funnel.sent}
+          base={funnel.planned}
+          baseLabel="do programado"
+          tone="brand"
         />
-        <KpiTile
-          label="Taxa de entrega"
-          value={pct(deliveredLike)}
-          suffix="%"
-          tone="muted"
-          caption={`${deliveredLike} de ${total}`}
+        <StageCard
+          label="Entregues"
+          value={funnel.delivered}
+          base={funnel.sent}
+          baseLabel="das enviadas"
+          secondary={ofPlanned(funnel.delivered)}
+          tone="brand"
         />
-        <KpiTile
-          label="Taxa de leitura"
-          value={pct(readCount)}
-          suffix="%"
-          tone="muted"
-          caption={
-            <span className="inline-flex items-center gap-1">
-              {readCount} de {total} <ReadRateInfo />
-            </span>
-          }
+        <StageCard
+          label="Lidas"
+          value={funnel.read}
+          base={funnel.delivered}
+          baseLabel="das entregues"
+          secondary={ofPlanned(funnel.read)}
+          tone="ok"
+          hint={<ReadRateInfo />}
         />
-        <KpiTile
-          label="Reações"
-          value={pct(reactionCount)}
-          suffix="%"
-          tone="muted"
-          caption={`${reactionCount} de ${total}`}
-        />
-        <KpiTile
-          label="Taxa de falha"
-          value={pct(failedCount)}
-          suffix="%"
+        <StageCard
+          label="Falharam"
+          value={funnel.failed}
+          base={funnel.planned}
+          baseLabel="do programado"
           tone="danger"
-          caption={`${failedCount} de ${total}`}
         />
+        <StageCard
+          label="Pendentes"
+          value={funnel.pending}
+          base={funnel.planned}
+          baseLabel="ainda na fila"
+          tone="pending"
+        />
+        <StageCard
+          label="Reações"
+          value={funnel.reactions}
+          base={funnel.delivered}
+          baseLabel="das entregues"
+          tone="violet"
+        />
+        <BiggestLossCard data={funnel} />
       </div>
 
-      {timeline.length > 0 && (
+      <div
+        className={cn(
+          "grid gap-4",
+          timeline.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]" : "",
+        )}
+      >
         <Card>
           <CardHeader>
-            <CardTitle>Tendência</CardTitle>
-            <CardDescription>Envios deste comunicado por dia</CardDescription>
+            <CardTitle>Funil de entrega</CardTitle>
+            <CardDescription>
+              Do programado ao lido · o que se perdeu em cada etapa
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <DashboardTimeline data={timeline} emptyMessage="Sem envios ainda." />
+            <DeliveryFunnel data={funnel} emptyMessage="Sem destinatários." />
           </CardContent>
         </Card>
-      )}
+
+        {timeline.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Tendência</CardTitle>
+              <CardDescription>Envios deste comunicado por dia</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DashboardTimeline data={timeline} emptyMessage="Sem envios ainda." />
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {errorGroups.length > 0 && (
         <Card>
@@ -244,12 +277,20 @@ export default async function ComunicadoDetalhe({
       )}
 
       <div className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold text-ink">Destinatários</h2>
+          {/* Aqui os números são exclusivos de propósito: cada pessoa aparece
+              uma vez, no estágio mais avançado que atingiu. Dizer isso em
+              palavras evita a leitura errada de "só 11 foram enviadas". */}
+          <p className="text-xs text-ink-2">
+            Cada pessoa aparece uma vez, no estágio mais avançado que alcançou. Quem leu está em
+            &quot;Lida&quot;, não em &quot;Entregue&quot; — por isso estes números são menores que os
+            dos cards acima, que são acumulados.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-ink-2">
-            {totalRecipients.toLocaleString("pt-BR")} destinatário(s)
-            {statusFilter !== "all"
-              ? ` com status "${RECIPIENT_STATUS_LABELS[statusFilter] ?? statusFilter}"`
-              : ""}
+            {totalRecipients.toLocaleString("pt-BR")} nesta visão
           </p>
           <div className="flex flex-wrap items-center rounded-md border border-line-2 bg-card p-0.5">
             {(["all", "queued", "sent", "delivered", "read", "failed"] as const).map((f) => (
@@ -263,7 +304,9 @@ export default async function ComunicadoDetalhe({
                     : "text-ink-2 hover:text-ink",
                 )}
               >
-                {f === "all" ? "Todos" : RECIPIENT_STATUS_LABELS[f]}
+                {f === "all"
+                  ? `Todos ${formatInt(funnel.planned)}`
+                  : `${RECIPIENT_STATUS_LABELS[f]} ${formatInt(counts[f] ?? 0)}`}
               </Link>
             ))}
           </div>

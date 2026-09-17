@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { buildFunnel, countByStatus, type Funnel } from "@/lib/metrics/funnel";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 export type TimelineDay = {
@@ -12,35 +13,28 @@ export type TimelineDay = {
   failed: number;
 };
 
-export type FunnelStats = {
-  total: number;
-  sent: number;
-  delivered: number;
-  read: number;
-  failed: number;
-};
-
 export type DashboardStats = {
   contacts: { total: number };
   total_sent_alltime: number;
   dispatches: {
-    delivery_rate_30d: number | null;
-    read_rate_30d: number | null;
     last: {
       id: string;
       template_name: string | null;
       status: string;
       created_at: string;
-      total_recipients: number;
-      sent: number;
-      delivered: number;
-      read: number;
-      failed: number;
+      funnel: Funnel;
     } | null;
   };
   timeline_30d: TimelineDay[];
-  funnel_30d: FunnelStats;
+  funnel_30d: Funnel;
 };
+
+/**
+ * Rascunho nunca foi disparado e cancelado foi abortado — nenhum dos dois é
+ * "mensagem programada" do ponto de vista do cliente. Contá-los no denominador
+ * afundava a taxa de entrega de quem deixava rascunhos grandes salvos.
+ */
+const COUNTED_DISPATCH_STATUSES = ["queued", "running", "done", "failed"] as const;
 
 function startOfDayIso(d: Date): string {
   const c = new Date(d);
@@ -79,11 +73,13 @@ export async function getDashboardStatsForWorkspace(
       .from("dispatch")
       .select("id, total_recipients")
       .eq("workspace_id", workspaceId)
+      .in("status", COUNTED_DISPATCH_STATUSES)
       .gte("created_at", since30),
     admin
       .from("dispatch")
       .select("id, status, created_at, total_recipients, template:template_id(name)")
       .eq("workspace_id", workspaceId)
+      .in("status", COUNTED_DISPATCH_STATUSES)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -101,32 +97,25 @@ export async function getDashboardStatsForWorkspace(
   // Recipients dos últimos 30d (pra timeline + funil)
   // ----------------------------------------------------------------------
   let recipients30: Array<{ status: string; sent_at: string | null }> | null = null;
+  let reactions30 = 0;
   if (dispatchIds30.length > 0) {
-    const { data } = await admin
-      .from("dispatch_recipient")
-      .select("status, sent_at")
-      .in("dispatch_id", dispatchIds30);
+    const [{ data }, { count: reactionCount }] = await Promise.all([
+      admin.from("dispatch_recipient").select("status, sent_at").in("dispatch_id", dispatchIds30),
+      admin
+        .from("dispatch_recipient")
+        .select("id", { count: "exact", head: true })
+        .in("dispatch_id", dispatchIds30)
+        .not("reaction_emoji", "is", null),
+    ]);
     recipients30 = data ?? [];
+    reactions30 = reactionCount ?? 0;
   }
 
-  const funnel30: FunnelStats = {
-    total: totalRecipientsSum30,
-    sent: 0,
-    delivered: 0,
-    read: 0,
-    failed: 0,
-  };
-  (recipients30 ?? []).forEach((r) => {
-    if (r.status === "sent") funnel30.sent++;
-    else if (r.status === "delivered") {
-      funnel30.sent++;
-      funnel30.delivered++;
-    } else if (r.status === "read") {
-      funnel30.sent++;
-      funnel30.delivered++;
-      funnel30.read++;
-    } else if (r.status === "failed") funnel30.failed++;
-  });
+  const funnel30 = buildFunnel(
+    countByStatus(recipients30 ?? []),
+    totalRecipientsSum30,
+    reactions30,
+  );
 
   const timelineMap = new Map<string, TimelineDay>();
   for (let i = 29; i >= 0; i--) {
@@ -153,38 +142,31 @@ export async function getDashboardStatsForWorkspace(
   });
   const timeline30: TimelineDay[] = Array.from(timelineMap.values());
 
-  let deliveryRate: number | null = null;
-  let readRate: number | null = null;
-  if (totalRecipientsSum30 > 0) {
-    deliveryRate = funnel30.delivered / totalRecipientsSum30;
-    readRate = funnel30.read / totalRecipientsSum30;
-  }
-
   // ----------------------------------------------------------------------
-  // Counts por status do último comunicado
+  // Funil do último comunicado
   // ----------------------------------------------------------------------
-  let lastWithCounts: DashboardStats["dispatches"]["last"] = null;
+  let lastWithFunnel: DashboardStats["dispatches"]["last"] = null;
   if (lastDispatch.data) {
     const last = lastDispatch.data;
-    const { data: lastRecipients } = await admin
-      .from("dispatch_recipient")
-      .select("status")
-      .eq("dispatch_id", last.id);
-    const counts = { sent: 0, delivered: 0, read: 0, failed: 0 };
-    (lastRecipients ?? []).forEach((r) => {
-      if (r.status === "sent") counts.sent++;
-      else if (r.status === "delivered") counts.delivered++;
-      else if (r.status === "read") counts.read++;
-      else if (r.status === "failed") counts.failed++;
-    });
+    const [{ data: lastRecipients }, { count: lastReactions }] = await Promise.all([
+      admin.from("dispatch_recipient").select("status").eq("dispatch_id", last.id),
+      admin
+        .from("dispatch_recipient")
+        .select("id", { count: "exact", head: true })
+        .eq("dispatch_id", last.id)
+        .not("reaction_emoji", "is", null),
+    ]);
     const tpl = last.template as { name: string } | null;
-    lastWithCounts = {
+    lastWithFunnel = {
       id: last.id,
       template_name: tpl?.name ?? null,
       status: last.status,
       created_at: last.created_at,
-      total_recipients: last.total_recipients,
-      ...counts,
+      funnel: buildFunnel(
+        countByStatus(lastRecipients ?? []),
+        last.total_recipients,
+        lastReactions ?? 0,
+      ),
     };
   }
 
@@ -205,11 +187,7 @@ export async function getDashboardStatsForWorkspace(
   return {
     contacts: { total: contactsTotal.count ?? 0 },
     total_sent_alltime: totalSentAllTime,
-    dispatches: {
-      delivery_rate_30d: deliveryRate,
-      read_rate_30d: readRate,
-      last: lastWithCounts,
-    },
+    dispatches: { last: lastWithFunnel },
     timeline_30d: timeline30,
     funnel_30d: funnel30,
   };

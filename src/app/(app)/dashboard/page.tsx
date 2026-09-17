@@ -3,12 +3,16 @@ import { ArrowRight, BarChart3, Plus } from "lucide-react";
 
 import { KpiTile } from "@/components/kpi-tile";
 import { PageHeader } from "@/components/page-header";
+import { StageCard } from "@/components/stage-card";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DashboardFunnel } from "@/features/dashboard/dashboard-funnel";
+import { BiggestLossCard } from "@/features/dashboard/biggest-loss-card";
+import { DeliveryFunnel } from "@/features/dashboard/delivery-funnel";
 import { DashboardTimeline } from "@/features/dashboard/dashboard-timeline";
+import { ReadRateInfo } from "@/features/dashboard/read-rate-info";
 import { getDashboardStats } from "@/features/dashboard/queries";
+import { formatInt, formatPct, rate } from "@/lib/metrics/funnel";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -42,19 +46,33 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
-function pctValue(n: number | null): number | null {
-  if (n === null) return null;
-  return Math.round(n * 100);
-}
-
-function MiniMetric({ label, value, color }: { label: string; value: number; color: string }) {
+/** Métrica compacta do último comunicado: valor, base e a conta pronta. */
+function MiniMetric({
+  label,
+  value,
+  base,
+  baseLabel,
+  color,
+}: {
+  label: string;
+  value: number;
+  base: number;
+  baseLabel: string;
+  color: string;
+}) {
   return (
     <div className="rounded-md border border-line bg-card-2 px-3 py-2">
       <p className="flex items-center gap-1.5 text-[11px] text-ink-2">
         <span className="size-1.5 rounded-full" style={{ background: color }} aria-hidden />
         {label}
       </p>
-      <p className="num mt-0.5 text-lg leading-none">{value.toLocaleString("pt-BR")}</p>
+      <p className="num mt-0.5 text-lg leading-none">
+        {formatInt(value)}
+        <span className="text-[12px] text-ink-3"> / {formatInt(base)}</span>
+      </p>
+      <p className="mt-0.5 text-[10px] text-ink-3">
+        {formatPct(rate(value, base))} {baseLabel}
+      </p>
     </div>
   );
 }
@@ -95,17 +113,22 @@ export default async function DashboardPage() {
           value={contacts.total.toLocaleString("pt-BR")}
           caption="na base do workspace"
         />
-        <KpiTile
-          label="Taxa de entrega"
-          value={pctValue(dispatchStats.delivery_rate_30d)}
-          suffix="%"
-          caption={`${funnel_30d.delivered.toLocaleString("pt-BR")} de ${funnel_30d.total.toLocaleString("pt-BR")} · 30d`}
+        <StageCard
+          label="Entregues · 30d"
+          value={funnel_30d.delivered}
+          base={funnel_30d.sent}
+          baseLabel="das enviadas"
+          secondary={`${formatPct(rate(funnel_30d.delivered, funnel_30d.planned))} do programado`}
+          tone="brand"
         />
-        <KpiTile
-          label="Taxa de leitura"
-          value={pctValue(dispatchStats.read_rate_30d)}
-          suffix="%"
-          caption={`${funnel_30d.read.toLocaleString("pt-BR")} lidas · 30d`}
+        <StageCard
+          label="Lidas · 30d"
+          value={funnel_30d.read}
+          base={funnel_30d.delivered}
+          baseLabel="das entregues"
+          secondary={`${formatPct(rate(funnel_30d.read, funnel_30d.planned))} do programado`}
+          tone="ok"
+          hint={<ReadRateInfo />}
         />
       </div>
 
@@ -131,11 +154,14 @@ export default async function DashboardPage() {
           <CardHeader>
             <div className="space-y-1">
               <CardTitle>Funil de entrega</CardTitle>
-              <CardDescription>Do destinatário ao lido · últimos 30 dias</CardDescription>
+              <CardDescription>
+                Do programado ao lido · últimos 30 dias · rascunhos não contam
+              </CardDescription>
             </div>
           </CardHeader>
-          <CardContent>
-            <DashboardFunnel data={funnel_30d} />
+          <CardContent className="space-y-4">
+            <DeliveryFunnel data={funnel_30d} emptyMessage="Sem disparos nos últimos 30 dias." />
+            {funnel_30d.planned > 0 && <BiggestLossCard data={funnel_30d} />}
           </CardContent>
         </Card>
       </div>
@@ -177,24 +203,40 @@ export default async function DashboardPage() {
                   </div>
                   <p className="font-mono text-[11px] text-ink-3">
                     {new Date(last.created_at).toLocaleString("pt-BR")} ·{" "}
-                    {last.total_recipients.toLocaleString("pt-BR")} destinatários
+                    {formatInt(last.funnel.planned)} programadas
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 <MiniMetric
-                  label="Enviados"
-                  value={last.sent + last.delivered + last.read}
+                  label="Enviadas"
+                  value={last.funnel.sent}
+                  base={last.funnel.planned}
+                  baseLabel="do programado"
                   color="var(--d-sent)"
                 />
                 <MiniMetric
                   label="Entregues"
-                  value={last.delivered + last.read}
+                  value={last.funnel.delivered}
+                  base={last.funnel.sent}
+                  baseLabel="das enviadas"
                   color="var(--d-deliv)"
                 />
-                <MiniMetric label="Lidos" value={last.read} color="var(--d-read)" />
-                <MiniMetric label="Falhas" value={last.failed} color="var(--d-fail)" />
+                <MiniMetric
+                  label="Lidas"
+                  value={last.funnel.read}
+                  base={last.funnel.delivered}
+                  baseLabel="das entregues"
+                  color="var(--d-read)"
+                />
+                <MiniMetric
+                  label="Falhas"
+                  value={last.funnel.failed}
+                  base={last.funnel.planned}
+                  baseLabel="do programado"
+                  color="var(--d-fail)"
+                />
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/comunicados/${last.id}`}>
                     <BarChart3 className="size-4" /> Ver dashboard do disparo
