@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MessageSquare, Plug } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -18,24 +19,21 @@ export default async function TemplatesPage() {
   const analyticsByTemplateId = await getTemplateAnalyticsForWorkspace(templates, connections);
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
-        <p className="text-muted-foreground text-sm">
-          Templates sincronizados da Meta. Criação direto no WhatsApp Manager — aqui só
-          espelhamos status e conteúdo.
-        </p>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="Templates"
+        description="Sincronizados da Meta. A criação é no WhatsApp Manager — aqui espelhamos status e conteúdo."
+      />
 
       {connections.length === 0 ? (
-        <Card className="border-dashed">
+        <Card className="border-dashed border-line-2">
           <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <div className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-2xl">
+            <div className="flex size-12 items-center justify-center rounded-lg bg-brand-soft text-brand">
               <Plug className="size-6" />
             </div>
             <div className="space-y-1">
-              <h2 className="text-foreground text-lg font-semibold">Sem conexão Meta</h2>
-              <p className="text-muted-foreground max-w-sm text-sm">
+              <h2 className="text-base font-semibold text-ink">Sem conexão Meta</h2>
+              <p className="max-w-sm text-sm text-ink-2">
                 Conecte a WABA do workspace antes de sincronizar templates.
               </p>
             </div>

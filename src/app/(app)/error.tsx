@@ -19,18 +19,18 @@ export default function AppError({
   }, [error]);
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-1 flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center duration-500">
-      <div className="bg-destructive/10 text-destructive flex size-12 items-center justify-center rounded-2xl">
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+      <div className="flex size-12 items-center justify-center rounded-lg border border-red-line bg-red-soft text-red">
         <AlertTriangle className="size-6" />
       </div>
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Algo deu errado nessa tela</h2>
-        <p className="text-muted-foreground max-w-sm text-sm">
+        <p className="max-w-sm text-sm text-ink-2">
           O resto do app continua funcionando. Tente de novo; se persistir, me manda o código
           abaixo.
         </p>
         {error.digest && (
-          <p className="text-muted-foreground font-mono text-[11px]">{error.digest}</p>
+          <p className="font-mono text-[11px] text-ink-3">{error.digest}</p>
         )}
       </div>
       <Button onClick={reset} size="sm">

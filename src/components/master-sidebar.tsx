@@ -1,14 +1,15 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { ArrowLeftRight, Users2, UserCircle } from "lucide-react";
+import { ArrowLeft, ShieldCheck, UserCircle, Users2 } from "lucide-react";
 
+import { navGroupLabelClass, navItemClass } from "@/components/app-sidebar";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -29,30 +30,38 @@ export function MasterSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <Image src="/meta-logo.png" alt="" width={20} height={20} />
-          <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate font-semibold">Master</span>
-            <span className="text-muted-foreground truncate text-xs">Autoprocs</span>
+      <SidebarHeader className="gap-3 border-b border-nav-line p-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-brand">
+            <ShieldCheck className="size-4 text-white" />
+          </div>
+          <div className="grid flex-1 leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="truncate text-[13px] font-semibold text-nav-active-ink">
+              Autoprocs · Master
+            </span>
+            <span className="truncate text-[11px] text-nav-ink-2">Plataforma</span>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
+      <SidebarContent className="gap-4 px-2 py-3">
+        <SidebarGroup className="gap-1 p-0">
+          <SidebarGroupLabel className={navGroupLabelClass}>Plataforma</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-0.5">
               {NAV_ITEMS.map((item) => {
                 const isActive =
-                  pathname === item.href ||
-                  (item.href === "/master" &&
-                    pathname.startsWith("/master/") &&
-                    !pathname.startsWith("/master/perfil"));
+                  item.href === "/master"
+                    ? pathname === "/master" || pathname.startsWith("/master/cliente")
+                    : pathname.startsWith(item.href);
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                      className={navItemClass}
+                    >
                       <Link href={item.href as Route}>
                         <item.icon />
                         <span>{item.title}</span>
@@ -64,22 +73,20 @@ export function MasterSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Voltar ao workspace">
-                  <Link href={"/dashboard" as Route}>
-                    <ArrowLeftRight />
-                    <span>Voltar ao workspace</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter className="border-t border-nav-line p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Voltar ao workspace" className={navItemClass}>
+              <Link href={"/dashboard" as Route}>
+                <ArrowLeft />
+                <span>Voltar ao workspace</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

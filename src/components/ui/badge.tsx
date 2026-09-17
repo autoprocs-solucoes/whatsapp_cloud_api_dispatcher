@@ -4,20 +4,24 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Pílula de rótulo: fundo claro da cor + borda clara. Para *status* (Ativo,
+ * Concluído, Falhou...) use `StatusBadge`, que acrescenta o pontinho — este
+ * aqui é o rótulo cru (tags, idioma, categoria).
+ */
 const badgeVariants = cva(
-  "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
+  "inline-flex w-fit shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
-        secondary:
-          "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
-        destructive:
-          "bg-destructive text-white focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90",
-        outline:
-          "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 [a&]:hover:underline",
+        // sucesso (Ativo / Concluído / Aprovado / Conectada / GREEN)
+        default: "border-ok-line bg-ok-soft text-ok-ink",
+        info: "border-brand-line bg-brand-soft text-brand-strong",
+        secondary: "border-line-2 bg-card-2 text-ink-2",
+        destructive: "border-red-line bg-red-soft text-red",
+        pending: "border-amber-line bg-amber-soft text-amber",
+        owner: "border-violet-line bg-violet-soft text-violet",
+        outline: "border-line-2 bg-card text-ink-2",
       },
     },
     defaultVariants: {

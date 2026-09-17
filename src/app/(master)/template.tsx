@@ -1,3 +1,3 @@
 export default function MasterTemplate({ children }: { children: React.ReactNode }) {
-  return <div className="animate-in fade-in duration-300">{children}</div>;
+  return <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">{children}</div>;
 }

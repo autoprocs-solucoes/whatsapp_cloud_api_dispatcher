@@ -26,7 +26,7 @@ export default async function SegmentosPage() {
 
       {segments.length === 0 ? (
         <div className="rounded-md border border-dashed py-16 text-center">
-          <div className="bg-primary/10 text-primary mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl">
+          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-lg bg-brand-soft text-brand">
             <Tag className="size-6" />
           </div>
           <h2 className="text-base font-medium">Nenhum segmento ainda</h2>

@@ -7,9 +7,9 @@ export default async function MasterLayout({ children }: { children: React.React
   const user = await requireMasterUser();
 
   return (
-    <SidebarProvider>
+    <SidebarProvider style={{ "--sidebar-width": "236px" } as React.CSSProperties}>
       <MasterSidebar />
-      <SidebarInset className="min-w-0">
+      <SidebarInset className="min-w-0 bg-paper">
         <AppHeader
           user={{
             fullName: user.profile.full_name,

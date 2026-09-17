@@ -1,25 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { ChevronRight, LogOut } from "lucide-react";
 
-import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 import { UserMenu } from "@/components/user-menu";
-import { navGroups } from "@/lib/navigation";
-
-function findPageTitle(pathname: string): string {
-  if (pathname.startsWith("/master/perfil")) return "Perfil";
-  if (pathname === "/master" || pathname.startsWith("/master/")) return "Clientes";
-  for (const group of navGroups) {
-    for (const item of group.items) {
-      if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
-        return item.title;
-      }
-    }
-  }
-  return "";
-}
+import { signOutAction } from "@/features/auth/actions";
+import { resolveBreadcrumb } from "@/lib/navigation";
 
 type Props = {
   user: { fullName: string; email: string; avatarUrl: string | null };
@@ -27,15 +15,32 @@ type Props = {
 
 export function AppHeader({ user }: Props) {
   const pathname = usePathname();
-  const title = findPageTitle(pathname);
+  const crumb = resolveBreadcrumb(pathname);
 
   return (
-    <header className="bg-background sticky top-0 z-30 flex h-14 items-center gap-2 border-b px-4">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 h-5" />
-      <h1 className="text-base font-semibold">{title}</h1>
-      <div className="ml-auto flex items-center gap-2">
-        <ThemeToggle />
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-paper px-4">
+      {/* No desktop a sidebar é fixa; o gatilho só existe pro modo compacto. */}
+      <SidebarTrigger className="-ml-1 text-ink-2" />
+
+      {crumb && (
+        <nav aria-label="Trilha de navegação" className="flex items-center gap-1.5 text-[13px]">
+          <span className="text-ink-3">{crumb.section}</span>
+          <ChevronRight className="size-3.5 text-ink-4" />
+          <span className="font-semibold text-ink">{crumb.page}</span>
+        </nav>
+      )}
+
+      <div className="ml-auto flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            void signOutAction();
+          }}
+        >
+          <LogOut className="size-3.5" />
+          Sair
+        </Button>
         <UserMenu fullName={user.fullName} email={user.email} avatarUrl={user.avatarUrl} />
       </div>
     </header>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Download, Upload } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ContactsTable } from "@/features/contacts/contacts-table";
 import { NewContactButton } from "@/features/contacts/new-contact-button";
@@ -33,30 +34,28 @@ export default async function ContatosPage({ searchParams }: { searchParams: Sea
   const exportHref = `/contatos/export${exportParams.toString() ? `?${exportParams}` : ""}`;
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Contatos</h1>
-          <p className="text-muted-foreground text-sm">
-            Importe contatos via planilha, gerencie campos custom e opt-outs.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {total > 0 && (
-            <Button asChild variant="outline">
-              <a href={exportHref} download>
-                <Download className="mr-1 size-4" /> Exportar CSV
-              </a>
+    <div className="space-y-5">
+      <PageHeader
+        title="Contatos"
+        description="Importe via planilha, gerencie tags, campos custom e opt-outs."
+        actions={
+          <>
+            {total > 0 && (
+              <Button asChild variant="outline" size="sm">
+                <a href={exportHref} download>
+                  <Download className="size-4" /> Exportar CSV
+                </a>
+              </Button>
+            )}
+            <NewContactButton />
+            <Button asChild size="sm">
+              <Link href="/contatos/importar">
+                <Upload className="size-4" /> Importar contatos
+              </Link>
             </Button>
-          )}
-          <NewContactButton />
-          <Button asChild>
-            <Link href="/contatos/importar">
-              <Upload className="mr-1 size-4" /> Importar contatos
-            </Link>
-          </Button>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <ContactsTable
         contacts={contacts}

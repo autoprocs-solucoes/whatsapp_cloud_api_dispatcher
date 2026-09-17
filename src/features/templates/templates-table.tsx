@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { EyeOff, Loader2, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
+import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WhatsAppPreview, type PreviewButton } from "@/features/dispatch/whatsapp-preview";
@@ -20,20 +21,32 @@ type Props = {
   analyticsByTemplateId: Map<string, TemplateAnalyticsPoint>;
 };
 
-function statusVariant(
-  status: string,
-): "default" | "secondary" | "destructive" | "outline" {
+const STATUS_LABELS: Record<string, string> = {
+  APPROVED: "Aprovado",
+  PENDING: "Em análise",
+  IN_APPEAL: "Em recurso",
+  REJECTED: "Rejeitado",
+  DISABLED: "Desabilitado",
+  PAUSED: "Pausado",
+};
+
+function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
+
+function statusTone(status: string): StatusTone {
   switch (status) {
     case "APPROVED":
-      return "default";
+      return "ok";
     case "PENDING":
     case "IN_APPEAL":
-      return "secondary";
+    case "PAUSED":
+      return "pending";
     case "REJECTED":
     case "DISABLED":
-      return "destructive";
+      return "danger";
     default:
-      return "outline";
+      return "neutral";
   }
 }
 
@@ -96,21 +109,21 @@ function extractButtons(buttons: unknown): PreviewButton[] {
 function TemplateAnalyticsStats({ analytics }: { analytics: TemplateAnalyticsPoint | undefined }) {
   if (!analytics || analytics.sent === 0) return null;
   return (
-    <div className="text-muted-foreground grid grid-cols-4 gap-1 rounded-md border px-2 py-1.5 text-center text-[10px]">
+    <div className="grid grid-cols-4 gap-1 rounded-md border border-line bg-card-2 px-2 py-1.5 text-center text-[10px] text-ink-3">
       <div>
-        <p className="text-foreground font-semibold">{analytics.sent}</p>
+        <p className="num text-[13px]">{analytics.sent}</p>
         <p>Enviadas</p>
       </div>
       <div>
-        <p className="text-foreground font-semibold">{analytics.delivered}</p>
+        <p className="num text-[13px]">{analytics.delivered}</p>
         <p>Entregues</p>
       </div>
       <div>
-        <p className="text-foreground font-semibold">{analytics.read}</p>
+        <p className="num text-[13px]">{analytics.read}</p>
         <p>Lidas</p>
       </div>
       <div>
-        <p className="text-foreground font-semibold">{analytics.clicked}</p>
+        <p className="num text-[13px]">{analytics.clicked}</p>
         <p>Cliques</p>
       </div>
     </div>
@@ -121,12 +134,10 @@ function TemplateCard({
   template,
   isOwner,
   analytics,
-  index,
 }: {
   template: Template;
   isOwner: boolean;
   analytics: TemplateAnalyticsPoint | undefined;
-  index: number;
 }) {
   const [hovered, setHovered] = useState(false);
   const router = useRouter();
@@ -158,33 +169,40 @@ function TemplateCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
-        "group animate-in fade-in slide-in-from-bottom-1 relative flex h-full flex-col gap-3 rounded-lg border bg-card p-3 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md",
+        "group flex h-full flex-col rounded-lg border border-line bg-card shadow-card transition-colors hover:border-line-3",
         (!isApproved || !isActive) && "opacity-70",
       )}
-      style={{ animationDelay: `${Math.min(index, 12) * 60}ms`, animationFillMode: "backwards" }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold" title={template.name}>
-            {template.name}
-          </h3>
-          <p className="text-muted-foreground text-[10px] uppercase">
-            {template.language} · {template.category}
-          </p>
+      <div className="flex items-start justify-between gap-2 border-b border-line p-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-line bg-card-2 text-[10px] font-semibold text-ink-2">
+            {template.name
+              .split(/[\s_-]+/)
+              .map((p) => p[0]?.toUpperCase() ?? "")
+              .join("")
+              .slice(0, 2)}
+          </span>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-semibold text-ink" title={template.name}>
+              {template.name}
+            </h3>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <Badge variant="secondary">{template.language}</Badge>
+              <Badge variant="secondary">{template.category}</Badge>
+            </div>
+          </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <Badge variant={statusVariant(template.status)} className="text-[10px]">
-            {template.status}
-          </Badge>
+          <StatusBadge tone={statusTone(template.status)}>{statusLabel(template.status)}</StatusBadge>
           {!isActive && (
-            <Badge variant="outline" className="gap-1 text-[10px]">
+            <Badge variant="outline">
               <EyeOff className="size-3" /> Desativado
             </Badge>
           )}
         </div>
       </div>
 
-      <div className="flex justify-center">
+      <div className="flex justify-center p-3">
         <WhatsAppPreview
           senderName="Empresa"
           headerText={template.header_text}
@@ -196,21 +214,17 @@ function TemplateCard({
         />
       </div>
 
-      <TemplateAnalyticsStats analytics={analytics} />
+      <div className="px-3">
+        <TemplateAnalyticsStats analytics={analytics} />
+      </div>
 
-      <div className="mt-auto flex items-center justify-between gap-2">
-        <span className="text-muted-foreground text-[10px]">
-          {new Date(template.last_synced_at).toLocaleDateString("pt-BR")}
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-line px-3 py-2.5">
+        <span className="font-mono text-[11px] text-ink-3">
+          Atualizado {new Date(template.last_synced_at).toLocaleDateString("pt-BR")}
         </span>
         <div className="flex items-center gap-2">
           {isOwner && (
-            <Button
-              onClick={handleToggle}
-              disabled={isToggling}
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs"
-            >
+            <Button onClick={handleToggle} disabled={isToggling} size="xs" variant="ghost">
               {isToggling ? (
                 <Loader2 className="size-3 animate-spin" />
               ) : isActive ? (
@@ -221,9 +235,9 @@ function TemplateCard({
             </Button>
           )}
           {isApproved && isActive && (
-            <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+            <Button asChild size="xs">
               <Link href={`/comunicados/novo?template=${template.id}`}>
-                <Plus className="mr-1 size-3" /> Criar comunicado
+                <Plus className="size-3" /> Criar comunicado
               </Link>
             </Button>
           )}
@@ -267,57 +281,61 @@ export function TemplatesTable({ templates, isOwner, analyticsByTemplateId }: Pr
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">
-          {filteredTemplates.length} de {templates.length} template(s) no cache local. Hover
-          preenche com valores de exemplo.
-        </p>
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-md border p-0.5">
+          <div className="flex items-center rounded-md border border-line-2 bg-card p-0.5">
             {ACTIVE_FILTER_OPTIONS.map((opt) => (
-              <Button
+              <button
                 key={opt.value}
+                type="button"
                 onClick={() => setActiveFilter(opt.value)}
-                size="sm"
-                variant={activeFilter === opt.value ? "secondary" : "ghost"}
-                className="h-7 px-2 text-xs"
+                className={cn(
+                  "rounded-sm px-3 py-1 text-[13px] font-medium transition-colors",
+                  activeFilter === opt.value
+                    ? "bg-brand-soft text-brand-strong"
+                    : "text-ink-2 hover:text-ink",
+                )}
               >
                 {opt.label}
-              </Button>
+              </button>
             ))}
           </div>
           {isOwner && (
             <Button onClick={handleSync} disabled={isPending} size="sm">
               {isPending ? (
                 <>
-                  <Loader2 className="mr-1 size-4 animate-spin" /> Sincronizando…
+                  <Loader2 className="size-4 animate-spin" /> Sincronizando…
                 </>
               ) : (
                 <>
-                  <RefreshCw className="mr-1 size-4" /> Sincronizar
+                  <RefreshCw className="size-4" /> Sincronizar
                 </>
               )}
             </Button>
           )}
         </div>
+        <p className="text-xs text-ink-3">
+          {filteredTemplates.length} de {templates.length} templates no cache local · passe o
+          mouse pra preencher com exemplos
+        </p>
       </div>
 
       {templates.length === 0 ? (
-        <div className="text-muted-foreground rounded-md border border-dashed px-3 py-12 text-center text-sm">
-          Nenhum template no cache. Clique em <strong>Sincronizar</strong> pra puxar da Meta.
+        <div className="rounded-lg border border-dashed border-line-2 px-3 py-12 text-center text-sm text-ink-3">
+          Nenhum template no cache. Clique em <strong className="text-ink">Sincronizar</strong>{" "}
+          pra puxar da Meta.
         </div>
       ) : filteredTemplates.length === 0 ? (
-        <div className="text-muted-foreground rounded-md border border-dashed px-3 py-12 text-center text-sm">
+        <div className="rounded-lg border border-dashed border-line-2 px-3 py-12 text-center text-sm text-ink-3">
           Nenhum template {activeFilter === "active" ? "ativo" : "desativado"} pra mostrar.
         </div>
       ) : (
         <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredTemplates.map((t, i) => (
+          {filteredTemplates.map((t) => (
             <TemplateCard
               key={t.id}
               template={t}
               isOwner={isOwner}
               analytics={analyticsByTemplateId.get(t.meta_template_id)}
-              index={i}
             />
           ))}
         </div>

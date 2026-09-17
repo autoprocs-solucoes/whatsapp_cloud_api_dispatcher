@@ -27,6 +27,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableShell,
+  TableToolbar,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -425,14 +437,14 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="min-w-full text-sm">
-          <thead className="bg-muted/40 text-xs">
+      <TableShell>
+        <Table>
+          <TableHeader>
             <tr>
-              <th className="w-8 px-3 py-2">
+              <TableHead className="w-8">
                 <input
                   type="checkbox"
-                  className="size-4"
+                  className="size-4 accent-[var(--brand)]"
                   checked={allSelected}
                   ref={(el) => {
                     if (el) el.indeterminate = someSelected;
@@ -440,61 +452,58 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
                   onChange={(e) => toggleSelectAll(e.target.checked)}
                   aria-label="Selecionar todos"
                 />
-              </th>
-              {isVisible("full_name") && (
-                <th className="px-3 py-2 text-left font-medium">Nome</th>
-              )}
-              {isVisible("phone_e164") && (
-                <th className="px-3 py-2 text-left font-medium">Telefone</th>
-              )}
-              {isVisible("tags") && (
-                <th className="px-3 py-2 text-left font-medium">Tags</th>
-              )}
-              {isVisible("opt_out") && (
-                <th className="px-3 py-2 text-left font-medium">Status</th>
-              )}
-              {isVisible("created_at") && (
-                <th className="px-3 py-2 text-left font-medium">Criado em</th>
-              )}
+              </TableHead>
+              {isVisible("full_name") && <TableHead>Nome</TableHead>}
+              {isVisible("phone_e164") && <TableHead>Telefone</TableHead>}
+              {isVisible("tags") && <TableHead>Tags</TableHead>}
+              {isVisible("opt_out") && <TableHead>Status</TableHead>}
+              {isVisible("created_at") && <TableHead>Criado em</TableHead>}
               {customColumns.map(
                 (col) =>
                   isVisible(col.key) && (
-                    <th
-                      key={col.key}
-                      className="px-3 py-2 text-left font-medium"
-                      title={col.label}
-                    >
+                    <TableHead key={col.key} title={col.label}>
                       {col.label}
-                    </th>
+                    </TableHead>
                   ),
               )}
-              <th className="px-3 py-2 text-right font-medium">Ações</th>
+              <TableHead className="text-right">Ações</TableHead>
             </tr>
-          </thead>
-          <tbody>
+          </TableHeader>
+          <TableBody>
             {contacts.length === 0 ? (
-              <tr>
-                <td colSpan={visibleColCount} className="text-muted-foreground px-3 py-8 text-center">
-                  Nenhum contato encontrado.
-                </td>
-              </tr>
+              <TableEmpty colSpan={visibleColCount}>Nenhum contato encontrado.</TableEmpty>
             ) : (
               contacts.map((c) => (
-                <tr key={c.id} className={cn("border-t", c.opt_out && "opacity-60")}>
-                  <td className="px-3 py-2">
+                <TableRow key={c.id} className={cn("group", c.opt_out && "opacity-60")}>
+                  <TableCell>
                     <input
                       type="checkbox"
-                      className="size-4"
+                      className="size-4 accent-[var(--brand)]"
                       checked={selected.has(c.id)}
                       onChange={(e) => toggleSelectOne(c.id, e.target.checked)}
                       aria-label={`Selecionar ${c.phone_e164}`}
                     />
-                  </td>
+                  </TableCell>
                   {isVisible("full_name") && (
-                    <td className="px-3 py-2">{c.full_name ?? "—"}</td>
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-line bg-card-2 text-[10px] font-semibold text-ink-2">
+                          {(c.full_name ?? c.phone_e164)
+                            .split(/\s+/)
+                            .map((p) => p[0]?.toUpperCase() ?? "")
+                            .join("")
+                            .slice(0, 2)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-ink">
+                            {c.full_name ?? "—"}
+                          </span>
+                        </span>
+                      </div>
+                    </TableCell>
                   )}
                   {isVisible("phone_e164") && (
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <TableCell className="font-mono text-xs text-ink-2">
                       <div className="flex items-center gap-2">
                         <span>{c.phone_e164}</span>
                         {(() => {
@@ -502,63 +511,58 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
                           if (n === 0) return null;
                           return (
                             <Badge
-                              variant="outline"
-                              className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+                              variant="pending"
                               title={`${n} atualização(ões) de custom fields pendente(s)`}
                             >
-                              <Bell className="mr-1 size-3" />
+                              <Bell className="size-3" />
                               {n} pendente{n > 1 ? "s" : ""}
                             </Badge>
                           );
                         })()}
                       </div>
-                    </td>
+                    </TableCell>
                   )}
                   {isVisible("tags") && (
-                    <td className="px-3 py-2">
+                    <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {c.tags.length === 0 ? (
-                          <span className="text-muted-foreground text-xs">—</span>
+                          <span className="text-xs text-ink-4">—</span>
                         ) : (
                           c.tags.map((t) => (
-                            <Badge key={t} variant="secondary" className="text-[10px]">
+                            <Badge key={t} variant="secondary">
                               {t}
                             </Badge>
                           ))
                         )}
                       </div>
-                    </td>
+                    </TableCell>
                   )}
                   {isVisible("opt_out") && (
-                    <td className="px-3 py-2">
+                    <TableCell>
                       {c.opt_out ? (
-                        <Badge variant="destructive" className="text-[10px]">
-                          Opt-out
-                        </Badge>
+                        <StatusBadge tone="danger">Opt-out</StatusBadge>
                       ) : (
-                        <Badge variant="default" className="text-[10px]">
-                          Ativo
-                        </Badge>
+                        <StatusBadge tone="ok">Ativo</StatusBadge>
                       )}
-                    </td>
+                    </TableCell>
                   )}
                   {isVisible("created_at") && (
-                    <td className="text-muted-foreground px-3 py-2 text-xs">
+                    <TableCell className="font-mono text-xs text-ink-3">
                       {new Date(c.created_at).toLocaleDateString("pt-BR")}
-                    </td>
+                    </TableCell>
                   )}
                   {customColumns.map((col) => {
                     if (!isVisible(col.key)) return null;
                     const cf = parseCustomFields(c.custom_fields);
                     const val = cf[col.label];
                     return (
-                      <td key={col.key} className="px-3 py-2 text-xs">
-                        {val ? val : <span className="text-muted-foreground">—</span>}
-                      </td>
+                      <TableCell key={col.key} className="text-xs text-ink-2">
+                        {val ? val : <span className="text-ink-4">—</span>}
+                      </TableCell>
                     );
                   })}
-                  <td className="px-3 py-2">
-                    <div className="flex justify-end gap-1">
+                  <TableCell>
+                    <div className="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -615,37 +619,40 @@ export function ContactsTable({ contacts, total, page, pageSize, pendingCounts }
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
 
-      <div className="flex items-center justify-between text-xs">
-        <p className="text-muted-foreground">
-          {total} contato(s) · página {page} de {totalPages}
-        </p>
-        <div className="flex gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1 || isPending}
-            onClick={() => updateParams({ page: String(page - 1) })}
-          >
-            <ChevronLeft className="size-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages || isPending}
-            onClick={() => updateParams({ page: String(page + 1) })}
-          >
-            <ChevronRight className="size-3.5" />
-          </Button>
-        </div>
-      </div>
+        <TableToolbar>
+          <p>
+            Mostrando {contacts.length} de {total.toLocaleString("pt-BR")} contatos
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1 || isPending}
+              onClick={() => updateParams({ page: String(page - 1) })}
+            >
+              <ChevronLeft className="size-3.5" /> Anterior
+            </Button>
+            <span className="px-2 font-mono text-ink-2">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages || isPending}
+              onClick={() => updateParams({ page: String(page + 1) })}
+            >
+              Próxima <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
+        </TableToolbar>
+      </TableShell>
 
       <EditContactDialog
         contact={editing}

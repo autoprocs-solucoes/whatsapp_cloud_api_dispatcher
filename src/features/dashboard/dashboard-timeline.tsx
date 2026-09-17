@@ -4,7 +4,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -15,13 +14,11 @@ import type { TimelineDay } from "@/features/dashboard/queries";
 
 type Props = { data: TimelineDay[]; emptyMessage?: string };
 
-// Paleta: rampa ordinal azul pra progressão sent -> delivered (menos ->
-// mais avançado), cores de status (fixas, não têm variante dark separada)
-// pro estado bom (lido) e crítico (falhou). Ver skill de dataviz.
-const COLOR_SENT = "var(--chart-ordinal-1)";
-const COLOR_DELIVERED = "var(--chart-ordinal-2)";
-const COLOR_READ = "var(--chart-status-good)";
-const COLOR_FAILED = "var(--chart-status-critical)";
+// Sequência de entrega: cinza -> azul claro -> azul Meta, falha em vermelho.
+const COLOR_SENT = "var(--d-sent)";
+const COLOR_DELIVERED = "var(--d-deliv)";
+const COLOR_READ = "var(--d-read)";
+const COLOR_FAILED = "var(--d-fail)";
 
 function formatShortDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -32,14 +29,12 @@ export function DashboardTimeline({
   data,
   emptyMessage = "Sem envios nos últimos 30 dias. Crie um comunicado pra começar.",
 }: Props) {
-  // Cada barra mostra a contagem terminal naquele dia.
-  // sent = só sent (não delivered ainda), delivered = delivered (não read),
-  // read = chegou a leitura, failed = falhou.
-  // Como queries.ts incrementa cumulativamente, normalizamos pra contagem
-  // exclusiva aqui pro stacked bar não dobrar visualmente.
+  // Cada barra mostra a contagem terminal naquele dia: sent = só enviado
+  // (ainda não entregue), delivered = entregue (não lido), read = lido.
+  // queries.ts incrementa cumulativamente, então normalizamos aqui pra
+  // contagem exclusiva e o empilhamento não dobrar visualmente.
   const chartData = data.map((d) => ({
     date: formatShortDate(d.date),
-    rawDate: d.date,
     "Só enviado": Math.max(0, d.sent - d.delivered),
     Entregue: Math.max(0, d.delivered - d.read),
     Lido: d.read,
@@ -50,89 +45,94 @@ export function DashboardTimeline({
 
   if (totalAll === 0) {
     return (
-      <div className="text-muted-foreground flex h-[220px] items-center justify-center text-xs">
+      <div className="flex h-[240px] items-center justify-center text-xs text-ink-3">
         {emptyMessage}
       </div>
     );
   }
 
-  // No máximo ~6 rótulos no eixo X — 30 datas coladas viram ruído ilegível.
+  // No máximo ~6 rótulos no eixo X — 30 datas coladas viram ruído.
   const tickInterval = Math.max(0, Math.ceil(chartData.length / 6) - 1);
 
+  // Topo do eixo Y arredondado pra cima, pra os ticks caírem em números
+  // redondos (0 / 100 / 200...) em vez do passo quebrado do auto-scale.
+  const peak = Math.max(
+    1,
+    ...chartData.map((d) => Math.max(d["Só enviado"] + d.Entregue + d.Lido, d.Falhou)),
+  );
+  const step = Math.pow(10, Math.floor(Math.log10(peak / 4))) * (peak / 4 > 5 * Math.pow(10, Math.floor(Math.log10(peak / 4))) ? 10 : 5);
+  const niceMax = Math.ceil(peak / step) * step;
+
+  const legend = [
+    { label: "Só enviado", color: COLOR_SENT },
+    { label: "Entregue", color: COLOR_DELIVERED },
+    { label: "Lido", color: COLOR_READ },
+    { label: "Falhou", color: COLOR_FAILED },
+  ];
+
   return (
-    <div className="h-[280px] w-full">
+    <div className="w-full space-y-2">
+      <div className="h-[240px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }} barGap={2}>
-          <CartesianGrid stroke="var(--border)" vertical={false} />
+        <BarChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+          <CartesianGrid stroke="var(--line)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: 11, fill: "var(--ink-3)" }}
             axisLine={false}
             tickLine={false}
             interval={tickInterval}
             tickMargin={8}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: 11, fill: "var(--ink-3)" }}
             axisLine={false}
             tickLine={false}
             allowDecimals={false}
-            width={32}
+            width={44}
+            domain={[0, niceMax]}
+            ticks={Array.from({ length: niceMax / step + 1 }, (_, i) => i * step)}
           />
           <Tooltip
-            cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+            cursor={{ fill: "var(--card-2)" }}
             contentStyle={{
-              fontSize: 11,
-              borderRadius: 8,
+              fontSize: 12,
+              borderRadius: "var(--r-el)",
               padding: "8px 10px",
               background: "var(--popover)",
-              border: "1px solid var(--border)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+              border: "1px solid var(--line)",
+              boxShadow: "var(--sh-card)",
             }}
-            labelStyle={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)" }}
+            labelStyle={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}
             itemStyle={{ fontWeight: 600 }}
           />
-          <Legend
-            wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-            iconSize={8}
-            iconType="circle"
-          />
-          <Bar
-            dataKey="Só enviado"
-            stackId="a"
-            fill={COLOR_SENT}
-            stroke="var(--card)"
-            strokeWidth={2}
-            maxBarSize={18}
-          />
-          <Bar
-            dataKey="Entregue"
-            stackId="a"
-            fill={COLOR_DELIVERED}
-            stroke="var(--card)"
-            strokeWidth={2}
-            maxBarSize={18}
-          />
+          <Bar dataKey="Só enviado" stackId="a" fill={COLOR_SENT} maxBarSize={16} />
+          <Bar dataKey="Entregue" stackId="a" fill={COLOR_DELIVERED} maxBarSize={16} />
           <Bar
             dataKey="Lido"
             stackId="a"
             fill={COLOR_READ}
-            stroke="var(--card)"
-            strokeWidth={2}
-            radius={[4, 4, 0, 0]}
-            maxBarSize={18}
+            radius={[3, 3, 0, 0]}
+            maxBarSize={16}
           />
           <Bar
             dataKey="Falhou"
             stackId="b"
             fill={COLOR_FAILED}
-            stroke="var(--card)"
-            strokeWidth={2}
-            radius={[4, 4, 0, 0]}
-            maxBarSize={18}
+            radius={[3, 3, 0, 0]}
+            maxBarSize={16}
           />
         </BarChart>
       </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap items-center gap-4 pl-10 text-xs text-ink-2">
+        {legend.map((l) => (
+          <span key={l.label} className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full" style={{ background: l.color }} aria-hidden />
+            {l.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

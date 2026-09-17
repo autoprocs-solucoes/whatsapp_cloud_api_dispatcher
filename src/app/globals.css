@@ -3,101 +3,160 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * `--font-sans`/`--font-heading`/`--font-mono` não são declaradas aqui via
- * `@theme` — nessa versão do Tailwind isso é ignorado (ver nota mais abaixo,
- * antes do `.font-heading`). As fontes reais são aplicadas com regras CSS
- * diretas (`!important`) logo depois do `@layer base`.
- */
-
-/*
- * Paleta baseada no azul de marca da Meta (#0866FF), a mesma cor do
- * "infinito" usada em Meta Business Suite / WhatsApp Manager — pra dar a
- * sensação de continuidade visual com as ferramentas oficiais que esse
- * dispatcher complementa.
- */
+/* =============================================================================
+ * Design tokens — paleta Meta.
+ * Fonte única de verdade de cor/raio/sombra. Nenhum componente declara cor
+ * literal: tudo consome estes tokens via utilities (bg-brand, text-ink-2,
+ * border-line, ...) mapeadas no `@theme inline` mais abaixo.
+ * ========================================================================== */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.564 0.24 261.2);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0.01 261.2);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0.01 261.2);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.95 0.03 261.2);
-  --accent-foreground: oklch(0.42 0.21 261.2);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.564 0.24 261.2);
-  --radius: 0.5rem;
-  --sidebar: oklch(0.99 0.005 261.2);
-  --sidebar-foreground: oklch(0.205 0 0);
-  --sidebar-primary: oklch(0.564 0.24 261.2);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.95 0.03 261.2);
-  --sidebar-accent-foreground: oklch(0.42 0.21 261.2);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.564 0.24 261.2);
-  --chart-1: oklch(0.564 0.24 261.2);
-  --chart-2: oklch(0.614 0.205 255.3);
-  --chart-3: oklch(0.7 0.15 250);
-  --chart-4: oklch(0.75 0.18 210);
-  --chart-5: oklch(0.6 0.18 300);
-  /* Rampa ordinal (progressão sent -> delivered) + cores de status
-     (good/critical, fixas nos dois temas) — skill de dataviz. */
-  --chart-ordinal-1: #86b6ef;
-  --chart-ordinal-2: #2a78d6;
-  --chart-status-good: #0ca30c;
-  --chart-status-critical: #d03b3b;
+  /* superfícies (cinza Meta / Facebook) */
+  --paper: #f0f2f5;
+  --surface-card: #ffffff;
+  --card-2: #f6f7f9;
+  --surface-input: #ffffff;
+
+  /* linhas */
+  --line: #e4e6eb;
+  --line-2: #d2d5da;
+  --line-3: #c0c4cb;
+
+  /* texto */
+  --ink: #1c1e21;
+  --ink-2: #606770;
+  --ink-3: #8a8d91;
+  --ink-4: #b0b3b8;
+
+  /* sidebar (azul-marinho Meta) */
+  --nav: #0c1626;
+  --nav-line: #1e2c46;
+  --nav-active: #16243e;
+  --nav-ink: #c4ccda;
+  --nav-ink-2: #7e889c;
+  --nav-active-ink: #ffffff;
+
+  /* PRIMÁRIO = azul Meta */
+  --brand: #0866ff;
+  --brand-strong: #0653cc;
+  --brand-2: #3b87ff;
+  --brand-soft: #e7f0ff;
+  --brand-line: #cbddff;
+
+  /* SUCESSO = verde (Ativo / Concluído / Aprovado / online) */
+  --ok: #2e9e4c;
+  --ok-soft: #e6f4ea;
+  --ok-line: #c4e5ce;
+  --ok-ink: #227a3b;
+
+  /* status */
+  --red: #e24234;
+  --red-soft: #fdecea;
+  --red-line: #f6d2cd;
+  --amber: #b26b00;
+  --amber-soft: #fbf0db;
+  --amber-line: #ebd6aa;
+
+  /* violeta — só o papel "owner" */
+  --violet: #6b40d8;
+  --violet-soft: #efe9fd;
+  --violet-line: #d9ccf8;
+
+  /* sequência de entrega: cinza -> azul claro -> azul Meta + vermelho */
+  --d-sent: #b0b6bf;
+  --d-deliv: #5c9dff;
+  --d-read: #0866ff;
+  --d-fail: #e24234;
+
+  /* raios pequenos + sombra rasa */
+  --r-card: 8px;
+  --r-el: 6px;
+  --r-sm: 5px;
+  --r-input: 6px;
+  --r-pill: 999px;
+  --sh-card: 0 1px 2px rgba(20, 25, 35, 0.05);
+
+  /* ---------------------------------------------------------------------
+   * Mapeamento para os nomes semânticos do shadcn — assim todo componente
+   * já existente (Button, Card, Input, Sidebar...) herda a paleta Meta sem
+   * precisar ser reescrito um a um.
+   * ------------------------------------------------------------------ */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--surface-card);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-card);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--card-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--card-2);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--brand-soft);
+  --accent-foreground: var(--brand-strong);
+  --destructive: var(--red);
+  --destructive-foreground: #ffffff;
+  --border: var(--line);
+  --input: var(--line-2);
+  --ring: var(--brand);
+  --radius: var(--r-card);
+
+  --sidebar: var(--nav);
+  --sidebar-foreground: var(--nav-ink);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--nav-active);
+  --sidebar-accent-foreground: var(--nav-active-ink);
+  --sidebar-border: var(--nav-line);
+  --sidebar-ring: var(--brand);
+
+  /* charts — mesma sequência de entrega */
+  --chart-1: var(--d-read);
+  --chart-2: var(--d-deliv);
+  --chart-3: var(--d-sent);
+  --chart-4: var(--ok);
+  --chart-5: var(--amber);
 }
 
+/* Tema escuro: mantido como variação dos mesmos tokens (o app abre em claro,
+   sem toggle na topbar). */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.65 0.2 261.2);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0.02 261.2);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.65 0.2 261.2);
-  --sidebar: oklch(0.16 0.015 261.2);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.65 0.2 261.2);
-  --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.28 0.05 261.2);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.65 0.2 261.2);
-  --chart-1: oklch(0.65 0.2 261.2);
-  --chart-2: oklch(0.7 0.17 255.3);
-  --chart-3: oklch(0.75 0.13 250);
-  --chart-4: oklch(0.8 0.15 210);
-  --chart-5: oklch(0.7 0.16 300);
-  --chart-ordinal-1: #3987e5;
-  --chart-ordinal-2: #184f95;
-  --chart-status-good: #0ca30c;
-  --chart-status-critical: #d03b3b;
+  --paper: #18191a;
+  --surface-card: #242526;
+  --card-2: #303233;
+  --surface-input: #242526;
+
+  --line: #3a3b3c;
+  --line-2: #4a4b4d;
+  --line-3: #5a5b5e;
+
+  --ink: #e4e6eb;
+  --ink-2: #b0b3b8;
+  --ink-3: #8a8d91;
+  --ink-4: #6a6d71;
+
+  --brand-soft: #16233a;
+  --brand-line: #24395e;
+
+  --ok-soft: #16281c;
+  --ok-line: #24422c;
+  --ok-ink: #5cc47a;
+
+  --red-soft: #2c1a18;
+  --red-line: #4a2823;
+  --amber-soft: #2a2114;
+  --amber-line: #453720;
+
+  --violet-soft: #1f1833;
+  --violet-line: #33275a;
+
+  --primary-foreground: #ffffff;
+  --destructive-foreground: #ffffff;
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 @theme inline {
+  /* semânticos shadcn */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -117,31 +176,65 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar-ring:
-    var(--sidebar-ring);
-  --color-sidebar-border:
-    var(--sidebar-border);
-  --color-sidebar-accent-foreground:
-    var(--sidebar-accent-foreground);
-  --color-sidebar-accent:
-    var(--sidebar-accent);
-  --color-sidebar-primary-foreground:
-    var(--sidebar-primary-foreground);
-  --color-sidebar-primary:
-    var(--sidebar-primary);
-  --color-sidebar-foreground:
-    var(--sidebar-foreground);
-  --color-sidebar:
-    var(--sidebar);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  /* tokens da paleta Meta, consumíveis direto no JSX */
+  --color-paper: var(--paper);
+  --color-card-2: var(--card-2);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-line-3: var(--line-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-nav: var(--nav);
+  --color-nav-line: var(--nav-line);
+  --color-nav-active: var(--nav-active);
+  --color-nav-ink: var(--nav-ink);
+  --color-nav-ink-2: var(--nav-ink-2);
+  --color-nav-active-ink: var(--nav-active-ink);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-2: var(--brand-2);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-line: var(--brand-line);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-line: var(--ok-line);
+  --color-ok-ink: var(--ok-ink);
+  --color-red: var(--red);
+  --color-red-soft: var(--red-soft);
+  --color-red-line: var(--red-line);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-amber-line: var(--amber-line);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-violet-line: var(--violet-line);
+  --color-d-sent: var(--d-sent);
+  --color-d-deliv: var(--d-deliv);
+  --color-d-read: var(--d-read);
+  --color-d-fail: var(--d-fail);
+
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-el);
+  --radius-lg: var(--r-card);
+  --radius-xl: var(--r-card);
+
+  --shadow-card: var(--sh-card);
 }
 
 @layer base {
@@ -157,47 +250,50 @@
 }
 
 /*
- * Essa versão do Tailwind (4.0.0-beta.4, uma beta bem antiga da v4) não
- * respeita override de `--font-sans`/`--font-mono` via `@theme` — a utility
- * gerada continua usando o default interno dela, então as fontes do
- * next/font (via --font-body-family/--font-heading-family/--font-mono-family,
- * setadas no <body> em layout.tsx) nunca apareciam. Confirmado inspecionando
- * o font-family computado no navegador. Fix: declarar direto com
- * !important, no mesmo padrão que o design kit já documenta pra esse tipo de
- * conflito (ver README dele, seção "Armadilhas já conhecidas").
+ * Esta versão do Tailwind (4.0.0-beta.4) ignora override de `--font-sans`/
+ * `--font-mono` via `@theme` — a utility gerada continua usando o default
+ * interno dela, então as fontes do next/font nunca apareciam. Confirmado
+ * inspecionando o font-family computado no navegador. Fix: declarar direto.
  */
 body {
   font-family:
-    var(--font-body-family), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    var(--font-sans-family), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji" !important;
 }
 
-h1,
-h2,
-h3,
-.font-heading {
-  font-family: var(--font-heading-family), var(--font-body-family), sans-serif !important;
-}
-
-.font-mono {
+.font-mono,
+code,
+kbd,
+samp,
+pre {
   font-family: var(--font-mono-family), ui-monospace, "JetBrains Mono", monospace !important;
 }
 
-/*
- * Fundo animado das telas de auth (login/signup/etc.) — só transform+opacity
- * (compositor-friendly), pausa sozinho com `prefers-reduced-motion` porque a
- * classe que dispara a animação é `motion-safe:` (Tailwind só aplica sob
- * `@media (prefers-reduced-motion: no-preference)`).
- */
-@keyframes blob-float {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
+/* Em `@layer components` de propósito: assim qualquer utility (text-nav-ink-2,
+   text-xs...) continua ganhando destas classes quando precisar variar. */
+@layer components {
+  /* Números: Inter 700, pretos, largura de dígito fixa. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--ink);
   }
-  33% {
-    transform: translate(24px, -18px) scale(1.06);
+
+  /* Label de seção / KPI: caixa-alta pequena com tracking. */
+  .label-caps {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
   }
-  66% {
-    transform: translate(-18px, 16px) scale(0.94);
-  }
+}
+
+/* Guarda contra SVG inline sem dimensão (estoura o layout). `:where()` mantém
+   especificidade zero, então qualquer classe de tamanho continua ganhando; os
+   SVGs internos do Recharts ficam de fora. */
+:where(svg:not([width]):not([height])):not(:where(.recharts-wrapper *)) {
+  width: 16px;
+  height: 16px;
 }

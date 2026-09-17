@@ -44,7 +44,7 @@ function renderText(
     const val = resolved[key];
     if (val && val.length > 0) {
       parts.push(
-        <span key={`f-${i}`} className="rounded bg-amber-200/40 px-0.5 dark:bg-amber-500/20">
+        <span key={`f-${i}`} className="rounded bg-amber-soft px-0.5 text-ink">
           {val}
         </span>,
       );
@@ -53,7 +53,7 @@ function renderText(
       parts.push(
         <span
           key={`p-${i}`}
-          className="rounded bg-blue-200/40 px-1 text-xs font-medium text-blue-900 dark:bg-blue-500/20 dark:text-blue-200"
+          className="rounded border border-brand-line bg-brand-soft px-1 font-mono text-[11px] font-medium text-brand-strong"
         >
           {label}
         </span>,

@@ -36,7 +36,7 @@ export function UserMenu({ fullName, email, avatarUrl }: Props) {
         <Button variant="ghost" size="icon" className="rounded-full" aria-label="Menu do usuário">
           <Avatar className="size-8">
             {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName || email} />}
-            <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+            <AvatarFallback className="border border-line bg-card-2 text-[11px] font-semibold text-ink-2">
               {initials(fullName || email)}
             </AvatarFallback>
           </Avatar>

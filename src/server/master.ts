@@ -43,6 +43,7 @@ export type MasterWorkspaceRow = {
   createdAt: string;
   ownerEmail: string | null;
   memberCount: number;
+  contactCount: number;
   totalSent: number;
   connections: MasterConnectionSummary[];
 };
@@ -79,9 +80,10 @@ export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
 
   // profile não tem e-mail (isso vive só no auth.users) — busca via admin auth,
   // uma chamada por owner único (lista de workspaces não costuma ser gigante).
-  const [ownersRes, membersRes, dispatchesRes, connectionsRes] = await Promise.all([
+  const [ownersRes, membersRes, contactsRes, dispatchesRes, connectionsRes] = await Promise.all([
     Promise.all(ownerIds.map((id) => admin.auth.admin.getUserById(id))),
     admin.from("workspace_member").select("workspace_id").in("workspace_id", workspaceIds),
+    admin.from("contact").select("workspace_id").in("workspace_id", workspaceIds),
     admin.from("dispatch").select("id, workspace_id").in("workspace_id", workspaceIds),
     admin
       .from("workspace_meta_connection")
@@ -93,6 +95,7 @@ export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
     ownersRes.map((r, i) => [ownerIds[i], r.data.user?.email ?? null] as const),
   );
   const memberCounts = countBy(membersRes.data);
+  const contactCounts = countBy(contactsRes.data);
 
   // "Disparos" = mensagens já enviadas com sucesso (all-time), não quantidade
   // de comunicados — soma dispatch_recipient por trás de cada dispatch do
@@ -129,6 +132,7 @@ export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
     createdAt: w.created_at,
     ownerEmail: emailByUserId.get(w.owner_id) ?? null,
     memberCount: memberCounts.get(w.id) ?? 0,
+    contactCount: contactCounts.get(w.id) ?? 0,
     totalSent: sentCountByWorkspace.get(w.id) ?? 0,
     connections: connectionsByWorkspace.get(w.id) ?? [],
   }));

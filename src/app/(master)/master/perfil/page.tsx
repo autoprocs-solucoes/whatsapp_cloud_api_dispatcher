@@ -8,6 +8,7 @@ import {
 import { DemoteMasterMemberButton } from "@/features/master/demote-member-button";
 import { PromoteMasterMemberForm } from "@/features/master/promote-member-form";
 import { AvatarUploadForm } from "@/features/profile/avatar-upload-form";
+import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/server/auth";
 import { listMasterMembers } from "@/server/master";
 
@@ -16,13 +17,11 @@ export default async function MasterPerfilPage() {
   const members = await listMasterMembers();
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Perfil</h1>
-        <p className="text-muted-foreground text-sm">
-          Sua foto e quem mais no time Autoprocs tem acesso ao painel Master.
-        </p>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="Perfil"
+        description="Sua foto e quem mais no time Autoprocs tem acesso ao painel Master."
+      />
 
       <Card>
         <CardHeader>
@@ -60,7 +59,7 @@ export default async function MasterPerfilPage() {
             <div key={m.userId} className="flex items-center justify-between text-sm">
               <div>
                 <p className="font-medium">{m.fullName || "Sem nome"}</p>
-                <p className="text-muted-foreground text-xs">{m.email ?? m.userId}</p>
+                <p className="font-mono text-xs text-ink-3">{m.email ?? m.userId}</p>
               </div>
               {m.userId !== user.id && (
                 <DemoteMasterMemberButton userId={m.userId} name={m.fullName || m.email || ""} />

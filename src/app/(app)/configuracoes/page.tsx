@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetaConnectionPanel } from "@/features/meta/meta-connection-panel";
 import { AvatarUploadForm } from "@/features/profile/avatar-upload-form";
@@ -31,13 +32,11 @@ export default async function ConfiguracoesPage() {
   const costByConnectionId = await getConnectionsCost(metaConnections);
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
-        <p className="text-muted-foreground text-sm">
-          Edite o workspace, gerencie membros e conecte sua conta Meta.
-        </p>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="Configurações"
+        description="Edite o workspace, gerencie membros e conecte sua conta Meta."
+      />
 
       <Tabs defaultValue="perfil" className="space-y-4">
         <TabsList>

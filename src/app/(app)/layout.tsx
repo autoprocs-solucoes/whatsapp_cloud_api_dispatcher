@@ -10,13 +10,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const workspaces = await getUserWorkspaces();
 
   return (
-    <SidebarProvider>
+    <SidebarProvider style={{ "--sidebar-width": "236px" } as React.CSSProperties}>
       <AppSidebar
         activeWorkspace={{ id: activeWorkspace.id, name: activeWorkspace.name }}
         workspaces={workspaces.map((w) => ({ id: w.id, name: w.name }))}
         isMaster={user.profile.is_superadmin}
+        user={{ name: user.profile.full_name, email: user.email }}
       />
-      <SidebarInset className="min-w-0">
+      <SidebarInset className="min-w-0 bg-paper">
         <AppHeader
           user={{
             fullName: user.profile.full_name,

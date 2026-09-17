@@ -839,8 +839,8 @@ export function DispatchWizard({
           />
           {selectedTemplate && (
             <p className="text-muted-foreground mt-2 text-center text-[10px]">
-              <span className="rounded bg-amber-200/40 px-1 dark:bg-amber-500/20">amarelo</span> = fallback ·{" "}
-              <span className="rounded bg-blue-200/40 px-1 dark:bg-blue-500/20">azul</span> = coluna do contato
+              <span className="rounded bg-amber-soft px-1 text-ink">amarelo</span> = fallback ·{" "}
+              <span className="rounded border border-brand-line bg-brand-soft px-1 text-brand-strong">azul</span> = coluna do contato
             </p>
           )}
         </aside>

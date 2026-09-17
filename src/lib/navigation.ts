@@ -31,3 +31,23 @@ export const navGroups: NavGroup[] = [
     items: [{ title: "Configurações", href: "/configuracoes", icon: Settings }],
   },
 ];
+
+export type Breadcrumb = { section: string; page: string };
+
+/** "Seção › Página" da topbar. Rotas do Master não vivem em `navGroups`
+ * (grupo de rotas separado), então entram como caso explícito. */
+export function resolveBreadcrumb(pathname: string): Breadcrumb | null {
+  if (pathname.startsWith("/master/perfil")) return { section: "Plataforma", page: "Perfil" };
+  if (pathname === "/master" || pathname.startsWith("/master/")) {
+    return { section: "Plataforma", page: "Clientes" };
+  }
+
+  for (const group of navGroups) {
+    for (const item of group.items) {
+      if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+        return { section: group.label, page: item.title };
+      }
+    }
+  }
+  return null;
+}

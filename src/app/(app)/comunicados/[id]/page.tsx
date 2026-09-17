@@ -2,18 +2,31 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Copy, Download } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { KpiTile } from "@/components/kpi-tile";
+import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableShell,
+  TableToolbar,
+} from "@/components/ui/table";
 import { DispatchExecutePanel } from "@/features/dispatch/dispatch-execute-panel";
 import { getDispatch } from "@/features/dispatch/actions";
 import { DashboardTimeline } from "@/features/dashboard/dashboard-timeline";
 import { ReadRateInfo } from "@/features/dashboard/read-rate-info";
-import { StatTile } from "@/components/stat-tile";
+import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
   queued: "Na fila",
-  running: "Em execução",
+  running: "Enviando",
   done: "Concluído",
   failed: "Falhou",
   canceled: "Cancelado",
@@ -27,20 +40,21 @@ const RECIPIENT_STATUS_LABELS: Record<string, string> = {
   failed: "Falhou",
 };
 
-function statusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+function statusTone(status: string): StatusTone {
   switch (status) {
     case "done":
     case "delivered":
     case "read":
+      return "ok";
     case "sent":
-      return "default";
+      return "info";
     case "queued":
     case "running":
-      return "secondary";
+      return "pending";
     case "failed":
-      return "destructive";
+      return "danger";
     default:
-      return "outline";
+      return "neutral";
   }
 }
 
@@ -83,37 +97,39 @@ export default async function ComunicadoDetalhe({
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link href="/comunicados">
-            <ChevronLeft className="mr-1 size-4" /> Voltar
+            <ChevronLeft className="size-4" /> Voltar
           </Link>
         </Button>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+          <div className="space-y-1">
+            <h1 className="text-[23px] leading-tight font-semibold tracking-tight text-ink">
               {template?.name ?? "Comunicado"}
             </h1>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-ink-2">
               {template?.language} ·{" "}
               {dispatch.recipient_source === "segment" ? "Segmento" : "Lista manual"} ·{" "}
-              {new Date(dispatch.created_at).toLocaleString("pt-BR")}
+              <span className="font-mono text-xs">
+                {new Date(dispatch.created_at).toLocaleString("pt-BR")}
+              </span>
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={statusBadgeVariant(dispatch.status)} className="text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge tone={statusTone(dispatch.status)}>
               {STATUS_LABELS[dispatch.status] ?? dispatch.status}
-            </Badge>
+            </StatusBadge>
             <Button asChild size="sm" variant="outline">
               <Link href={`/comunicados/novo?from=${dispatch.id}`}>
-                <Copy className="mr-1 size-4" /> Duplicar
+                <Copy className="size-4" /> Duplicar
               </Link>
             </Button>
             {totalRecipients > 0 && (
               <Button asChild size="sm" variant="outline">
                 <a href={`/comunicados/${dispatch.id}/export`} download>
-                  <Download className="mr-1 size-4" /> Exportar CSV
+                  <Download className="size-4" /> Exportar CSV
                 </a>
               </Button>
             )}
@@ -131,36 +147,33 @@ export default async function ComunicadoDetalhe({
         />
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {(["queued", "sent", "delivered", "read", "failed"] as const).map((s, i) => (
-          <StatTile
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+        {(["queued", "sent", "delivered", "read", "failed"] as const).map((s) => (
+          <KpiTile
             key={s}
             label={RECIPIENT_STATUS_LABELS[s] ?? s}
-            value={counts[s] ?? 0}
-            tone={s === "failed" ? "destructive" : "default"}
-            delayMs={i * 50}
+            value={(counts[s] ?? 0).toLocaleString("pt-BR")}
+            tone={s === "failed" ? "danger" : "default"}
           />
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <StatTile
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+        <KpiTile
           label="Taxa de envio"
           value={pct(sentLike)}
           suffix="%"
           tone="muted"
           caption={`${sentLike} de ${total}`}
-          delayMs={250}
         />
-        <StatTile
+        <KpiTile
           label="Taxa de entrega"
           value={pct(deliveredLike)}
           suffix="%"
           tone="muted"
           caption={`${deliveredLike} de ${total}`}
-          delayMs={300}
         />
-        <StatTile
+        <KpiTile
           label="Taxa de leitura"
           value={pct(readCount)}
           suffix="%"
@@ -170,134 +183,127 @@ export default async function ComunicadoDetalhe({
               {readCount} de {total} <ReadRateInfo />
             </span>
           }
-          delayMs={350}
         />
-        <StatTile
+        <KpiTile
           label="Reações"
           value={pct(reactionCount)}
           suffix="%"
           tone="muted"
           caption={`${reactionCount} de ${total}`}
-          delayMs={400}
         />
-        <StatTile
+        <KpiTile
           label="Taxa de falha"
           value={pct(failedCount)}
           suffix="%"
-          tone="destructive"
+          tone="danger"
           caption={`${failedCount} de ${total}`}
-          delayMs={450}
         />
       </div>
 
       {timeline.length > 0 && (
-        <section className="rounded-md border p-4">
-          <div className="mb-3">
-            <h2 className="text-sm font-medium">Tendência</h2>
-            <p className="text-muted-foreground text-xs">
-              Envios deste comunicado por dia
-            </p>
-          </div>
-          <DashboardTimeline data={timeline} emptyMessage="Sem envios ainda." />
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Tendência</CardTitle>
+            <CardDescription>Envios deste comunicado por dia</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DashboardTimeline data={timeline} emptyMessage="Sem envios ainda." />
+          </CardContent>
+        </Card>
       )}
 
       {errorGroups.length > 0 && (
-        <section className="rounded-md border p-4">
-          <div className="mb-3">
-            <h2 className="text-sm font-medium">Erros mais comuns</h2>
-            <p className="text-muted-foreground text-xs">
-              {failedCount} falha(s) agrupadas por causa
-            </p>
-          </div>
-          <div className="overflow-x-auto rounded-md border">
-            <table className="min-w-full text-sm">
-              <thead className="bg-muted/40 text-xs">
+        <Card>
+          <CardHeader>
+            <CardTitle>Erros mais comuns</CardTitle>
+            <CardDescription>{failedCount} falha(s) agrupadas por causa</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium">Código</th>
-                  <th className="px-3 py-2 text-left font-medium">Mensagem</th>
-                  <th className="px-3 py-2 text-right font-medium">Ocorrências</th>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Mensagem</TableHead>
+                  <TableHead className="text-right">Ocorrências</TableHead>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHeader>
+              <TableBody>
                 {errorGroups.map((g, i) => (
-                  <tr key={i} className="border-t">
-                    <td className="text-muted-foreground px-3 py-2 font-mono text-xs">
+                  <TableRow key={i}>
+                    <TableCell className="font-mono text-xs text-ink-2">
                       {g.error_code || "—"}
-                    </td>
-                    <td className="px-3 py-2 text-xs">{g.error_message || "—"}</td>
-                    <td className="text-foreground px-3 py-2 text-right text-xs font-semibold">
-                      {g.count}
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="text-xs text-ink-2">{g.error_message || "—"}</TableCell>
+                    <TableCell className="num text-right text-[13px]">{g.count}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
-      <div>
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-muted-foreground text-sm">
-            {totalRecipients} destinatário(s){" "}
-            {statusFilter !== "all" ? `com status "${RECIPIENT_STATUS_LABELS[statusFilter] ?? statusFilter}"` : ""}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-ink-2">
+            {totalRecipients.toLocaleString("pt-BR")} destinatário(s)
+            {statusFilter !== "all"
+              ? ` com status "${RECIPIENT_STATUS_LABELS[statusFilter] ?? statusFilter}"`
+              : ""}
           </p>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap items-center rounded-md border border-line-2 bg-card p-0.5">
             {(["all", "queued", "sent", "delivered", "read", "failed"] as const).map((f) => (
-              <Button
+              <Link
                 key={f}
-                asChild
-                size="sm"
-                variant={statusFilter === f ? "default" : "outline"}
+                href={`/comunicados/${dispatch.id}?status=${f}`}
+                className={cn(
+                  "rounded-sm px-2.5 py-1 text-[13px] font-medium transition-colors",
+                  statusFilter === f
+                    ? "bg-brand-soft text-brand-strong"
+                    : "text-ink-2 hover:text-ink",
+                )}
               >
-                <Link href={`/comunicados/${dispatch.id}?status=${f}`}>
-                  {f === "all" ? "Todos" : RECIPIENT_STATUS_LABELS[f]}
-                </Link>
-              </Button>
+                {f === "all" ? "Todos" : RECIPIENT_STATUS_LABELS[f]}
+              </Link>
             ))}
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-md border">
-          <table className="min-w-full text-sm">
-            <thead className="bg-muted/40 text-xs">
+        <TableShell>
+          <Table>
+            <TableHeader>
               <tr>
-                <th className="px-3 py-2 text-left font-medium">Telefone</th>
-                <th className="px-3 py-2 text-left font-medium">Status</th>
-                <th className="px-3 py-2 text-left font-medium">Enviado em</th>
-                <th className="px-3 py-2 text-left font-medium">Entregue em</th>
-                <th className="px-3 py-2 text-left font-medium">Lido em</th>
-                <th className="px-3 py-2 text-left font-medium">Reação</th>
-                <th className="px-3 py-2 text-left font-medium">Erro</th>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Enviado em</TableHead>
+                <TableHead>Entregue em</TableHead>
+                <TableHead>Lido em</TableHead>
+                <TableHead>Reação</TableHead>
+                <TableHead>Erro</TableHead>
               </tr>
-            </thead>
-            <tbody>
+            </TableHeader>
+            <TableBody>
               {recipients.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-muted-foreground px-3 py-8 text-center">
-                    Nenhum destinatário nesse filtro.
-                  </td>
-                </tr>
+                <TableEmpty colSpan={7}>Nenhum destinatário nesse filtro.</TableEmpty>
               ) : (
                 recipients.map((r) => (
-                  <tr key={r.id} className="border-t">
-                    <td className="px-3 py-2 font-mono text-xs">{r.phone_e164}</td>
-                    <td className="px-3 py-2">
-                      <Badge variant={statusBadgeVariant(r.status)} className="text-[10px]">
+                  <TableRow key={r.id}>
+                    <TableCell className="font-mono text-xs">{r.phone_e164}</TableCell>
+                    <TableCell>
+                      <StatusBadge tone={statusTone(r.status)}>
                         {RECIPIENT_STATUS_LABELS[r.status] ?? r.status}
-                      </Badge>
-                    </td>
-                    <td className="text-muted-foreground px-3 py-2 text-xs">
+                      </StatusBadge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-ink-3">
                       {r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR") : "—"}
-                    </td>
-                    <td className="text-muted-foreground px-3 py-2 text-xs">
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-ink-3">
                       {r.delivered_at ? new Date(r.delivered_at).toLocaleString("pt-BR") : "—"}
-                    </td>
-                    <td className="text-muted-foreground px-3 py-2 text-xs">
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-ink-3">
                       {r.read_at ? new Date(r.read_at).toLocaleString("pt-BR") : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-xs">
+                    </TableCell>
+                    <TableCell>
                       {r.reaction_emoji ? (
                         <span
                           title={
@@ -310,46 +316,40 @@ export default async function ComunicadoDetalhe({
                           {r.reaction_emoji}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-ink-4">—</span>
                       )}
-                    </td>
-                    <td className="text-muted-foreground px-3 py-2 text-xs">
-                      {r.error_message ?? "—"}
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="text-xs text-ink-3">{r.error_message ?? "—"}</TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
 
-        {totalPages > 1 && (
-          <div className="mt-3 flex items-center justify-end gap-1 text-xs">
-            <span className="text-muted-foreground mr-2">
-              página {page} de {totalPages}
-            </span>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              disabled={page <= 1}
-            >
-              <Link href={`/comunicados/${dispatch.id}?status=${statusFilter}&page=${page - 1}`}>
-                Anterior
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              disabled={page >= totalPages}
-            >
-              <Link href={`/comunicados/${dispatch.id}?status=${statusFilter}&page=${page + 1}`}>
-                Próxima
-              </Link>
-            </Button>
-          </div>
-        )}
+          {totalPages > 1 && (
+            <TableToolbar>
+              <p>
+                Página {page} de {totalPages}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button asChild size="sm" variant="outline" disabled={page <= 1}>
+                  <Link
+                    href={`/comunicados/${dispatch.id}?status=${statusFilter}&page=${page - 1}`}
+                  >
+                    Anterior
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline" disabled={page >= totalPages}>
+                  <Link
+                    href={`/comunicados/${dispatch.id}?status=${statusFilter}&page=${page + 1}`}
+                  >
+                    Próxima
+                  </Link>
+                </Button>
+              </div>
+            </TableToolbar>
+          )}
+        </TableShell>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -7,20 +7,16 @@ import { RecoveryRedirect } from "@/features/auth/recovery-redirect";
 
 import "./globals.css";
 
-const bodyFont = Instrument_Sans({
+const sans = Inter({
   subsets: ["latin"],
-  variable: "--font-body-family",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans-family",
   display: "swap",
 });
 
-const headingFont = Bricolage_Grotesque({
+const mono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-heading-family",
-  display: "swap",
-});
-
-const monoFont = JetBrains_Mono({
-  subsets: ["latin"],
+  weight: ["400", "500"],
   variable: "--font-mono-family",
   display: "swap",
 });
@@ -33,10 +29,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body
-        className={`${bodyFont.variable} ${headingFont.variable} ${monoFont.variable} font-sans antialiased`}
-      >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <body className={`${sans.variable} ${mono.variable} font-sans antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
           <RecoveryRedirect />
           {children}
           <Toaster richColors position="top-right" />
