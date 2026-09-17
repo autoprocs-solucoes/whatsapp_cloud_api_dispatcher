@@ -51,6 +51,9 @@ declare global {
   }
 }
 
+/** Versão do diálogo do Embedded Signup. Ver comentário no FB.init abaixo. */
+const SIGNUP_DIALOG_VERSION = "v25.0";
+
 type SessionInfo = {
   event: string;
   data: {
@@ -63,7 +66,6 @@ type SessionInfo = {
 type Props = {
   appId: string;
   configId: string;
-  graphApiVersion: string;
   workspaceId: string;
   ctaLabel?: string;
   /** "whatsapp_business_app_onboarding" ativa o fluxo de Coexistência. */
@@ -74,7 +76,6 @@ type Props = {
 export function EmbeddedSignupButton({
   appId,
   configId,
-  graphApiVersion,
   workspaceId,
   ctaLabel = "Conectar Facebook",
   featureType = "",
@@ -105,15 +106,25 @@ export function EmbeddedSignupButton({
   }, []);
 
   // Inicializa FB SDK quando o script carregar.
+  //
+  // A versão aqui é do diálogo do Embedded Signup e NÃO acompanha a
+  // META_GRAPH_API_VERSION usada nas chamadas de servidor (envio, templates,
+  // analytics), que continua onde está porque mudá-la mexeria no que já
+  // funciona. Elas são independentes: o SDK só abre o popup.
+  //
+  // Fica fixa numa versão recente porque a Coexistência é nova — a
+  // documentação dela usa v25.0 nos exemplos, e versões antigas do diálogo
+  // ignoram o `featureType` em silêncio, caindo no cadastro padrão (que pede
+  // pra digitar um número em vez de parear com o app do celular).
   React.useEffect(() => {
     if (!sdkReady || !window.FB) return;
     window.FB.init({
       appId,
       cookie: true,
       xfbml: true,
-      version: graphApiVersion,
+      version: SIGNUP_DIALOG_VERSION,
     });
-  }, [sdkReady, appId, graphApiVersion]);
+  }, [sdkReady, appId]);
 
   function launchSignup() {
     if (!window.FB) {
@@ -167,11 +178,11 @@ export function EmbeddedSignupButton({
         //
         // Aqui havia um `features: [{name: "marketing_messages_lite"}, ...]`
         // adicionado como contorno de um erro de business_id. Ele trocava o
-        // fluxo inteiro: em vez do pareamento por QR code com o app do
-        // celular, a Meta abria o cadastro do Marketing Messages Lite, que
-        // pede pra digitar um número de envio — e oferecia o número de teste
-        // americano, reinterpretado como brasileiro. Nunca dava pra conectar
-        // um número que já existe no app.
+        // fluxo inteiro: em vez do pareamento com o app do celular, a Meta
+        // abria o cadastro do Marketing Messages Lite, que pede pra digitar um
+        // número de envio — e oferecia o número de teste americano,
+        // reinterpretado como brasileiro. Nunca dava pra conectar um número
+        // que já existe no app.
         extras: {
           setup: {},
           featureType,

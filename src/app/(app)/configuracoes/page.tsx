@@ -117,7 +117,6 @@ export default async function ConfiguracoesPage() {
             connections={metaConnections}
             costByConnectionId={costByConnectionId}
             metaAppId={serverEnv.META_APP_ID}
-            graphApiVersion={serverEnv.META_GRAPH_API_VERSION}
             coexistenceConfigId={serverEnv.META_COEXISTENCE_CONFIG_ID}
             standardSignupConfigId={serverEnv.META_EMBEDDED_SIGNUP_CONFIG_ID}
           />

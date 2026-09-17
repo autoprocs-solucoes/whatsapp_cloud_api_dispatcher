@@ -353,7 +353,6 @@ type Props = {
   connections: MetaConnectionView[];
   costByConnectionId: Map<string, ConversationCostSummary | null>;
   metaAppId: string | undefined;
-  graphApiVersion: string;
   coexistenceConfigId: string | undefined;
   standardSignupConfigId: string | undefined;
 };
@@ -364,7 +363,6 @@ export function MetaConnectionPanel({
   connections,
   costByConnectionId,
   metaAppId,
-  graphApiVersion,
   coexistenceConfigId,
   standardSignupConfigId,
 }: Props) {
@@ -390,7 +388,6 @@ export function MetaConnectionPanel({
           <EmbeddedSignupButton
             appId={metaAppId!}
             configId={standardSignupConfigId!}
-            graphApiVersion={graphApiVersion}
             workspaceId={workspaceId}
             connectionMethod="embedded_signup"
             ctaLabel="Criar número"
@@ -405,13 +402,12 @@ export function MetaConnectionPanel({
       <ChoiceCard
         icon={Link2}
         title="Login com Coexistência"
-        description="Pro cliente que já usa o app WhatsApp Business no celular e quer manter os dois: app + Cloud API. A Meta mostra um QR code pra parear com o celular."
+        description="Pro cliente que já usa o app WhatsApp Business no celular e quer manter os dois: app + Cloud API. A Meta mostra um código de verificação pra confirmar dentro do app — exige WhatsApp Business 2.24.17 ou mais novo."
       >
         {coexistenceEnabled ? (
           <EmbeddedSignupButton
             appId={metaAppId!}
             configId={coexistenceConfigId!}
-            graphApiVersion={graphApiVersion}
             workspaceId={workspaceId}
             featureType="whatsapp_business_app_onboarding"
             connectionMethod="coexistence"
