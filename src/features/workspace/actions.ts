@@ -117,6 +117,100 @@ export async function updateWorkspaceAction(
   return { ok: true, data: undefined };
 }
 
+const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const LOGO_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+const LOGO_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Logo do cliente — aparece no topo do menu lateral do workspace. Guarda no
+ * mesmo bucket `avatars`, sob o prefixo `workspaces/`, pra não precisar de
+ * outro bucket só por causa disso. */
+export async function updateWorkspaceLogoAction(formData: FormData): Promise<ActionResult> {
+  const workspaceId = String(formData.get("workspaceId") ?? "");
+  const file = formData.get("logo");
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const admin = createAdminClient();
+  const { data: membership } = await admin
+    .from("workspace_member")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership || membership.role !== "owner") {
+    return { ok: false, error: "Apenas owners podem trocar a logo" };
+  }
+
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Selecione uma imagem" };
+  }
+  if (!LOGO_TYPES.includes(file.type)) {
+    return { ok: false, error: "Formato inválido — use PNG, JPEG ou WebP" };
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    return { ok: false, error: "Imagem muito grande (máx. 5MB)" };
+  }
+
+  const path = `workspaces/${workspaceId}/logo.${LOGO_EXT[file.type] ?? "png"}`;
+  const { error: uploadError } = await admin.storage.from("avatars").upload(path, file, {
+    upsert: true,
+    contentType: file.type,
+    cacheControl: "3600",
+  });
+  if (uploadError) return { ok: false, error: `Falha no upload: ${uploadError.message}` };
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from("avatars").getPublicUrl(path);
+  // Cache-bust: o caminho é fixo, então sem isso o navegador segura a antiga.
+  const bustedUrl = `${publicUrl}?v=${Date.now()}`;
+
+  const { error } = await admin
+    .from("workspace")
+    .update({ logo_url: bustedUrl })
+    .eq("id", workspaceId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: undefined };
+}
+
+export async function removeWorkspaceLogoAction(workspaceId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const admin = createAdminClient();
+  const { data: membership } = await admin
+    .from("workspace_member")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership || membership.role !== "owner") {
+    return { ok: false, error: "Apenas owners podem trocar a logo" };
+  }
+
+  const { error } = await admin
+    .from("workspace")
+    .update({ logo_url: null })
+    .eq("id", workspaceId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: undefined };
+}
+
 export async function switchWorkspaceAction(workspaceId: string): Promise<void> {
   const supabase = await createClient();
   const {

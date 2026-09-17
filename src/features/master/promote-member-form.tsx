@@ -34,21 +34,24 @@ export function PromoteMasterMemberForm() {
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3">
-      <div className="min-w-[240px] flex-1 space-y-2">
-        <Label htmlFor="promote-email">E-mail</Label>
+    <form ref={formRef} action={formAction} className="space-y-2">
+      <Label htmlFor="promote-email">E-mail</Label>
+      {/* Campo e botão na mesma linha: com o texto de ajuda dentro da coluna,
+          o `items-end` empurrava o botão pra baixo do campo. */}
+      <div className="flex flex-wrap items-center gap-2">
         <Input
           id="promote-email"
           name="email"
           type="email"
           required
           placeholder="pessoa@autoprocs.com"
+          className="min-w-[240px] flex-1"
         />
-        <p className="text-muted-foreground text-xs">
-          Convida por e-mail se a pessoa ainda não tem conta; se já tiver, só ativa o acesso master.
-        </p>
+        <SubmitButton />
       </div>
-      <SubmitButton />
+      <p className="text-xs text-ink-3">
+        Convida por e-mail se a pessoa ainda não tem conta; se já tiver, só ativa o acesso master.
+      </p>
     </form>
   );
 }

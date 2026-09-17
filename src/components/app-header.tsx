@@ -6,15 +6,10 @@ import { ChevronRight, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { UserMenu } from "@/components/user-menu";
 import { signOutAction } from "@/features/auth/actions";
 import { resolveBreadcrumb } from "@/lib/navigation";
 
-type Props = {
-  user: { fullName: string; email: string; avatarUrl: string | null };
-};
-
-export function AppHeader({ user }: Props) {
+export function AppHeader() {
   const pathname = usePathname();
   const crumb = resolveBreadcrumb(pathname);
 
@@ -43,7 +38,6 @@ export function AppHeader({ user }: Props) {
           <LogOut className="size-3.5" />
           Sair
         </Button>
-        <UserMenu fullName={user.fullName} email={user.email} avatarUrl={user.avatarUrl} />
       </div>
     </header>
   );

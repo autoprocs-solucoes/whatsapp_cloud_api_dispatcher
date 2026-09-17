@@ -82,3 +82,29 @@ export async function removeAvatarAction(): Promise<ActionResult> {
   revalidatePath("/", "layout");
   return { ok: true, data: undefined };
 }
+
+/** Nome exibido do usuário (sidebar, time master, menus). */
+export async function updateProfileNameAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireUser();
+
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  if (fullName.length < 2) {
+    return { ok: false, error: "Informe um nome com pelo menos 2 caracteres" };
+  }
+  if (fullName.length > 80) {
+    return { ok: false, error: "Nome muito longo (máx. 80 caracteres)" };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("profile")
+    .update({ full_name: fullName })
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: undefined };
+}

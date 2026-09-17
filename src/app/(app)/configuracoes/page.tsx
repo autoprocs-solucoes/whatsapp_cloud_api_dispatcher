@@ -11,6 +11,8 @@ import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetaConnectionPanel } from "@/features/meta/meta-connection-panel";
 import { AvatarUploadForm } from "@/features/profile/avatar-upload-form";
+import { ProfileNameForm } from "@/features/profile/profile-name-form";
+import { WorkspaceLogoForm } from "@/features/workspace/workspace-logo-form";
 import { InviteMemberForm } from "@/features/workspace/invite-member-form";
 import { MembersTable } from "@/features/workspace/members-table";
 import { removeMemberAction } from "@/features/workspace/actions";
@@ -51,17 +53,18 @@ export default async function ConfiguracoesPage() {
         <TabsContent value="perfil">
           <Card>
             <CardHeader>
-              <CardTitle>Foto de perfil</CardTitle>
+              <CardTitle>Seus dados</CardTitle>
               <CardDescription>
-                Aparece no menu do usuário. Vale pra qualquer conta, inclusive admin master.
+                Nome e foto que aparecem no rodapé do menu lateral.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-5">
               <AvatarUploadForm
                 initialAvatarUrl={user.profile.avatar_url}
                 fullName={user.profile.full_name}
                 email={user.email}
               />
+              <ProfileNameForm initialName={user.profile.full_name} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -70,9 +73,15 @@ export default async function ConfiguracoesPage() {
           <Card>
             <CardHeader>
               <CardTitle>Dados do workspace</CardTitle>
-              <CardDescription>Nome exibido para todos os membros.</CardDescription>
+              <CardDescription>Nome e logo exibidos para todos os membros.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-5">
+              <WorkspaceLogoForm
+                workspaceId={workspace.id}
+                workspaceName={workspace.name}
+                initialLogoUrl={workspace.logo_url}
+                canEdit={isOwner}
+              />
               <WorkspaceSettingsForm
                 workspaceId={workspace.id}
                 initialName={workspace.name}

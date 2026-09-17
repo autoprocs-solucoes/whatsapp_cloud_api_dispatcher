@@ -12,19 +12,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider style={{ "--sidebar-width": "236px" } as React.CSSProperties}>
       <AppSidebar
-        activeWorkspace={{ id: activeWorkspace.id, name: activeWorkspace.name }}
-        workspaces={workspaces.map((w) => ({ id: w.id, name: w.name }))}
-        isMaster={user.profile.is_superadmin}
-        user={{ name: user.profile.full_name, email: user.email }}
+        activeWorkspace={{
+          id: activeWorkspace.id,
+          name: activeWorkspace.name,
+          logoUrl: activeWorkspace.logo_url,
+        }}
+        workspaces={workspaces.map((w) => ({ id: w.id, name: w.name, logoUrl: w.logo_url }))}
+        user={{
+          name: user.profile.full_name,
+          email: user.email,
+          avatarUrl: user.profile.avatar_url,
+        }}
       />
       <SidebarInset className="min-w-0 bg-paper">
-        <AppHeader
-          user={{
-            fullName: user.profile.full_name,
-            email: user.email,
-            avatarUrl: user.profile.avatar_url,
-          }}
-        />
+        <AppHeader />
         <main className="min-w-0 flex-1 p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>

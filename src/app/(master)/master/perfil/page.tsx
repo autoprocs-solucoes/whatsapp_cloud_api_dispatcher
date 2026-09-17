@@ -8,6 +8,7 @@ import {
 import { DemoteMasterMemberButton } from "@/features/master/demote-member-button";
 import { PromoteMasterMemberForm } from "@/features/master/promote-member-form";
 import { AvatarUploadForm } from "@/features/profile/avatar-upload-form";
+import { ProfileNameForm } from "@/features/profile/profile-name-form";
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/server/auth";
 import { listMasterMembers } from "@/server/master";
@@ -25,15 +26,16 @@ export default async function MasterPerfilPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Foto de perfil</CardTitle>
-          <CardDescription>Aparece no menu do usuário.</CardDescription>
+          <CardTitle>Seus dados</CardTitle>
+          <CardDescription>Nome e foto que aparecem no menu lateral.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-5">
           <AvatarUploadForm
             initialAvatarUrl={user.profile.avatar_url}
             fullName={user.profile.full_name}
             email={user.email}
           />
+          <ProfileNameForm initialName={user.profile.full_name} />
         </CardContent>
       </Card>
 

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { Send, ShieldCheck } from "lucide-react";
 
 import {
   Sidebar,
@@ -37,27 +37,20 @@ export const navGroupLabelClass = "label-caps px-2 text-nav-ink-2";
 type Props = {
   activeWorkspace: WorkspaceOption;
   workspaces: WorkspaceOption[];
-  isMaster?: boolean;
-  user: { name: string; email: string };
+  user: { name: string; email: string; avatarUrl: string | null };
 };
 
-export function AppSidebar({ activeWorkspace, workspaces, isMaster, user }: Props) {
+/**
+ * Menu do workspace. É a visão do cliente — nada de plataforma/master aqui,
+ * mesmo pra quem é superadmin: quem entra num cliente vê exatamente o que o
+ * cliente vê.
+ */
+export function AppSidebar({ activeWorkspace, workspaces, user }: Props) {
   const pathname = usePathname();
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="gap-3 border-b border-nav-line p-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-brand">
-            <Send className="size-4 text-white" />
-          </div>
-          <div className="grid flex-1 leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-[13px] font-semibold text-nav-active-ink">
-              Autoprocs · Dispatcher
-            </span>
-            <span className="truncate text-[11px] text-nav-ink-2">Disparos WhatsApp</span>
-          </div>
-        </div>
+      <SidebarHeader className="border-b border-nav-line p-3">
         <div className="group-data-[collapsible=icon]:hidden">
           <WorkspaceSwitcher active={activeWorkspace} workspaces={workspaces} />
         </div>
@@ -92,31 +85,23 @@ export function AppSidebar({ activeWorkspace, workspaces, isMaster, user }: Prop
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
-
-        {isMaster && (
-          <SidebarGroup className="gap-1 p-0">
-            <SidebarGroupLabel className={navGroupLabelClass}>Plataforma</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Master" className={navItemClass}>
-                    <Link href={"/master" as Route}>
-                      <ShieldCheck />
-                      <span>Master</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-nav-line p-3">
         <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:hidden">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-nav-active text-[11px] font-semibold text-nav-active-ink">
-            {(user.name || user.email).slice(0, 2).toUpperCase()}
-          </div>
+          {user.avatarUrl ? (
+            <Image
+              src={user.avatarUrl}
+              alt=""
+              width={28}
+              height={28}
+              className="size-7 shrink-0 rounded-md object-cover"
+            />
+          ) : (
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-nav-active text-[11px] font-semibold text-nav-active-ink">
+              {(user.name || user.email).slice(0, 2).toUpperCase()}
+            </span>
+          )}
           <div className="grid min-w-0 flex-1 leading-tight">
             <span className="truncate text-xs font-medium text-nav-ink">
               {user.name || "Sem nome"}

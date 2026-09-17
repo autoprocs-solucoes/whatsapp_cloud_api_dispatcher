@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { useTransition } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 export type WorkspaceOption = {
   id: string;
   name: string;
+  logoUrl?: string | null;
 };
 
 function initials(name: string): string {
@@ -27,11 +29,43 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
+function WorkspaceMark({
+  name,
+  logoUrl,
+  size = 32,
+}: {
+  name: string;
+  logoUrl?: string | null;
+  size?: number;
+}) {
+  if (logoUrl) {
+    return (
+      <Image
+        src={logoUrl}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0 rounded-md bg-white object-contain"
+      />
+    );
+  }
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-md bg-nav-active text-[11px] font-semibold text-nav-ink"
+      style={{ width: size, height: size }}
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
 type Props = {
   active: WorkspaceOption;
   workspaces: WorkspaceOption[];
 };
 
+/** Identidade do cliente no topo do menu — logo + nome. Também é o seletor
+ * quando a conta pertence a mais de um workspace. */
 export function WorkspaceSwitcher({ active, workspaces }: Props) {
   const [isPending, startTransition] = useTransition();
 
@@ -42,20 +76,28 @@ export function WorkspaceSwitcher({ active, workspaces }: Props) {
     });
   }
 
+  const brand = (
+    <>
+      <WorkspaceMark name={active.name} logoUrl={active.logoUrl} />
+      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-nav-active-ink">
+        {active.name}
+      </span>
+    </>
+  );
+
+  if (workspaces.length <= 1) {
+    return <div className="flex items-center gap-2.5 px-1 py-1">{brand}</div>;
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
           disabled={isPending}
-          className="flex h-10 w-full items-center gap-2 rounded-md border border-nav-line bg-nav-active px-2 text-left transition-colors hover:border-ink-2/40 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none disabled:opacity-60"
+          className="flex w-full items-center gap-2.5 rounded-md px-1 py-1 text-left transition-colors hover:bg-nav-active focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none disabled:opacity-60"
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-nav text-[10px] font-semibold text-nav-ink">
-            {initials(active.name)}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-nav-active-ink">
-            {active.name}
-          </span>
+          {brand}
           <ChevronsUpDown className="size-3.5 shrink-0 text-nav-ink-2" />
         </button>
       </DropdownMenuTrigger>
