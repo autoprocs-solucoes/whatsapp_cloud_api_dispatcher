@@ -35,6 +35,14 @@ const STATUS_LABELS: Record<string, string> = {
   canceled: "Cancelado",
 };
 
+/** Códigos de limite da Meta. Quem está esperando por um deles não falhou:
+ * está na fila até a janela de 24h virar. */
+const META_RATE_LIMIT_CODES = new Set(["4", "429", "80007", "130429", "131048", "131056"]);
+
+function waitingOnMetaLimit(errorCode: string | null): boolean {
+  return errorCode !== null && META_RATE_LIMIT_CODES.has(errorCode);
+}
+
 /** Estado de UMA pessoa — exclusivo. "Enviada" aqui quer dizer "saiu, mas
  * ainda sem confirmação de entrega"; quem já entregou está em "Entregue". */
 const RECIPIENT_STATUS_LABELS: Record<string, string> = {
@@ -338,13 +346,15 @@ export default async function ComunicadoDetalhe({
                           {RECIPIENT_STATUS_LABELS[r.status] ?? r.status}
                         </StatusBadge>
                         {/* Reenvio agendado: sem isso o destinatário parecia
-                            parado "na fila" sem explicação. */}
-                        {r.status === "queued" && r.attempts > 0 && (
+                            parado "na fila" sem explicação. Espera por limite
+                            da Meta não é tentativa — não gasta o orçamento de
+                            retry e sai sozinha quando a janela vira. */}
+                        {r.status === "queued" && r.next_attempt_at && (
                           <span className="text-[10px] whitespace-nowrap text-amber">
-                            {r.attempts}ª tentativa
-                            {r.next_attempt_at
-                              ? ` · nova às ${new Date(r.next_attempt_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-                              : ""}
+                            {waitingOnMetaLimit(r.error_code)
+                              ? "aguardando limite da Meta"
+                              : `${r.attempts}ª tentativa`}
+                            {` · nova às ${new Date(r.next_attempt_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`}
                           </span>
                         )}
                       </div>
