@@ -622,4 +622,94 @@ export async function sendTemplate(
   return { messageId };
 }
 
+// ----------------------------------------------------------------------------
+// Mensagem de texto livre (fora de template).
+//
+// Só funciona dentro da janela de 24h aberta pelo contato. Fora dela a Meta
+// responde 200 com message id e descarta a mensagem silenciosamente — quem
+// chama precisa ter checado a janela antes.
+// ----------------------------------------------------------------------------
+export async function sendTextMessage(params: {
+  phoneNumberId: string;
+  token: string;
+  to: string;
+  text: string;
+}): Promise<{ messageId: string; waId: string | null }> {
+  const data = await request<
+    SendTemplateResponse & { contacts?: { wa_id?: string }[] }
+  >(`/${params.phoneNumberId}/messages`, {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: params.to,
+      type: "text",
+      text: { preview_url: true, body: params.text },
+    }),
+  });
+
+  const messageId = data.messages?.[0]?.id;
+  if (!messageId) {
+    throw new GraphApiError(500, { error: { message: "Resposta sem message id" } });
+  }
+  // A Meta normaliza o número (no Brasil, o nono dígito entra ou sai). O
+  // `wa_id` devolvido é a chave real da conversa — gravar o número digitado
+  // criaria uma thread paralela que nunca casa com a do webhook.
+  return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
+}
+
+/** Marca a mensagem como lida no WhatsApp do contato (os dois tiques azuis). */
+export async function markMessageRead(params: {
+  phoneNumberId: string;
+  token: string;
+  messageId: string;
+}): Promise<void> {
+  await request(`/${params.phoneNumberId}/messages`, {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: params.messageId,
+    }),
+  });
+}
+
+/**
+ * URL temporária de um arquivo recebido. A Meta não entrega o binário direto:
+ * primeiro devolve uma URL, e essa URL ainda exige o token no header — por
+ * isso o download precisa passar pelo servidor, nunca pelo navegador.
+ */
+export async function getMediaUrl(
+  mediaId: string,
+  token: string,
+): Promise<{ url: string; mimeType: string | null }> {
+  const data = await request<{ url?: string; mime_type?: string }>(`/${mediaId}`, {
+    method: "GET",
+    token,
+  });
+  if (!data.url) {
+    throw new GraphApiError(404, { error: { message: "Mídia sem URL" } });
+  }
+  return { url: data.url, mimeType: data.mime_type ?? null };
+}
+
+export async function downloadMedia(
+  url: string,
+  token: string,
+): Promise<{ body: ArrayBuffer; contentType: string }> {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new GraphApiError(res.status, { error: { message: "Falha baixando mídia" } });
+  }
+  return {
+    body: await res.arrayBuffer(),
+    contentType: res.headers.get("content-type") ?? "application/octet-stream",
+  };
+}
+
 export { extractPlaceholders } from "./placeholders";

@@ -1,4 +1,12 @@
-import { LayoutDashboard, MessageSquare, Send, Settings, Tag, Users } from "lucide-react";
+import {
+  Inbox,
+  LayoutDashboard,
+  MessageSquare,
+  Send,
+  Settings,
+  Tag,
+  Users,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
@@ -20,6 +28,7 @@ export const navGroups: NavGroup[] = [
   {
     label: "Comunicação",
     items: [
+      { title: "Conversas", href: "/conversas", icon: Inbox },
       { title: "Contatos", href: "/contatos", icon: Users },
       { title: "Segmentos", href: "/segmentos", icon: Tag },
       { title: "Templates", href: "/templates", icon: MessageSquare },

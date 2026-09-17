@@ -607,11 +607,108 @@ export type Database = {
           },
         ];
       };
+      whatsapp_message: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          connection_id: string;
+          phone_number_id: string;
+          contact_phone_e164: string;
+          contact_id: string | null;
+          contact_name: string | null;
+          direction: "in" | "out";
+          type: string;
+          body: string | null;
+          media_id: string | null;
+          media_mime: string | null;
+          meta_message_id: string | null;
+          status: "sent" | "delivered" | "read" | "failed" | null;
+          error_message: string | null;
+          read_internally: boolean;
+          sent_at: string;
+          raw: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          connection_id: string;
+          phone_number_id: string;
+          contact_phone_e164: string;
+          contact_id?: string | null;
+          contact_name?: string | null;
+          direction: "in" | "out";
+          type?: string;
+          body?: string | null;
+          media_id?: string | null;
+          media_mime?: string | null;
+          meta_message_id?: string | null;
+          status?: "sent" | "delivered" | "read" | "failed" | null;
+          error_message?: string | null;
+          read_internally?: boolean;
+          sent_at?: string;
+          raw?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          contact_id?: string | null;
+          contact_name?: string | null;
+          body?: string | null;
+          status?: "sent" | "delivered" | "read" | "failed" | null;
+          error_message?: string | null;
+          read_internally?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_message_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_message_connection_id_fkey";
+            columns: ["connection_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace_meta_connection";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      list_whatsapp_conversations: {
+        Args: {
+          p_workspace_id: string;
+          p_limit?: number;
+          p_offset?: number;
+          p_search?: string | null;
+        };
+        Returns: {
+          contact_phone_e164: string;
+          contact_id: string | null;
+          contact_name: string | null;
+          connection_id: string;
+          last_body: string | null;
+          last_type: string;
+          last_direction: "in" | "out";
+          last_at: string;
+          unread: number;
+          last_inbound_at: string | null;
+        }[];
+      };
+      reschedule_dispatch_recipient: {
+        Args: {
+          p_id: string;
+          p_delay_seconds: number;
+          p_error_code: string;
+          p_error_message: string;
+        };
+        Returns: undefined;
+      };
       is_workspace_member: {
         Args: { p_workspace_id: string };
         Returns: boolean;
@@ -646,6 +743,9 @@ export type WorkspaceMetaConnection =
   Database["public"]["Tables"]["workspace_meta_connection"]["Row"];
 export type WorkspacePhoneNumber =
   Database["public"]["Tables"]["workspace_phone_number"]["Row"];
+export type WhatsappMessage = Database["public"]["Tables"]["whatsapp_message"]["Row"];
+export type WhatsappConversation =
+  Database["public"]["Functions"]["list_whatsapp_conversations"]["Returns"][number];
 export type Contact = Database["public"]["Tables"]["contact"]["Row"];
 export type ContactInsert = Database["public"]["Tables"]["contact"]["Insert"];
 export type ContactImport = Database["public"]["Tables"]["contact_import"]["Row"];

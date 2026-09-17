@@ -62,10 +62,204 @@ type MetaReaction = {
   emoji?: string;
 };
 
+type MetaMedia = { id?: string; mime_type?: string; caption?: string };
+
 type MetaInboundMessage = {
+  id?: string;
+  from?: string;
+  to?: string;
+  timestamp?: string;
   type?: string;
+  text?: { body?: string };
+  image?: MetaMedia;
+  video?: MetaMedia;
+  document?: MetaMedia & { filename?: string };
+  audio?: MetaMedia;
+  sticker?: MetaMedia;
+  location?: { latitude?: number; longitude?: number; name?: string };
+  button?: { text?: string };
+  interactive?: {
+    button_reply?: { title?: string };
+    list_reply?: { title?: string };
+  };
   reaction?: MetaReaction;
 };
+
+type MetaContactProfile = { wa_id?: string; profile?: { name?: string } };
+
+// ----------------------------------------------------------------------------
+// Espelho de conversas
+// ----------------------------------------------------------------------------
+
+/** Texto legível e metadados de mídia, seja qual for o tipo da mensagem. */
+function extractContent(msg: MetaInboundMessage): {
+  type: string;
+  body: string | null;
+  mediaId: string | null;
+  mediaMime: string | null;
+} {
+  const type = msg.type ?? "unknown";
+  const media = (m?: MetaMedia) => ({
+    mediaId: m?.id ?? null,
+    mediaMime: m?.mime_type ?? null,
+  });
+
+  switch (type) {
+    case "text":
+      return { type, body: msg.text?.body ?? null, mediaId: null, mediaMime: null };
+    case "image":
+      return { type, body: msg.image?.caption ?? null, ...media(msg.image) };
+    case "video":
+      return { type, body: msg.video?.caption ?? null, ...media(msg.video) };
+    case "document":
+      return {
+        type,
+        body: msg.document?.caption ?? msg.document?.filename ?? null,
+        ...media(msg.document),
+      };
+    case "audio":
+      return { type, body: null, ...media(msg.audio) };
+    case "sticker":
+      return { type, body: null, ...media(msg.sticker) };
+    case "location": {
+      const loc = msg.location;
+      const coords =
+        loc?.latitude !== undefined && loc?.longitude !== undefined
+          ? `${loc.latitude}, ${loc.longitude}`
+          : null;
+      return { type, body: loc?.name ?? coords, mediaId: null, mediaMime: null };
+    }
+    case "button":
+      return { type, body: msg.button?.text ?? null, mediaId: null, mediaMime: null };
+    case "interactive":
+      return {
+        type,
+        body: msg.interactive?.button_reply?.title ?? msg.interactive?.list_reply?.title ?? null,
+        mediaId: null,
+        mediaMime: null,
+      };
+    default:
+      return { type, body: null, mediaId: null, mediaMime: null };
+  }
+}
+
+/** A Meta manda o timestamp em segundos. */
+function messageTimestamp(msg: MetaInboundMessage): string {
+  const raw = Number(msg.timestamp);
+  if (!Number.isFinite(raw) || raw <= 0) return new Date().toISOString();
+  return new Date(raw * 1000).toISOString();
+}
+
+type Tenant = {
+  workspaceId: string;
+  connectionId: string;
+  phoneNumberId: string;
+};
+
+/**
+ * Descobre de quem é o evento. A Meta entrega tudo no mesmo endpoint, então o
+ * roteamento vem da WABA (`entry.id`) ou do número que recebeu
+ * (`value.metadata.phone_number_id`). Sem isso não dá pra saber em qual
+ * workspace gravar.
+ */
+async function resolveTenant(
+  admin: ReturnType<typeof createAdminClient>,
+  wabaId: string | null,
+  phoneNumberId: string | null,
+): Promise<Tenant | null> {
+  if (phoneNumberId) {
+    const { data } = await admin
+      .from("workspace_phone_number")
+      .select("workspace_id, connection_id, phone_number_id")
+      .eq("phone_number_id", phoneNumberId)
+      .maybeSingle();
+    if (data) {
+      return {
+        workspaceId: data.workspace_id,
+        connectionId: data.connection_id,
+        phoneNumberId: data.phone_number_id,
+      };
+    }
+  }
+
+  if (wabaId) {
+    const { data } = await admin
+      .from("workspace_meta_connection")
+      .select("id, workspace_id")
+      .eq("waba_id", wabaId)
+      .maybeSingle();
+    if (data && phoneNumberId) {
+      return {
+        workspaceId: data.workspace_id,
+        connectionId: data.id,
+        phoneNumberId,
+      };
+    }
+  }
+
+  return null;
+}
+
+/** Casa o número da conversa com um contato já cadastrado, se existir. */
+async function findContactId(
+  admin: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  phone: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("contact")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("phone_e164", phone)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
+/**
+ * Grava uma mensagem no espelho.
+ *
+ * `direction` 'in' = o contato escreveu; 'out' = saiu do número do workspace,
+ * inclusive pelo app do celular (echo de coexistência). A chave da conversa é
+ * sempre o número do CONTATO, nunca o da empresa.
+ */
+async function mirrorMessage(
+  admin: ReturnType<typeof createAdminClient>,
+  tenant: Tenant,
+  msg: MetaInboundMessage,
+  direction: "in" | "out",
+  contactName: string | null,
+) {
+  // Numa mensagem recebida o contato é o remetente; num echo, o destinatário.
+  const contactPhone = direction === "in" ? msg.from : msg.to;
+  if (!contactPhone) return;
+
+  const normalized = contactPhone.startsWith("+") ? contactPhone : `+${contactPhone}`;
+  const { type, body, mediaId, mediaMime } = extractContent(msg);
+
+  await admin.from("whatsapp_message").upsert(
+    {
+      workspace_id: tenant.workspaceId,
+      connection_id: tenant.connectionId,
+      phone_number_id: tenant.phoneNumberId,
+      contact_phone_e164: normalized,
+      contact_id: await findContactId(admin, tenant.workspaceId, normalized),
+      contact_name: contactName,
+      direction,
+      type,
+      body,
+      media_id: mediaId,
+      media_mime: mediaMime,
+      meta_message_id: msg.id ?? null,
+      // Echo veio do celular: já saiu, mas a plataforma não acompanha o status.
+      status: direction === "out" ? "sent" : null,
+      // Recebida entra como não lida; o que sai já nasce lido.
+      read_internally: direction === "out",
+      sent_at: messageTimestamp(msg),
+      raw: msg as never,
+    },
+    { onConflict: "workspace_id,meta_message_id", ignoreDuplicates: true },
+  );
+}
 
 async function processStatus(admin: ReturnType<typeof createAdminClient>, status: MetaStatus) {
   if (!status.id || !status.status) return;
@@ -92,6 +286,25 @@ async function processStatus(admin: ReturnType<typeof createAdminClient>, status
   }
 
   await admin.from("dispatch_recipient").update(patch).eq("meta_message_id", status.id);
+}
+
+/** Espelha o status de entrega nas mensagens que saíram pela plataforma. */
+async function processMirrorStatus(
+  admin: ReturnType<typeof createAdminClient>,
+  status: MetaStatus,
+) {
+  if (!status.id || !status.status) return;
+  if (!["sent", "delivered", "read", "failed"].includes(status.status)) return;
+
+  const err = status.errors?.[0];
+  await admin
+    .from("whatsapp_message")
+    .update({
+      status: status.status as "sent" | "delivered" | "read" | "failed",
+      error_message: err ? String(err.title ?? err.message ?? "").slice(0, 500) : null,
+    })
+    .eq("meta_message_id", status.id)
+    .eq("direction", "out");
 }
 
 async function processReaction(admin: ReturnType<typeof createAdminClient>, reaction: MetaReaction) {
@@ -138,7 +351,11 @@ export async function POST(req: NextRequest) {
   // retornar. Tem timeout curto embutido, então não trava a resposta pra Meta.
   await forwardToLegacyUrl(rawBody, signatureHeader);
 
-  let body: { object?: string; entry?: { changes?: { value?: Record<string, unknown> }[] }[] };
+  let body: {
+    object?: string;
+    // `entry.id` é o WABA id — usado pra descobrir de qual workspace é o evento.
+    entry?: { id?: string; changes?: { value?: Record<string, unknown> }[] }[];
+  };
   try {
     body = JSON.parse(rawBody);
   } catch {
@@ -159,18 +376,58 @@ export async function POST(req: NextRequest) {
       for (const status of statuses) {
         try {
           await processStatus(admin, status);
+          await processMirrorStatus(admin, status);
         } catch (e) {
           console.error("[meta/webhook] status:", (e as Error).message);
         }
       }
 
       const messages = (value.messages as MetaInboundMessage[] | undefined) ?? [];
-      for (const msg of messages) {
-        if (msg.type === "reaction" && msg.reaction) {
-          try {
-            await processReaction(admin, msg.reaction);
-          } catch (e) {
-            console.error("[meta/webhook] reaction:", (e as Error).message);
+      // Coexistência: mensagens que a empresa mandou pelo app do celular
+      // chegam aqui, não em `messages`. Sem isso o espelho mostraria só um
+      // lado da conversa quando o atendimento acontece fora da plataforma.
+      //
+      // Depende do campo `smb_message_echoes` estar assinado no painel do app
+      // (Meta App Dashboard → WhatsApp → Configuração → Campos do webhook).
+      // O campo `messages`, que traz as recebidas e os status, já vem ligado.
+      const echoes = (value.message_echoes as MetaInboundMessage[] | undefined) ?? [];
+
+      if (messages.length > 0 || echoes.length > 0) {
+        const metadata = value.metadata as { phone_number_id?: string } | undefined;
+        const tenant = await resolveTenant(
+          admin,
+          typeof entry.id === "string" ? entry.id : null,
+          metadata?.phone_number_id ?? null,
+        );
+
+        if (!tenant) {
+          // WABA/número que não pertence a nenhum workspace — nada a fazer.
+          console.warn("[meta/webhook] tenant não encontrado", metadata?.phone_number_id);
+        } else {
+          const profiles = (value.contacts as MetaContactProfile[] | undefined) ?? [];
+          const nameOf = (waId?: string) =>
+            profiles.find((c) => c.wa_id === waId)?.profile?.name ?? null;
+
+          for (const msg of messages) {
+            try {
+              // Reação não é bolha de conversa: é um adorno numa mensagem que
+              // já existe. Continua atualizando o destinatário do disparo.
+              if (msg.type === "reaction" && msg.reaction) {
+                await processReaction(admin, msg.reaction);
+                continue;
+              }
+              await mirrorMessage(admin, tenant, msg, "in", nameOf(msg.from));
+            } catch (e) {
+              console.error("[meta/webhook] mensagem recebida:", (e as Error).message);
+            }
+          }
+
+          for (const msg of echoes) {
+            try {
+              await mirrorMessage(admin, tenant, msg, "out", nameOf(msg.to));
+            } catch (e) {
+              console.error("[meta/webhook] echo:", (e as Error).message);
+            }
           }
         }
       }
