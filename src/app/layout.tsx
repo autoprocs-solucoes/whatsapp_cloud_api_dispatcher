@@ -24,6 +24,10 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Autoprocs Dispatcher",
   description: "Disparador de mensagens em massa via WhatsApp Cloud API.",
+  // O manifest é o que permite "Adicionar à Tela de Início" no iPhone — sem
+  // isso o Safari não entrega notificação push, por regra da Apple.
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Dispatcher", statusBarStyle: "default" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

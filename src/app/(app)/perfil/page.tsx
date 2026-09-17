@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PushToggle } from "@/features/notifications/push-toggle";
 import { AvatarUploadForm } from "@/features/profile/avatar-upload-form";
 import { ProfileNameForm } from "@/features/profile/profile-name-form";
 import { requireUser } from "@/server/auth";
@@ -38,6 +39,19 @@ export default async function PerfilPage() {
           />
 
           <ProfileNameForm initialName={user.profile.full_name} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Notificações</CardTitle>
+          <CardDescription>
+            Avisa quando um comunicado termina de ser enviado. Vale só para os workspaces em que
+            você é owner, e precisa ser ligado em cada navegador que você usa.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
         </CardContent>
       </Card>
     </div>

@@ -343,6 +343,38 @@ async function sendTemplate(args: {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------------------------------------------------------------------
+// Notificação de comunicado concluído
+//
+// Quem envia o push é a aplicação, não este worker: Web Push precisa de Node
+// e aqui é Deno. Best-effort com timeout curto — o disparo já terminou, e
+// falhar em avisar não pode reabrir nem travar nada.
+// ---------------------------------------------------------------------------
+const APP_URL = Deno.env.get("APP_URL") ?? Deno.env.get("NEXT_PUBLIC_APP_URL");
+
+async function notifyDispatchFinished(dispatchId: string): Promise<void> {
+  if (!APP_URL) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${APP_URL.replace(/\/+$/, "")}/api/internal/dispatch-finished`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ dispatchId }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      console.warn("[worker] notificacao respondeu", res.status);
+    }
+  } catch (e) {
+    console.warn("[worker] notificacao falhou:", (e as Error).message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
 Deno.serve(async (_req) => {
@@ -572,13 +604,20 @@ Deno.serve(async (_req) => {
         .in("status", ["sent", "delivered", "read"]);
 
       finalStatus = (deliveredCount ?? 0) > 0 ? "done" : "failed";
-      await admin
+      const { error: finishError } = await admin
         .from("dispatch")
         .update({
           status: finalStatus,
           finished_at: new Date().toISOString(),
         })
-        .eq("id", dispatch.id);
+        .eq("id", dispatch.id)
+        // Só quem de fato virou a chave notifica. Sem isso, duas invocações
+        // simultâneas mandariam a mesma notificação duas vezes.
+        .in("status", ["queued", "running"]);
+
+      if (!finishError) {
+        await notifyDispatchFinished(dispatch.id);
+      }
     }
 
     report[dispatch.id] = { sent, failed, retrying, left, rateLimitHit, finalStatus };

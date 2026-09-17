@@ -1,0 +1,23 @@
+{
+  "name": "Autoprocs Dispatcher",
+  "short_name": "Dispatcher",
+  "description": "Disparos e conversas no WhatsApp Cloud API.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f0f2f5",
+  "theme_color": "#0866ff",
+  "icons": [
+    {
+      "src": "/autoprocs-logo.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/autoprocs-logo.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

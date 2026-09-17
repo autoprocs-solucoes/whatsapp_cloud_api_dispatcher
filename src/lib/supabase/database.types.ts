@@ -616,6 +616,43 @@ export type Database = {
           },
         ];
       };
+      push_subscription: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent: string | null;
+          created_at: string;
+          last_used_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent?: string | null;
+          created_at?: string;
+          last_used_at?: string | null;
+        };
+        Update: {
+          p256dh?: string;
+          auth?: string;
+          user_agent?: string | null;
+          last_used_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_subscription_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profile";
+            referencedColumns: ["user_id"];
+          },
+        ];
+      };
       whatsapp_message: {
         Row: {
           id: string;
