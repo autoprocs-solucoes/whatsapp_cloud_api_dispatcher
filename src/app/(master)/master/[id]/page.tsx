@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardFunnel } from "@/features/dashboard/dashboard-funnel";
 import { DashboardTimeline } from "@/features/dashboard/dashboard-timeline";
-import { getWorkspaceDetailForMaster, requireMasterUser } from "@/server/master";
+import { getWorkspaceDetailForMaster } from "@/server/master";
 import { listDispatchesForMaster } from "@/server/master-dispatches";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -48,7 +48,6 @@ function healthBadgeVariant(status: string | null): "default" | "secondary" | "d
 type Params = Promise<{ id: string }>;
 
 export default async function MasterWorkspaceDetailPage({ params }: { params: Params }) {
-  await requireMasterUser();
   const { id } = await params;
 
   const [detail, dispatches] = await Promise.all([

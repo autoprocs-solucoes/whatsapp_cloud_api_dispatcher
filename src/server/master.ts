@@ -188,3 +188,32 @@ export async function getWorkspaceDetailForMaster(
     stats,
   };
 }
+
+// ----------------------------------------------------------------------------
+// Membros do time master (Autoprocs) — quem tem `is_superadmin`. Separado dos
+// membros de workspace de cliente; é o "time interno" que acessa /master.
+// ----------------------------------------------------------------------------
+export type MasterMember = {
+  userId: string;
+  fullName: string;
+  email: string | null;
+};
+
+export async function listMasterMembers(): Promise<MasterMember[]> {
+  const admin = createAdminClient();
+  const { data: profiles } = await admin
+    .from("profile")
+    .select("user_id, full_name")
+    .eq("is_superadmin", true)
+    .order("full_name", { ascending: true });
+  if (!profiles || profiles.length === 0) return [];
+
+  const emails = await Promise.all(
+    profiles.map((p) => admin.auth.admin.getUserById(p.user_id)),
+  );
+  return profiles.map((p, i) => ({
+    userId: p.user_id,
+    fullName: p.full_name,
+    email: emails[i]?.data.user?.email ?? null,
+  }));
+}

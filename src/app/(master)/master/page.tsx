@@ -1,8 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { listWorkspacesForMaster, requireMasterUser } from "@/server/master";
+import { listWorkspacesForMaster } from "@/server/master";
 
 function healthBadgeVariant(status: string | null): "default" | "secondary" | "destructive" {
   switch (status) {
@@ -17,17 +16,13 @@ function healthBadgeVariant(status: string | null): "default" | "secondary" | "d
   }
 }
 
-export default async function MasterPage() {
-  await requireMasterUser();
+export default async function MasterClientesPage() {
   const workspaces = await listWorkspacesForMaster();
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <Image src="/meta-logo.png" alt="" width={22} height={22} />
-          Master
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
         <p className="text-muted-foreground text-sm">
           Visão cross-tenant de todos os clientes (workspaces) da plataforma. Clique num cliente
           pra ver o overview completo.

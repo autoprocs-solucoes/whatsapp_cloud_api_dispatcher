@@ -49,6 +49,12 @@
   --chart-3: oklch(0.7 0.15 250);
   --chart-4: oklch(0.75 0.18 210);
   --chart-5: oklch(0.6 0.18 300);
+  /* Rampa ordinal (progressão sent -> delivered) + cores de status
+     (good/critical, fixas nos dois temas) — skill de dataviz. */
+  --chart-ordinal-1: #86b6ef;
+  --chart-ordinal-2: #2a78d6;
+  --chart-status-good: #0ca30c;
+  --chart-status-critical: #d03b3b;
 }
 
 .dark {
@@ -84,6 +90,10 @@
   --chart-3: oklch(0.75 0.13 250);
   --chart-4: oklch(0.8 0.15 210);
   --chart-5: oklch(0.7 0.16 300);
+  --chart-ordinal-1: #3987e5;
+  --chart-ordinal-2: #184f95;
+  --chart-status-good: #0ca30c;
+  --chart-status-critical: #d03b3b;
 }
 
 @theme inline {

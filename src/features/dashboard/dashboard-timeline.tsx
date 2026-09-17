@@ -15,6 +15,14 @@ import type { TimelineDay } from "@/features/dashboard/queries";
 
 type Props = { data: TimelineDay[]; emptyMessage?: string };
 
+// Paleta: rampa ordinal azul pra progressão sent -> delivered (menos ->
+// mais avançado), cores de status (fixas, não têm variante dark separada)
+// pro estado bom (lido) e crítico (falhou). Ver skill de dataviz.
+const COLOR_SENT = "var(--chart-ordinal-1)";
+const COLOR_DELIVERED = "var(--chart-ordinal-2)";
+const COLOR_READ = "var(--chart-status-good)";
+const COLOR_FAILED = "var(--chart-status-critical)";
+
 function formatShortDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -38,10 +46,7 @@ export function DashboardTimeline({
     Falhou: d.failed,
   }));
 
-  const totalAll = data.reduce(
-    (acc, d) => acc + d.sent + d.failed,
-    0,
-  );
+  const totalAll = data.reduce((acc, d) => acc + d.sent + d.failed, 0);
 
   if (totalAll === 0) {
     return (
@@ -51,42 +56,80 @@ export function DashboardTimeline({
     );
   }
 
+  // No máximo ~6 rótulos no eixo X — 30 datas coladas viram ruído ilegível.
+  const tickInterval = Math.max(0, Math.ceil(chartData.length / 6) - 1);
+
   return (
-    <div className="h-[260px] w-full">
+    <div className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={chartData}
-          margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
-        >
-          <CartesianGrid strokeDasharray="2 4" vertical={false} opacity={0.3} />
+        <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }} barGap={2}>
+          <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10 }}
-            interval="preserveStartEnd"
-            tickMargin={6}
+            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            axisLine={false}
+            tickLine={false}
+            interval={tickInterval}
+            tickMargin={8}
           />
-          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} width={32} />
+          <YAxis
+            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            axisLine={false}
+            tickLine={false}
+            allowDecimals={false}
+            width={32}
+          />
           <Tooltip
+            cursor={{ fill: "var(--muted)", opacity: 0.4 }}
             contentStyle={{
               fontSize: 11,
-              borderRadius: 6,
-              padding: "6px 8px",
+              borderRadius: 8,
+              padding: "8px 10px",
+              background: "var(--popover)",
+              border: "1px solid var(--border)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
             }}
-            labelStyle={{ fontSize: 11, fontWeight: 600 }}
+            labelStyle={{ fontSize: 11, fontWeight: 600, color: "var(--foreground)" }}
+            itemStyle={{ fontWeight: 600 }}
           />
           <Legend
-            wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
+            wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
             iconSize={8}
             iconType="circle"
           />
-          <Bar dataKey="Só enviado" stackId="a" fill="#94a3b8" radius={0} />
-          <Bar dataKey="Entregue" stackId="a" fill="#60a5fa" radius={0} />
-          <Bar dataKey="Lido" stackId="a" fill="#22c55e" radius={[3, 3, 0, 0]} />
+          <Bar
+            dataKey="Só enviado"
+            stackId="a"
+            fill={COLOR_SENT}
+            stroke="var(--card)"
+            strokeWidth={2}
+            maxBarSize={18}
+          />
+          <Bar
+            dataKey="Entregue"
+            stackId="a"
+            fill={COLOR_DELIVERED}
+            stroke="var(--card)"
+            strokeWidth={2}
+            maxBarSize={18}
+          />
+          <Bar
+            dataKey="Lido"
+            stackId="a"
+            fill={COLOR_READ}
+            stroke="var(--card)"
+            strokeWidth={2}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={18}
+          />
           <Bar
             dataKey="Falhou"
             stackId="b"
-            fill="#ef4444"
-            radius={[3, 3, 0, 0]}
+            fill={COLOR_FAILED}
+            stroke="var(--card)"
+            strokeWidth={2}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={18}
           />
         </BarChart>
       </ResponsiveContainer>
