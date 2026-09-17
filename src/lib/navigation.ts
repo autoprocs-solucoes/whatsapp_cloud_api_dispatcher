@@ -48,6 +48,9 @@ export type Breadcrumb = { section: string; page: string };
 export function resolveBreadcrumb(pathname: string): Breadcrumb | null {
   if (pathname.startsWith("/perfil")) return { section: "Conta", page: "Perfil" };
   if (pathname.startsWith("/master/perfil")) return { section: "Master", page: "Perfil" };
+  if (pathname.startsWith("/master/novo-cliente")) {
+    return { section: "Master", page: "Novo cliente" };
+  }
   if (pathname === "/master" || pathname.startsWith("/master/")) {
     return { section: "Master", page: "Clientes" };
   }

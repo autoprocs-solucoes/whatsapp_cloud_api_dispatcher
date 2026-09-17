@@ -171,12 +171,14 @@ export function ClientsGrid({ workspaces }: { workspaces: MasterWorkspaceRow[] }
           <ClientCard key={w.id} w={w} />
         ))}
 
+        {/* Vai pro cadastro do painel master, não pro /onboarding — aquele é a
+            tela de primeiro acesso e redireciona quem já tem workspace. */}
         <Link
-          href="/onboarding"
+          href="/master/novo-cliente"
           className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line-2 text-ink-3 transition-colors hover:border-brand hover:text-brand"
         >
           <Plus className="size-5" />
-          <span className="text-sm font-medium">Adicionar workspace</span>
+          <span className="text-sm font-medium">Adicionar cliente</span>
         </Link>
       </div>
     </div>

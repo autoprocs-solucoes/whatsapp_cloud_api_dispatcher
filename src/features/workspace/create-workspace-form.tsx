@@ -8,25 +8,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createWorkspaceAction, type ActionResult } from "@/features/workspace/actions";
 
-function SubmitButton() {
+function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Criando..." : "Criar workspace"}
+      {pending ? "Criando..." : label}
     </Button>
   );
 }
 
-export function CreateWorkspaceForm() {
+/**
+ * `mode` decide o destino depois de criar:
+ * - "onboarding": primeiro workspace do usuário — vira o ativo e abre o dashboard.
+ * - "master": o admin está cadastrando um cliente — não troca o workspace ativo
+ *   e volta pra lista de clientes.
+ */
+export function CreateWorkspaceForm({
+  mode = "onboarding",
+}: {
+  mode?: "onboarding" | "master";
+}) {
   const [state, formAction] = useActionState<ActionResult | null, FormData>(
     createWorkspaceAction,
     null,
   );
+  const isMaster = mode === "master";
 
   return (
     <form action={formAction} className="space-y-4">
+      <input type="hidden" name="mode" value={mode} />
       <div className="space-y-2">
-        <Label htmlFor="name">Nome do workspace</Label>
+        <Label htmlFor="name">{isMaster ? "Nome do cliente" : "Nome do workspace"}</Label>
         <Input
           id="name"
           name="name"
@@ -40,7 +52,7 @@ export function CreateWorkspaceForm() {
       {state?.ok === false && !state.fieldErrors && (
         <p className="text-destructive text-sm">{state.error}</p>
       )}
-      <SubmitButton />
+      <SubmitButton label={isMaster ? "Criar cliente" : "Criar workspace"} />
     </form>
   );
 }

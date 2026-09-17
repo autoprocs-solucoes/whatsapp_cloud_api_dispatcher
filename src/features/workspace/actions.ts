@@ -61,6 +61,22 @@ export async function createWorkspaceAction(
     return { ok: false, error: error?.message ?? "Falha ao criar workspace" };
   }
 
+  // Criado pelo painel master: o admin está cadastrando um cliente, não
+  // entrando nele. Trocar o workspace ativo aqui tiraria ele de onde estava
+  // sem avisar, então volta pra lista com o cliente novo já visível.
+  if (String(formData.get("mode")) === "master") {
+    const { data: profile } = await admin
+      .from("profile")
+      .select("is_superadmin")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (profile?.is_superadmin) {
+      revalidatePath("/master");
+      redirect("/master");
+    }
+  }
+
   const cookieStore = await cookies();
   cookieStore.set(ACTIVE_WORKSPACE_COOKIE, workspace.id, {
     httpOnly: true,
