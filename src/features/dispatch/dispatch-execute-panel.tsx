@@ -37,7 +37,7 @@ export function DispatchExecutePanel({ dispatchId, total, status }: Props) {
         toast.error(res.error);
         return;
       }
-      toast.success("Comunicado enfileirado · processando em background");
+      toast.success("Transmissão enfileirada · processando em background");
       router.refresh();
     });
   }
@@ -47,7 +47,7 @@ export function DispatchExecutePanel({ dispatchId, total, status }: Props) {
       <div className="border-primary/20 bg-primary/5 rounded-md border p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium">Comunicado em rascunho</p>
+            <p className="text-sm font-medium">Transmissão em rascunho</p>
             <p className="text-muted-foreground text-xs">
               {total} destinatário(s). Worker em background dispara em lotes. Pode
               fechar essa aba que continua.

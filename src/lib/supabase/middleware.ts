@@ -16,7 +16,7 @@ const PROTECTED_PREFIXES = [
   "/contatos",
   "/segmentos",
   "/templates",
-  "/comunicados",
+  "/transmissao",
   "/configuracoes",
   "/perfil",
   "/master",

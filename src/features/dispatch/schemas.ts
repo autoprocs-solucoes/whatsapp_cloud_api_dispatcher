@@ -35,6 +35,12 @@ export const createDispatchSchema = z
   .object({
     template_id: z.string().uuid(),
     phone_number_id: z.string().min(1),
+    /** Nome da transmissão, o que aparece na lista. */
+    name: z.string().trim().max(80).default(""),
+    /** Campanha de onde saiu esta transmissão. */
+    campaign_id: z.string().uuid().nullable().default(null),
+    /** ISO local (yyyy-MM-ddTHH:mm). Vazio = envia agora. */
+    scheduled_at: z.string().trim().default(""),
     recipient_source: recipientSourceSchema,
     segment_id: z.string().uuid().nullable().optional(),
     manual_phones: z.array(z.string().min(1)).max(5000).default([]),

@@ -121,6 +121,7 @@ async function loadTemplate(
 export type DispatchListItem = Dispatch & {
   template_name: string | null;
   segment_name: string | null;
+  campaign_name: string | null;
   counts: Record<string, number>;
 };
 
@@ -131,7 +132,7 @@ export async function listDispatches(): Promise<DispatchListItem[]> {
   const admin = createAdminClient();
   const { data: dispatches } = await admin
     .from("dispatch")
-    .select("*, template:template_id(name), segment:segment_id(name)")
+    .select("*, template:template_id(name), segment:segment_id(name), campaign:campaign_id(name)")
     .eq("workspace_id", ctx.workspaceId)
     .order("created_at", { ascending: false })
     .limit(100);
@@ -154,12 +155,15 @@ export async function listDispatches(): Promise<DispatchListItem[]> {
   return dispatches.map((d) => {
     const tpl = (d as { template?: { name: string } | null }).template;
     const seg = (d as { segment?: { name: string } | null }).segment;
+    const camp = (d as { campaign?: { name: string } | null }).campaign;
     return {
       ...d,
       template: undefined,
       segment: undefined,
+      campaign: undefined,
       template_name: tpl?.name ?? null,
       segment_name: seg?.name ?? null,
+      campaign_name: camp?.name ?? null,
       counts: byDispatch[d.id] ?? {},
     } as DispatchListItem;
   });
@@ -175,10 +179,10 @@ function dateKey(iso: string): string {
   return iso.slice(0, 10);
 }
 
-// Bucketiza os envios do comunicado por dia (mesma lógica exclusiva do
+// Bucketiza os envios da transmissão por dia (mesma lógica exclusiva do
 // dashboard: cada recipient conta uma vez, no estágio terminal atingido).
-// Janela = do primeiro ao último dia com atividade nesse comunicado (não fixa
-// em 30 dias, já que um comunicado normalmente é bem mais curto que isso).
+// Janela = do primeiro ao último dia com atividade nessa transmissão (não fixa
+// em 30 dias, já que uma transmissão normalmente é bem mais curta que isso).
 // Falhas no envio (rejeitadas na hora, sem sent_at) usam failed_at como data.
 function buildDispatchTimeline(
   rows: { status: string; sent_at: string | null; failed_at: string | null }[],
@@ -365,6 +369,9 @@ export async function previewRecipientsAction(
   const parsed = createDispatchSchema.safeParse({
     template_id: formData.get("template_id"),
     phone_number_id: formData.get("phone_number_id"),
+    name: formData.get("name") ?? "",
+    campaign_id: formData.get("campaign_id") || null,
+    scheduled_at: formData.get("scheduled_at") ?? "",
     recipient_source: formData.get("recipient_source"),
     segment_id: formData.get("segment_id") || null,
     manual_phones: parseManualPhones(formData.get("manual_phones")),
@@ -474,6 +481,9 @@ export async function createDispatchAction(
   const parsed = createDispatchSchema.safeParse({
     template_id: formData.get("template_id"),
     phone_number_id: formData.get("phone_number_id"),
+    name: formData.get("name") ?? "",
+    campaign_id: formData.get("campaign_id") || null,
+    scheduled_at: formData.get("scheduled_at") ?? "",
     recipient_source: formData.get("recipient_source"),
     segment_id: formData.get("segment_id") || null,
     manual_phones: parseManualPhones(formData.get("manual_phones")),
@@ -504,6 +514,12 @@ export async function createDispatchAction(
       workspace_id: ctx.workspaceId,
       template_id: parsed.data.template_id,
       phone_number_id: parsed.data.phone_number_id,
+      name: parsed.data.name || null,
+      campaign_id: parsed.data.campaign_id,
+      // Guarda como instante absoluto; o worker compara com now() do banco.
+      scheduled_at: parsed.data.scheduled_at
+        ? new Date(parsed.data.scheduled_at).toISOString()
+        : null,
       segment_id: parsed.data.segment_id ?? null,
       recipient_source: parsed.data.recipient_source,
       manual_phones: parsed.data.manual_phones,
@@ -516,7 +532,7 @@ export async function createDispatchAction(
     .single();
 
   if (insertErr || !dispatch) {
-    return { ok: false, error: insertErr?.message ?? "Falha criando comunicado" };
+    return { ok: false, error: insertErr?.message ?? "Falha criando transmissão" };
   }
 
   const recipientRows = recipients.map((r) => ({
@@ -536,7 +552,7 @@ export async function createDispatchAction(
     }
   }
 
-  revalidatePath("/comunicados");
+  revalidatePath("/transmissao");
   return { ok: true, data: { id: dispatch.id, stats } };
 }
 
@@ -596,28 +612,35 @@ export async function executeDispatchAction(
     .eq("workspace_id", ctx.workspaceId)
     .eq("id", parsed.data.id)
     .maybeSingle();
-  if (!dispatch) return { ok: false, error: "Comunicado não encontrado" };
+  if (!dispatch) return { ok: false, error: "Transmissão não encontrada" };
   if (dispatch.status !== "draft") {
-    return { ok: false, error: `Comunicado já está ${dispatch.status}` };
+    return { ok: false, error: `Transmissão já está ${dispatch.status}` };
   }
 
   // Validações antes de enfileirar — pra dar erro síncrono cedo.
   const template = await loadTemplate(ctx.workspaceId, dispatch.template_id);
-  if (!template) return { ok: false, error: "Template do comunicado não existe mais" };
+  if (!template) return { ok: false, error: "Template da transmissão não existe mais" };
 
   const connection = await getConnectionForPhoneNumber(ctx.workspaceId, dispatch.phone_number_id);
   if (!connection) return { ok: false, error: "Número remetente sem conexão Meta" };
 
-  // Transição atômica draft → queued. Se 0 linhas, outro request já enfileirou.
+  // Agendada pra frente entra como `scheduled`: o worker promove pra `queued`
+  // quando a hora chegar, em vez de sair enviando agora.
+  const scheduledAhead =
+    dispatch.scheduled_at !== null && new Date(dispatch.scheduled_at).getTime() > Date.now();
+  const nextStatus = scheduledAhead ? ("scheduled" as const) : ("queued" as const);
+
+  // Transição atômica draft → queued/scheduled. Se 0 linhas, outro request já
+  // enfileirou.
   const { data: locked, error: lockErr } = await admin
     .from("dispatch")
-    .update({ status: "queued" })
+    .update({ status: nextStatus })
     .eq("id", dispatch.id)
     .eq("status", "draft")
     .select("id");
   if (lockErr) return { ok: false, error: `Falha ao enfileirar: ${lockErr.message}` };
   if (!locked || locked.length === 0) {
-    return { ok: false, error: "Comunicado já está sendo executado" };
+    return { ok: false, error: "Transmissão já está sendo executada" };
   }
 
   const { count: queued } = await admin
@@ -626,11 +649,100 @@ export async function executeDispatchAction(
     .eq("dispatch_id", dispatch.id)
     .eq("status", "queued");
 
-  // Kick imediato no worker — não-bloqueante.
-  void kickWorker();
+  // Kick imediato no worker — não-bloqueante. Agendada não precisa: o cron
+  // chama o worker de tempos em tempos e ele promove na hora certa.
+  if (!scheduledAhead) void kickWorker();
 
-  revalidatePath("/comunicados");
-  revalidatePath(`/comunicados/${dispatch.id}`);
-  return { ok: true, data: { status: "queued", queued: queued ?? 0 } };
+  revalidatePath("/transmissao");
+  revalidatePath(`/transmissao/${dispatch.id}`);
+  return { ok: true, data: { status: nextStatus, queued: queued ?? 0 } };
+}
+
+// ----------------------------------------------------------------------------
+// Controle da transmissão em andamento: pausar, retomar e parar.
+// O worker só olha `queued`/`running`, então pausar é mudar o status — o que
+// sobrou na fila fica esperando e nada mais é reivindicado.
+// ----------------------------------------------------------------------------
+
+type DispatchStatus = Dispatch["status"];
+
+async function transitionDispatch(
+  id: string,
+  from: DispatchStatus[],
+  to: "paused" | "queued" | "canceled",
+): Promise<ActionResult<{ status: string }>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const admin = createAdminClient();
+  const patch =
+    to === "canceled"
+      ? { status: to, finished_at: new Date().toISOString() }
+      : { status: to };
+
+  const { data, error } = await admin
+    .from("dispatch")
+    .update(patch)
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspaceId)
+    .in("status", from)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) {
+    return { ok: false, error: "A transmissão não está mais nesse estado" };
+  }
+
+  if (to === "queued") void kickWorker();
+
+  revalidatePath("/transmissao");
+  revalidatePath(`/transmissao/${id}`);
+  return { ok: true, data: { status: to } };
+}
+
+export async function pauseDispatchAction(id: string) {
+  return transitionDispatch(id, ["queued", "running", "scheduled"], "paused");
+}
+
+export async function resumeDispatchAction(id: string) {
+  return transitionDispatch(id, ["paused"], "queued");
+}
+
+/** Parar de vez: o que não saiu não sai mais. */
+export async function cancelDispatchAction(id: string) {
+  return transitionDispatch(id, ["draft", "scheduled", "queued", "running", "paused"], "canceled");
+}
+
+/** Muda a hora marcada de uma transmissão que ainda não começou. */
+export async function rescheduleDispatchAction(
+  id: string,
+  scheduledAt: string,
+): Promise<ActionResult> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const when = scheduledAt ? new Date(scheduledAt) : null;
+  if (when && Number.isNaN(when.getTime())) {
+    return { ok: false, error: "Data inválida" };
+  }
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("dispatch")
+    .update({
+      scheduled_at: when ? when.toISOString() : null,
+      status: when && when.getTime() > Date.now() ? "scheduled" : "queued",
+    })
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspaceId)
+    .in("status", ["scheduled", "queued", "paused"])
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) {
+    return { ok: false, error: "Só dá pra remarcar transmissão que ainda não terminou" };
+  }
+
+  revalidatePath("/transmissao");
+  revalidatePath(`/transmissao/${id}`);
+  return { ok: true, data: undefined };
 }
 

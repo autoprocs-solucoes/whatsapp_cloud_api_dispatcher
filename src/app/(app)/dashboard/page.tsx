@@ -46,7 +46,7 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
-/** Métrica compacta do último comunicado: valor, base e a conta pronta. */
+/** Métrica compacta da última transmissão: valor, base e a conta pronta. */
 function MiniMetric({
   label,
   value,
@@ -95,8 +95,8 @@ export default async function DashboardPage() {
         description={`Panorama de envios, entrega e leitura do workspace ${workspace.name}.`}
         actions={
           <Button asChild size="sm">
-            <Link href="/comunicados/novo">
-              <Plus className="size-4" /> Novo comunicado
+            <Link href="/transmissao/nova">
+              <Plus className="size-4" /> Nova transmissão
             </Link>
           </Button>
         }
@@ -168,10 +168,10 @@ export default async function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Último comunicado</CardTitle>
+          <CardTitle>Última transmissão</CardTitle>
           <CardAction>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/comunicados">
+              <Link href="/transmissao">
                 Ver todos <ArrowRight className="size-3.5" />
               </Link>
             </Button>
@@ -180,8 +180,8 @@ export default async function DashboardPage() {
         <CardContent>
           {!last ? (
             <p className="py-6 text-center text-sm text-ink-3">
-              Nenhum comunicado ainda.{" "}
-              <Link href="/comunicados/novo" className="font-medium text-brand hover:underline">
+              Nenhuma transmissão ainda.{" "}
+              <Link href="/transmissao/nova" className="font-medium text-brand hover:underline">
                 Criar o primeiro
               </Link>
               .
@@ -190,12 +190,12 @@ export default async function DashboardPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-line bg-card-2 text-[11px] font-semibold text-ink-2">
-                  {initials(last.template_name ?? "Comunicado")}
+                  {initials(last.template_name ?? "Transmissão")}
                 </span>
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-semibold text-ink">
-                      {last.template_name ?? "Comunicado"}
+                      {last.template_name ?? "Transmissão"}
                     </p>
                     <StatusBadge tone={statusTone(last.status)}>
                       {STATUS_LABELS[last.status] ?? last.status}
@@ -238,7 +238,7 @@ export default async function DashboardPage() {
                   color="var(--d-fail)"
                 />
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/comunicados/${last.id}`}>
+                  <Link href={`/transmissao/${last.id}`}>
                     <BarChart3 className="size-4" /> Ver dashboard do disparo
                   </Link>
                 </Button>

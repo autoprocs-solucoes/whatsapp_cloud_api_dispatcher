@@ -1,5 +1,6 @@
 import {
   Inbox,
+  Layers,
   LayoutDashboard,
   MessageSquare,
   Send,
@@ -34,7 +35,8 @@ export const navGroups: NavGroup[] = [
       { title: "Segmentos", href: "/segmentos", icon: Tag },
       { title: "Templates", href: "/templates", icon: MessageSquare },
       { title: "Fluxos", href: "/fluxos", icon: Workflow },
-      { title: "Comunicados", href: "/comunicados", icon: Send },
+      { title: "Campanhas", href: "/campanhas", icon: Layers },
+      { title: "Transmissão", href: "/transmissao", icon: Send },
     ],
   },
   {

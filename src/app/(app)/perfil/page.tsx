@@ -46,7 +46,7 @@ export default async function PerfilPage() {
         <CardHeader>
           <CardTitle>Notificações</CardTitle>
           <CardDescription>
-            Avisa quando um comunicado termina de ser enviado. Vale só para os workspaces em que
+            Avisa quando uma transmissão termina de ser enviada. Vale só para os workspaces em que
             você é owner, e precisa ser ligado em cada navegador que você usa.
           </CardDescription>
         </CardHeader>

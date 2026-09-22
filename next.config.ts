@@ -20,6 +20,15 @@ const storageHost = supabaseHostname();
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   typedRoutes: true,
+  // "Comunicados" virou "Transmissão". Link antigo (favorito, e-mail de
+  // notificação já enviado) continua chegando no lugar certo.
+  async redirects() {
+    return [
+      { source: "/comunicados", destination: "/transmissao", permanent: true },
+      { source: "/comunicados/novo", destination: "/transmissao/nova", permanent: true },
+      { source: "/comunicados/:path*", destination: "/transmissao/:path*", permanent: true },
+    ];
+  },
   images: {
     remotePatterns: [
       // Curinga: vale para qualquer projeto Supabase hospedado, mesmo que a env

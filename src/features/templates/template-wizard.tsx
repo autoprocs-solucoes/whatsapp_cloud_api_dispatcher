@@ -559,7 +559,7 @@ export function TemplateWizard({ connections }: Props) {
           )}
         </div>
 
-        {/* Prévia fixa: o mesmo aparelho que o comunicado usa, então o que a
+        {/* Prévia fixa: o mesmo aparelho que a transmissão usa, então o que a
             pessoa vê aqui é o que ela vai ver na hora de disparar. */}
         <div className="lg:sticky lg:top-4 lg:self-start">
           <WhatsAppPreview

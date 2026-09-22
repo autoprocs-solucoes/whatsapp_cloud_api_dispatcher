@@ -27,7 +27,7 @@ function formatShortDate(iso: string): string {
 
 export function DashboardTimeline({
   data,
-  emptyMessage = "Sem envios nos últimos 30 dias. Crie um comunicado pra começar.",
+  emptyMessage = "Sem envios nos últimos 30 dias. Crie uma transmissão pra começar.",
 }: Props) {
   // Cada barra mostra a contagem terminal naquele dia: sent = só enviado
   // (ainda não entregue), delivered = entregue (não lido), read = lido.

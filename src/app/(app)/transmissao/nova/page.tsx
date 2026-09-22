@@ -4,24 +4,26 @@ import { DispatchWizard } from "@/features/dispatch/wizard";
 import { getDispatchPreset } from "@/features/dispatch/actions";
 import { listTemplatesForWorkspace } from "@/features/templates/actions";
 import { listSegments, listCustomFieldKeys } from "@/features/segments/actions";
+import { listSendableCampaigns } from "@/server/campaigns";
 import { getMetaConnections } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
 
-type SearchParams = Promise<{ template?: string; from?: string }>;
+type SearchParams = Promise<{ template?: string; from?: string; campanha?: string }>;
 
-export default async function NovoComunicadoPage({
+export default async function NovaTransmissaoPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
   const workspace = await requireActiveWorkspace();
   const sp = await searchParams;
-  const [templates, segments, customKeys, connections, preset] = await Promise.all([
+  const [templates, segments, customKeys, connections, preset, campaigns] = await Promise.all([
     listTemplatesForWorkspace(),
     listSegments(),
     listCustomFieldKeys(),
     getMetaConnections(workspace.id),
     sp.from ? getDispatchPreset(sp.from) : Promise.resolve(null),
+    listSendableCampaigns(workspace.id),
   ]);
 
   if (connections.length === 0) {
@@ -36,12 +38,12 @@ export default async function NovoComunicadoPage({
     <div className="space-y-3">
       <header className="flex items-baseline gap-3">
         <h1 className="text-lg font-semibold tracking-tight">
-          {isDuplicate ? "Duplicar comunicado" : "Novo comunicado"}
+          {isDuplicate ? "Duplicar transmissão" : "Nova transmissão"}
         </h1>
         <p className="text-muted-foreground text-xs">
           {isDuplicate
             ? "Configurações pré-preenchidas · revise antes de disparar."
-            : "Wizard 6 passos · opt-outs filtrados automaticamente."}
+            : "6 passos · opt-outs filtrados automaticamente."}
         </p>
       </header>
 
@@ -52,6 +54,13 @@ export default async function NovoComunicadoPage({
         customKeys={customKeys}
         initialTemplateId={sp.template}
         initialPreset={preset}
+        campaigns={campaigns.map((c) => ({
+          id: c.id,
+          name: c.name,
+          templateId: c.templateId,
+          flowId: c.flowId,
+        }))}
+        initialCampaignId={sp.campanha}
       />
     </div>
   );

@@ -58,6 +58,16 @@ type Props = {
   customKeys: string[];
   initialTemplateId?: string;
   initialPreset?: InitialPreset | null;
+  /** Campanhas prontas pra transmitir (ativas e com modelo aprovado). */
+  campaigns?: CampaignOption[];
+  initialCampaignId?: string;
+};
+
+export type CampaignOption = {
+  id: string;
+  name: string;
+  templateId: string | null;
+  flowId: string | null;
 };
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -97,6 +107,8 @@ export function DispatchWizard({
   customKeys,
   initialTemplateId,
   initialPreset,
+  campaigns = [],
+  initialCampaignId,
 }: Props) {
   const router = useRouter();
 
@@ -133,6 +145,14 @@ export function DispatchWizard({
 
   const [step, setStep] = useState<Step>(hasInitialTemplate ? 2 : 1);
   const [isPending, startTransition] = useTransition();
+
+  const [campaignId, setCampaignId] = useState(
+    initialCampaignId && campaigns.some((c) => c.id === initialCampaignId)
+      ? initialCampaignId
+      : "",
+  );
+  const [broadcastName, setBroadcastName] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
 
   const [templateId, setTemplateId] = useState(
     hasInitialTemplate ? effectiveInitialTemplate! : "",
@@ -338,6 +358,9 @@ export function DispatchWizard({
     const fd = new FormData();
     fd.append("template_id", templateId);
     fd.append("phone_number_id", phoneNumberId);
+    fd.append("name", broadcastName);
+    fd.append("campaign_id", campaignId);
+    fd.append("scheduled_at", scheduledAt);
     fd.append("recipient_source", recipientSource);
     if (recipientSource === "segment") fd.append("segment_id", segmentId);
     if (recipientSource === "manual") fd.append("manual_phones", manualPhonesText);
@@ -401,8 +424,8 @@ export function DispatchWizard({
         toast.error(res.error);
         return;
       }
-      toast.success("Comunicado criado em rascunho");
-      router.push(`/comunicados/${res.data.id}`);
+      toast.success("Transmissão criada em rascunho");
+      router.push(`/transmissao/${res.data.id}`);
     });
   }
 
@@ -449,6 +472,34 @@ export function DispatchWizard({
       <div className="rounded-md border p-3">
         {step === 1 && (
           <div className="space-y-3">
+            {campaigns.length > 0 && (
+              <div className="space-y-2">
+                <Label>Campanha</Label>
+                <select
+                  value={campaignId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setCampaignId(id);
+                    // A campanha carrega o modelo de abertura — escolher a
+                    // campanha já resolve o passo do template.
+                    const campaign = campaigns.find((c) => c.id === id);
+                    if (campaign?.templateId) setTemplateId(campaign.templateId);
+                    if (campaign && !broadcastName) setBroadcastName(campaign.name);
+                  }}
+                  className="border-input bg-background h-9 w-full max-w-md rounded-md border px-3 text-sm"
+                >
+                  <option value="">Transmissão avulsa (sem campanha)</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-muted-foreground text-xs">
+                  A campanha traz o modelo de abertura. Sem campanha, escolha o template na mão.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Template aprovado</Label>
               <Combobox
@@ -747,6 +798,31 @@ export function DispatchWizard({
 
         {step === 6 && (
           <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="broadcast-name">Nome da transmissão</Label>
+                <Input
+                  id="broadcast-name"
+                  value={broadcastName}
+                  maxLength={80}
+                  placeholder="Cobrança de setembro"
+                  onChange={(e) => setBroadcastName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="broadcast-when">Agendar para</Label>
+                <Input
+                  id="broadcast-when"
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                />
+                <p className="text-muted-foreground text-xs">
+                  Em branco, sai assim que você disparar.
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-1 text-sm">
               <p>
                 <span className="text-muted-foreground">Template:</span>{" "}
@@ -809,7 +885,7 @@ export function DispatchWizard({
             )}
 
             <div className="border-primary/20 bg-primary/5 rounded-md border p-3 text-xs">
-              Ao confirmar criamos o comunicado em <strong>rascunho</strong> e te
+              Ao confirmar criamos a transmissão em <strong>rascunho</strong> e te
               redirecionamos pra página dele, onde tem o botão pra disparar.
             </div>
           </div>

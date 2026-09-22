@@ -46,7 +46,7 @@ export function DisconnectMetaButton({ workspaceId, connectionId }: Props) {
         <AlertDialogHeader>
           <AlertDialogTitle>Desconectar conta Meta?</AlertDialogTitle>
           <AlertDialogDescription>
-            Você perderá acesso aos templates e não conseguirá disparar comunicados até reconectar.
+            Você perderá acesso aos templates e não conseguirá transmitir até reconectar.
             Os contatos e disparos passados permanecem.
           </AlertDialogDescription>
         </AlertDialogHeader>

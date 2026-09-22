@@ -60,7 +60,7 @@ export async function GET(
   );
   const body = "﻿" + [header, ...rows].join("\n");
 
-  const filename = `comunicado-${id.slice(0, 8)}-${new Date()
+  const filename = `transmissao-${id.slice(0, 8)}-${new Date()
     .toISOString()
     .slice(0, 10)}.csv`;
 

@@ -100,7 +100,7 @@ export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
   const contactCounts = countBy(contactsRes.data);
 
   // "Disparos" = mensagens já enviadas com sucesso (all-time), não quantidade
-  // de comunicados — soma dispatch_recipient por trás de cada dispatch do
+  // de transmissões — soma dispatch_recipient por trás de cada dispatch do
   // workspace.
   const dispatchIds = (dispatchesRes.data ?? []).map((d) => d.id);
   const workspaceByDispatchId = new Map(

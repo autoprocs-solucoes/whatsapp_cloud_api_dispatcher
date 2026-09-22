@@ -74,7 +74,7 @@ export function countByStatus(rows: { status: string }[]): StatusCounts {
  *
  * `planned` vem de `dispatch.total_recipients`. Quando não for informado, cai
  * pra soma dos status — que é o mesmo número, já que cada destinatário vira uma
- * linha no momento em que o comunicado é criado.
+ * linha no momento em que a transmissão é criada.
  */
 export function buildFunnel(
   counts: StatusCounts,

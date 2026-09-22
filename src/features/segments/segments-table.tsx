@@ -173,7 +173,7 @@ export function SegmentsTable({ segments }: Props) {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Excluir segmento?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                &quot;{s.name}&quot; será removido. Comunicados que usam esse
+                                &quot;{s.name}&quot; será removido. Transmissões que usam esse
                                 segmento como referência continuam intactos.
                               </AlertDialogDescription>
                             </AlertDialogHeader>

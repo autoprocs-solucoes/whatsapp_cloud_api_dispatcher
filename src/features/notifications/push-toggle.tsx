@@ -29,7 +29,7 @@ function urlBase64ToBuffer(base64: string): ArrayBuffer {
 }
 
 /**
- * Liga/desliga a notificação de comunicado concluído NESTE navegador.
+ * Liga/desliga a notificação de transmissão concluída NESTE navegador.
  *
  * É por aparelho, não por conta: o endpoint é emitido pelo navegador, então
  * quem usa desktop e celular precisa ligar nos dois.

@@ -14,7 +14,7 @@ export default async function SegmentosPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Segmentos</h1>
           <p className="text-muted-foreground text-sm">
-            Crie regras sobre tags e campos custom para reusar nos comunicados.
+            Crie regras sobre tags e campos custom para reusar nas transmissões.
           </p>
         </div>
         <Button asChild>
@@ -31,7 +31,7 @@ export default async function SegmentosPage() {
           </div>
           <h2 className="text-base font-medium">Nenhum segmento ainda</h2>
           <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
-            Crie um segmento pra reaproveitar regras de destinatários em vários comunicados.
+            Crie um segmento pra reaproveitar regras de destinatários em várias transmissões.
           </p>
         </div>
       ) : (

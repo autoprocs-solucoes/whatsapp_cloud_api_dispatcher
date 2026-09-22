@@ -6,7 +6,8 @@
 //  (b) server action `executeDispatchAction` (kick imediato após enqueue)
 //
 // Por invocação:
-//  - Lista até 10 dispatches em status 'queued'|'running'
+//  - Promove 'scheduled' cuja hora chegou e lista até 10 dispatches
+//    em status 'queued'|'running' ('paused' fica de fora de propósito)
 //  - Pra cada um, faz claim atômico de até BATCH_SIZE recipients via RPC
 //  - Envia via WhatsApp Cloud API e atualiza dispatch_recipient
 //  - Para quando hit MAX_PER_INVOCATION ou não há mais queued
@@ -388,6 +389,17 @@ Deno.serve(async (_req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // Transmissão agendada cuja hora chegou entra na fila agora. Roda antes da
+  // listagem pra ela já ser pega nesta mesma invocação.
+  const { error: promoteErr } = await admin
+    .from("dispatch")
+    .update({ status: "queued" })
+    .eq("status", "scheduled")
+    .lte("scheduled_at", new Date().toISOString());
+  if (promoteErr) {
+    console.error("[worker] falha promovendo agendadas", promoteErr);
+  }
 
   // Lista dispatches ativos. 10 é teto razoável por invocação.
   const { data: dispatches, error: dispErr } = await admin

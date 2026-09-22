@@ -75,7 +75,7 @@ export async function promoteMasterMemberAction(
 /**
  * "Entrar" num cliente a partir do Master: troca o workspace ativo do
  * próprio master pra esse cliente e manda pro dashboard normal — o menu
- * completo do cliente (Dashboard/Contatos/Segmentos/Templates/Comunicados/
+ * completo do cliente (Dashboard/Contatos/Segmentos/Templates/Transmissão/
  * Configurações) aparece porque é literalmente o app do cliente, não uma
  * página paralela. Garante membership como owner antes de trocar (o master
  * pode não ser membro de todo workspace ainda).

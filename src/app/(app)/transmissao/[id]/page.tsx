@@ -66,7 +66,7 @@ function statusTone(status: string): StatusTone {
 type Params = Promise<{ id: string }>;
 type SearchParams = Promise<{ status?: string; page?: string }>;
 
-export default async function ComunicadoDetalhe({
+export default async function TransmissaoDetalhe({
   params,
   searchParams,
 }: {
@@ -115,14 +115,14 @@ export default async function ComunicadoDetalhe({
     <div className="space-y-5">
       <div className="space-y-3">
         <Button asChild variant="ghost" size="sm" className="-ml-2">
-          <Link href="/comunicados">
+          <Link href="/transmissao">
             <ChevronLeft className="size-4" /> Voltar
           </Link>
         </Button>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <h1 className="text-[23px] leading-tight font-semibold tracking-tight text-ink">
-              {template?.name ?? "Comunicado"}
+              {template?.name ?? "Transmissão"}
             </h1>
             <p className="text-sm text-ink-2">
               {template?.language} ·{" "}
@@ -137,13 +137,13 @@ export default async function ComunicadoDetalhe({
               {STATUS_LABELS[dispatch.status] ?? dispatch.status}
             </StatusBadge>
             <Button asChild size="sm" variant="outline">
-              <Link href={`/comunicados/novo?from=${dispatch.id}`}>
+              <Link href={`/transmissao/nova?from=${dispatch.id}`}>
                 <Copy className="size-4" /> Duplicar
               </Link>
             </Button>
             {totalRecipients > 0 && (
               <Button asChild size="sm" variant="outline">
-                <a href={`/comunicados/${dispatch.id}/export`} download>
+                <a href={`/transmissao/${dispatch.id}/export`} download>
                   <Download className="size-4" /> Exportar CSV
                 </a>
               </Button>
@@ -236,7 +236,7 @@ export default async function ComunicadoDetalhe({
           <Card>
             <CardHeader>
               <CardTitle>Tendência</CardTitle>
-              <CardDescription>Envios deste comunicado por dia</CardDescription>
+              <CardDescription>Envios desta transmissão por dia</CardDescription>
             </CardHeader>
             <CardContent>
               <DashboardTimeline data={timeline} emptyMessage="Sem envios ainda." />
@@ -296,7 +296,7 @@ export default async function ComunicadoDetalhe({
             {(["all", "queued", "sent", "delivered", "read", "failed"] as const).map((f) => (
               <Link
                 key={f}
-                href={`/comunicados/${dispatch.id}?status=${f}`}
+                href={`/transmissao/${dispatch.id}?status=${f}`}
                 className={cn(
                   "rounded-sm px-2.5 py-1 text-[13px] font-medium transition-colors",
                   statusFilter === f
@@ -389,14 +389,14 @@ export default async function ComunicadoDetalhe({
               <div className="flex items-center gap-1">
                 <Button asChild size="sm" variant="outline" disabled={page <= 1}>
                   <Link
-                    href={`/comunicados/${dispatch.id}?status=${statusFilter}&page=${page - 1}`}
+                    href={`/transmissao/${dispatch.id}?status=${statusFilter}&page=${page - 1}`}
                   >
                     Anterior
                   </Link>
                 </Button>
                 <Button asChild size="sm" variant="outline" disabled={page >= totalPages}>
                   <Link
-                    href={`/comunicados/${dispatch.id}?status=${statusFilter}&page=${page + 1}`}
+                    href={`/transmissao/${dispatch.id}?status=${statusFilter}&page=${page + 1}`}
                   >
                     Próxima
                   </Link>

@@ -514,8 +514,8 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
                             </AlertDialogTitle>
                             <AlertDialogDescription>
                               {c.opt_out
-                                ? `${c.phone_e164} voltará a receber comunicados.`
-                                : `${c.phone_e164} não receberá mais nenhum comunicado.`}
+                                ? `${c.phone_e164} voltará a receber transmissões.`
+                                : `${c.phone_e164} não receberá mais nenhuma transmissão.`}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

@@ -102,7 +102,7 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
   return sent;
 }
 
-/** Owners do workspace — são eles que recebem aviso de comunicado concluído. */
+/** Owners do workspace — são eles que recebem aviso de transmissão concluída. */
 export async function getWorkspaceOwnerIds(workspaceId: string): Promise<string[]> {
   const admin = createAdminClient();
   const { data } = await admin

@@ -545,17 +545,89 @@ export type Database = {
           },
         ];
       };
+      campaign: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          description: string | null;
+          template_id: string | null;
+          flow_id: string | null;
+          status: "active" | "archived";
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          name: string;
+          description?: string | null;
+          template_id?: string | null;
+          flow_id?: string | null;
+          status?: "active" | "archived";
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          name?: string;
+          description?: string | null;
+          template_id?: string | null;
+          flow_id?: string | null;
+          status?: "active" | "archived";
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "campaign_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campaign_template_id_fkey";
+            columns: ["template_id"];
+            isOneToOne: false;
+            referencedRelation: "template";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campaign_flow_id_fkey";
+            columns: ["flow_id"];
+            isOneToOne: false;
+            referencedRelation: "flow";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       dispatch: {
         Row: {
           id: string;
           workspace_id: string;
+          campaign_id: string | null;
+          name: string | null;
+          scheduled_at: string | null;
           template_id: string;
           phone_number_id: string;
           segment_id: string | null;
           recipient_source: "segment" | "manual";
           manual_phones: string[];
           variable_mapping: Json;
-          status: "draft" | "queued" | "running" | "done" | "failed" | "canceled";
+          status:
+            | "draft"
+            | "scheduled"
+            | "queued"
+            | "running"
+            | "paused"
+            | "done"
+            | "failed"
+            | "canceled";
           total_recipients: number;
           created_by: string | null;
           created_at: string;
@@ -566,13 +638,24 @@ export type Database = {
         Insert: {
           id?: string;
           workspace_id: string;
+          campaign_id?: string | null;
+          name?: string | null;
+          scheduled_at?: string | null;
           template_id: string;
           phone_number_id: string;
           segment_id?: string | null;
           recipient_source: "segment" | "manual";
           manual_phones?: string[];
           variable_mapping?: Json;
-          status?: "draft" | "queued" | "running" | "done" | "failed" | "canceled";
+          status?:
+            | "draft"
+            | "scheduled"
+            | "queued"
+            | "running"
+            | "paused"
+            | "done"
+            | "failed"
+            | "canceled";
           total_recipients?: number;
           created_by?: string | null;
           created_at?: string;
@@ -583,13 +666,24 @@ export type Database = {
         Update: {
           id?: string;
           workspace_id?: string;
+          campaign_id?: string | null;
+          name?: string | null;
+          scheduled_at?: string | null;
           template_id?: string;
           phone_number_id?: string;
           segment_id?: string | null;
           recipient_source?: "segment" | "manual";
           manual_phones?: string[];
           variable_mapping?: Json;
-          status?: "draft" | "queued" | "running" | "done" | "failed" | "canceled";
+          status?:
+            | "draft"
+            | "scheduled"
+            | "queued"
+            | "running"
+            | "paused"
+            | "done"
+            | "failed"
+            | "canceled";
           total_recipients?: number;
           created_by?: string | null;
           created_at?: string;
@@ -598,6 +692,13 @@ export type Database = {
           finished_at?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "dispatch_campaign_id_fkey";
+            columns: ["campaign_id"];
+            isOneToOne: false;
+            referencedRelation: "campaign";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "dispatch_workspace_id_fkey";
             columns: ["workspace_id"];
@@ -884,6 +985,7 @@ export type ContactImport = Database["public"]["Tables"]["contact_import"]["Row"
 export type Template = Database["public"]["Tables"]["template"]["Row"];
 export type Segment = Database["public"]["Tables"]["segment"]["Row"];
 export type Flow = Database["public"]["Tables"]["flow"]["Row"];
+export type Campaign = Database["public"]["Tables"]["campaign"]["Row"];
 export type FlowFolder = Database["public"]["Tables"]["flow_folder"]["Row"];
 export type SegmentInsert = Database["public"]["Tables"]["segment"]["Insert"];
 export type Dispatch = Database["public"]["Tables"]["dispatch"]["Row"];

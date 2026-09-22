@@ -143,7 +143,7 @@ export async function getDashboardStatsForWorkspace(
   const timeline30: TimelineDay[] = Array.from(timelineMap.values());
 
   // ----------------------------------------------------------------------
-  // Funil do último comunicado
+  // Funil da última transmissão
   // ----------------------------------------------------------------------
   let lastWithFunnel: DashboardStats["dispatches"]["last"] = null;
   if (lastDispatch.data) {

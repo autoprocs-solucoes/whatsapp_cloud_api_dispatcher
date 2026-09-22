@@ -24,7 +24,7 @@ export default async function EditarSegmentoPage({ params }: { params: Params })
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Editar segmento</h1>
         <p className="text-muted-foreground text-sm">
-          Atualize regras e nome. Mudanças se refletem em comunicados futuros.
+          Atualize regras e nome. Mudanças se refletem em transmissões futuras.
         </p>
       </header>
       <SegmentEditor

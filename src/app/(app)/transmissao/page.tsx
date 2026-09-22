@@ -7,18 +7,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DispatchesTable } from "@/features/dispatch/dispatches-table";
 import { listDispatches } from "@/features/dispatch/actions";
 
-export default async function ComunicadosPage() {
+export default async function TransmissaoPage() {
   const dispatches = await listDispatches();
 
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Comunicados"
-        description="Histórico de disparos e criação de novos comunicados."
+        title="Transmissão"
+        description="Cada transmissão envia uma campanha para um segmento ou lista. Agende, acompanhe e pause daqui."
         actions={
           <Button asChild size="sm">
-            <Link href="/comunicados/novo">
-              <Plus className="size-4" /> Novo comunicado
+            <Link href="/transmissao/nova">
+              <Plus className="size-4" /> Criar nova transmissão
             </Link>
           </Button>
         }
@@ -31,14 +31,14 @@ export default async function ComunicadosPage() {
               <Send className="size-5" />
             </div>
             <div className="space-y-1">
-              <h2 className="text-base font-semibold text-ink">Nenhum comunicado ainda</h2>
+              <h2 className="text-base font-semibold text-ink">Nenhuma transmissão ainda</h2>
               <p className="max-w-sm text-sm text-ink-2">
-                Crie seu primeiro comunicado escolhendo um template aprovado.
+                Crie a primeira escolhendo uma campanha — ou um template aprovado, se for avulsa.
               </p>
             </div>
             <Button asChild size="sm" className="mt-1">
-              <Link href="/comunicados/novo">
-                <Plus className="size-4" /> Novo comunicado
+              <Link href="/transmissao/nova">
+                <Plus className="size-4" /> Criar nova transmissão
               </Link>
             </Button>
           </CardContent>

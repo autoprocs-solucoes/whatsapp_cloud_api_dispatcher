@@ -100,7 +100,7 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
             <div className="space-y-1">
               <h2 className="text-base font-semibold text-ink">Nenhuma conversa ainda</h2>
               <p className="max-w-md text-sm text-ink-2">
-                Assim que alguém responder um comunicado, a conversa aparece aqui. Mensagens
+                Assim que alguém responder uma transmissão, a conversa aparece aqui. Mensagens
                 enviadas pelo aplicativo do celular também entram, quando o número usa coexistência.
               </p>
             </div>

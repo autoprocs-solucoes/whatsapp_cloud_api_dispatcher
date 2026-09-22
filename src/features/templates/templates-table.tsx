@@ -283,7 +283,7 @@ function TemplateCard({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Apagar {template.name}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    O modelo sai da Meta e daqui. Comunicados já enviados continuam no histórico,
+                    O modelo sai da Meta e daqui. Transmissões já enviadas continuam no histórico,
                     mas não dá pra disparar esse modelo de novo sem criar outro e esperar a
                     revisão.
                   </AlertDialogDescription>
@@ -299,8 +299,8 @@ function TemplateCard({
           )}
           {isApproved && isActive && (
             <Button asChild size="xs">
-              <Link href={`/comunicados/novo?template=${template.id}`}>
-                <Plus className="size-3" /> Criar comunicado
+              <Link href={`/transmissao/nova?template=${template.id}`}>
+                <Plus className="size-3" /> Transmitir
               </Link>
             </Button>
           )}

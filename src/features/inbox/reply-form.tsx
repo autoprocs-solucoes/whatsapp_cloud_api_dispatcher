@@ -39,7 +39,7 @@ export function ReplyForm({ phone, window: win }: Props) {
           descartado sem aviso.
         </p>
         <Button asChild size="sm" variant="outline">
-          <Link href="/comunicados/novo">Retomar com um template</Link>
+          <Link href="/transmissao/nova">Retomar com um template</Link>
         </Button>
       </div>
     );

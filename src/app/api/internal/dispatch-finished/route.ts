@@ -9,7 +9,7 @@ import { serverEnv } from "@/lib/env";
 import { getWorkspaceOwnerIds, sendPushToUsers } from "@/server/push";
 
 /**
- * Avisa os owners do workspace que um comunicado terminou.
+ * Avisa os owners do workspace que uma transmissão terminou.
  *
  * Chamado pelo worker (Edge Function) porque o envio de Web Push precisa de
  * Node, e o worker roda em Deno. Autenticado pela service_role key: é rota
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!dispatch) {
-    return NextResponse.json({ error: "Comunicado não encontrado" }, { status: 404 });
+    return NextResponse.json({ error: "Transmissão não encontrada" }, { status: 404 });
   }
 
   const { data: rows } = await admin
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   const funnel = buildFunnel(countByStatus(rows ?? []), dispatch.total_recipients || 0);
   const tpl = dispatch.template as { name: string } | null;
-  const name = tpl?.name ?? "Comunicado";
+  const name = tpl?.name ?? "Transmissão";
 
   // O resumo carrega o que importa decidir: quanto saiu e quanto falhou. Sem
   // isso a notificação obrigaria a abrir a plataforma só pra saber se deu certo.
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   const sent = await sendPushToUsers(owners, {
     title,
     body: parts.join(" · "),
-    url: `/comunicados/${dispatch.id}`,
+    url: `/transmissao/${dispatch.id}`,
     tag: `dispatch-${dispatch.id}`,
   });
 

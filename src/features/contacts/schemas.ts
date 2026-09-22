@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Itens por página na listagem de contatos. Mesmo passo usado em segmentos e
- * comunicados. */
+ * transmissões. */
 export const CONTACTS_PAGE_SIZE = 10;
 
 export const mappingSchema = z.object({

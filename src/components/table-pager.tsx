@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TableToolbar } from "@/components/ui/table";
 
-/** Itens por página nas listagens (contatos, segmentos, comunicados). */
+/** Itens por página nas listagens (contatos, segmentos, transmissões). */
 export const PAGE_SIZE = 10;
 
 type Props = {
@@ -14,7 +14,7 @@ type Props = {
   pageSize: number;
   /** Total de itens depois dos filtros. */
   total: number;
-  /** Plural do que está sendo listado: "contatos", "comunicados", "segmentos". */
+  /** Plural do que está sendo listado: "contatos", "transmissões", "segmentos". */
   unit: string;
   onPageChange: (page: number) => void;
   disabled?: boolean;
