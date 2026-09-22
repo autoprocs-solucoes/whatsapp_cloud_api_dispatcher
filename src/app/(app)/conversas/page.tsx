@@ -62,9 +62,10 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
   const sp = await searchParams;
   const workspace = await requireActiveWorkspace();
 
-  // Teto alto porque agora a lista rola de verdade — 50 cortava conversa que
-  // a pessoa nem sabia que existia.
-  const conversations = await listConversations(workspace.id, { search: sp.q, limit: 200 });
+  // Agora que cada transmissão abre conversa, a lista passa de 500 fácil. O
+  // teto é alto de propósito e a busca resolve o resto — paginação aqui só
+  // atrapalharia quem procura um contato específico.
+  const conversations = await listConversations(workspace.id, { search: sp.q, limit: 600 });
 
   // Sem `tel` a primeira conversa abre sozinha, que é o esperado ao entrar na
   // tela. `fechado=1` é o que o botão de fechar usa pra dizer "nenhuma", já
