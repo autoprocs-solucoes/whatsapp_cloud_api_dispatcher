@@ -10,17 +10,15 @@ import {
   deleteTemplate,
   extractPlaceholders,
   getTemplateAnalytics,
-  listTemplates,
   uploadTemplateHeaderHandle,
   type CreateTemplateComponent,
-  type MetaTemplate,
   type MetaTemplateButton,
-  type MetaTemplateComponent,
   type NamedParamExample,
   type TemplateAnalyticsPoint,
 } from "@/lib/meta/graph-api";
 import { createTemplateSchema } from "@/features/templates/schemas";
 import { requireUser } from "@/server/auth";
+import { syncTemplatesForWorkspace, syncTemplatesIfStale } from "@/server/templates";
 import { getMetaConnections, type MetaConnectionView } from "@/server/meta";
 import { requireActiveWorkspace, type WorkspaceWithRole } from "@/server/workspace";
 import type { Template } from "@/lib/supabase/database.types";
@@ -28,22 +26,6 @@ import type { Template } from "@/lib/supabase/database.types";
 export type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string };
-
-function extractTexts(components: MetaTemplateComponent[]) {
-  let header_text: string | null = null;
-  let body_text: string | null = null;
-  let footer_text: string | null = null;
-  let buttons: unknown = [];
-
-  for (const c of components) {
-    if (c.type === "HEADER" && c.format === "TEXT") header_text = c.text ?? null;
-    if (c.type === "BODY") body_text = c.text ?? null;
-    if (c.type === "FOOTER") footer_text = c.text ?? null;
-    if (c.type === "BUTTONS") buttons = c.buttons ?? [];
-  }
-
-  return { header_text, body_text, footer_text, buttons };
-}
 
 
 /**
@@ -64,6 +46,12 @@ async function requireTemplateManager(): Promise<
 
 export async function listTemplatesForWorkspace(): Promise<Template[]> {
   const workspace = await requireActiveWorkspace();
+
+  // Template criado no WhatsApp Manager (ou aprovado pela Meta depois) só
+  // aparece aqui depois de um sync. Fazer isso na leitura, quando o espelho
+  // está velho, evita a lista desatualizada sem ninguém perceber.
+  await syncTemplatesIfStale(workspace.id);
+
   const admin = createAdminClient();
   let query = admin
     .from("template")
@@ -148,57 +136,11 @@ export async function syncTemplatesAction(): Promise<ActionResult<{ synced: numb
   if (!user) return { ok: false, error: "Não autenticado" };
 
   const workspace = await requireActiveWorkspace();
-  const connections = await getMetaConnections(workspace.id);
-  if (connections.length === 0) {
-    return { ok: false, error: "Workspace sem conexão Meta. Conecte em Configurações." };
-  }
-
-  const admin = createAdminClient();
-  let totalSynced = 0;
-
-  // Sincroniza cada conta (WABA) conectada separadamente — templates
-  // pertencem a uma WABA específica, não ao workspace como um todo.
-  for (const { connection } of connections) {
-    let templates: MetaTemplate[];
-    try {
-      templates = await listTemplates(connection.waba_id, connection.access_token);
-    } catch (e) {
-      if (e instanceof GraphApiError) {
-        return { ok: false, error: `Meta (${connection.business_name ?? connection.waba_id}): ${e.message}` };
-      }
-      return { ok: false, error: `Falha ao buscar templates da Meta (${connection.business_name ?? connection.waba_id})` };
-    }
-
-    const rows = templates.map((t) => {
-      const texts = extractTexts(t.components);
-      return {
-        workspace_id: workspace.id,
-        connection_id: connection.id,
-        meta_template_id: t.id,
-        name: t.name,
-        language: t.language,
-        category: t.category,
-        status: t.status,
-        header_text: texts.header_text,
-        body_text: texts.body_text,
-        footer_text: texts.footer_text,
-        buttons: texts.buttons as never,
-        components_raw: t.components as never,
-        last_synced_at: new Date().toISOString(),
-      };
-    });
-
-    if (rows.length > 0) {
-      const { error } = await admin
-        .from("template")
-        .upsert(rows, { onConflict: "workspace_id,meta_template_id", ignoreDuplicates: false });
-      if (error) return { ok: false, error: `Erro salvando templates: ${error.message}` };
-      totalSynced += rows.length;
-    }
-  }
+  const result = await syncTemplatesForWorkspace(workspace.id);
+  if (!result.ok) return { ok: false, error: result.error };
 
   revalidatePath("/templates");
-  return { ok: true, data: { synced: totalSynced } };
+  return { ok: true, data: { synced: result.synced } };
 }
 
 // ----------------------------------------------------------------------------
