@@ -246,6 +246,13 @@ export function DispatchWizard({
     [headerPlaceholders, bodyPlaceholders],
   );
 
+  /** Variáveis que vão com o mesmo texto pra todo mundo por não terem
+   * coluna escolhida — a origem do "mandei pra 200 e todos receberam
+   * 'Dr(a)'". */
+  const fixedVars = allMappingKeys.filter(
+    (m) => !decodeColumn(mappingState[`${m.component}:${m.num}`]?.columnId ?? ""),
+  );
+
   const variableMapping: VariableMapping = useMemo(() => {
     const out: VariableMapping = {};
     for (const m of allMappingKeys) {
@@ -589,6 +596,13 @@ export function DispatchWizard({
                   Defina <strong>coluna</strong> pra variar por contato, ou só{" "}
                   <strong>fallback</strong> pra mandar valor fixo a todos.
                 </p>
+                {fixedVars.length > 0 && (
+                  <p className="rounded-md bg-amber-soft px-2.5 py-2 text-xs text-amber">
+                    Sem coluna, {fixedVars.map((m) => `{{${m.num}}}`).join(", ")} vai com o mesmo
+                    texto pra todo mundo. Pra usar o nome do contato, escolha a coluna{" "}
+                    <strong>Nome</strong>.
+                  </p>
+                )}
                 <div className="text-muted-foreground hidden grid-cols-[150px_1fr_1fr] gap-2 px-1 text-[10px] font-medium uppercase tracking-wider sm:grid">
                   <span>Placeholder</span>
                   <span>Coluna (opcional)</span>
@@ -892,6 +906,28 @@ export function DispatchWizard({
                     ?.display_phone_number ?? phoneNumberId}
                 </strong>
               </p>
+              {allMappingKeys.length > 0 && (
+                <div>
+                  <span className="text-muted-foreground">Variáveis:</span>{" "}
+                  {allMappingKeys.map((m) => {
+                    const key = `${m.component}:${m.num}`;
+                    const state = mappingState[key];
+                    const column = decodeColumn(state?.columnId ?? "");
+                    return (
+                      <span key={key} className="mr-2 inline-block">
+                        <code>{`{{${m.num}}}`}</code>{" "}
+                        {column ? (
+                          <strong>{columnLabel(state?.columnId ?? "")}</strong>
+                        ) : (
+                          <strong className="text-amber">
+                            fixo &quot;{state?.fallback || "(vazio)"}&quot; pra todos
+                          </strong>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               <p>
                 <span className="text-muted-foreground">Origem:</span>{" "}
                 <strong>
