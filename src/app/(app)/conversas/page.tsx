@@ -61,7 +61,9 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
   const sp = await searchParams;
   const workspace = await requireActiveWorkspace();
 
-  const conversations = await listConversations(workspace.id, { search: sp.q, limit: 50 });
+  // Teto alto porque agora a lista rola de verdade — 50 cortava conversa que
+  // a pessoa nem sabia que existia.
+  const conversations = await listConversations(workspace.id, { search: sp.q, limit: 200 });
 
   // Sem `tel` a primeira conversa abre sozinha, que é o esperado ao entrar na
   // tela. `fechado=1` é o que o botão de fechar usa pra dizer "nenhuma", já
@@ -108,8 +110,10 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
         </Card>
       ) : (
         <div className="grid h-[calc(100vh-13rem)] min-h-[32rem] overflow-hidden rounded-lg border border-wa-line shadow-card lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-          {/* Lista de conversas */}
-          <div className="flex flex-col border-r border-wa-line bg-wa-in">
+          {/* Lista de conversas. `min-h-0` é o que faz a lista rolar: sem ele a
+              coluna cresce além da altura do container e o conteúdo some
+              cortado pelo overflow-hidden de cima, sem barra nenhuma. */}
+          <div className="flex min-h-0 flex-col border-r border-wa-line bg-wa-in">
             <form className="bg-wa-panel p-2" action="/conversas">
               <div className="relative">
                 <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-wa-ink-2" />
@@ -123,7 +127,7 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
               </div>
             </form>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
               {conversations.length === 0 ? (
                 <p className="p-6 text-center text-sm text-wa-ink-2">
                   Nenhuma conversa encontrada.
