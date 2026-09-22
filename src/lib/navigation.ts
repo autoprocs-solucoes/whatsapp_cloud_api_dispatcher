@@ -6,6 +6,7 @@ import {
   Settings,
   Tag,
   Users,
+  Workflow,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -32,6 +33,7 @@ export const navGroups: NavGroup[] = [
       { title: "Contatos", href: "/contatos", icon: Users },
       { title: "Segmentos", href: "/segmentos", icon: Tag },
       { title: "Templates", href: "/templates", icon: MessageSquare },
+      { title: "Fluxos", href: "/fluxos", icon: Workflow },
       { title: "Comunicados", href: "/comunicados", icon: Send },
     ],
   },

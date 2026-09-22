@@ -459,6 +459,92 @@ export type Database = {
           },
         ];
       };
+      flow_folder: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          name?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "flow_folder_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      flow: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          folder_id: string | null;
+          name: string;
+          description: string | null;
+          status: "draft" | "published";
+          graph: Json;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          published_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          folder_id?: string | null;
+          name: string;
+          description?: string | null;
+          status?: "draft" | "published";
+          graph?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          published_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          folder_id?: string | null;
+          name?: string;
+          description?: string | null;
+          status?: "draft" | "published";
+          graph?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          published_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "flow_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "flow_folder_id_fkey";
+            columns: ["folder_id"];
+            isOneToOne: false;
+            referencedRelation: "flow_folder";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       dispatch: {
         Row: {
           id: string;
@@ -797,6 +883,8 @@ export type ContactInsert = Database["public"]["Tables"]["contact"]["Insert"];
 export type ContactImport = Database["public"]["Tables"]["contact_import"]["Row"];
 export type Template = Database["public"]["Tables"]["template"]["Row"];
 export type Segment = Database["public"]["Tables"]["segment"]["Row"];
+export type Flow = Database["public"]["Tables"]["flow"]["Row"];
+export type FlowFolder = Database["public"]["Tables"]["flow_folder"]["Row"];
 export type SegmentInsert = Database["public"]["Tables"]["segment"]["Insert"];
 export type Dispatch = Database["public"]["Tables"]["dispatch"]["Row"];
 export type DispatchInsert = Database["public"]["Tables"]["dispatch"]["Insert"];
