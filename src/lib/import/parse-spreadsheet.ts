@@ -1,6 +1,7 @@
 import "server-only";
 
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 import Papa from "papaparse";
 
 export type ParsedSpreadsheet = {
@@ -44,9 +45,55 @@ function cellToString(value: unknown): string {
   return String(value).trim();
 }
 
-async function parseXlsx(buffer: Buffer): Promise<ParsedSpreadsheet> {
+/**
+ * Tira os filtros da planilha antes de ler.
+ *
+ * Planilha salva do Excel com filtro por cor (ou por ícone) carrega nós que o
+ * leitor de xlsx não conhece e ele para com "Unexpected xml node". Filtro não
+ * tem nada a ver com o valor das células, então a saída é apagar o bloco e ler
+ * de novo — a planilha original não é tocada, só a cópia em memória.
+ */
+async function stripFilters(buffer: Buffer): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(buffer);
+
+  for (const name of Object.keys(zip.files)) {
+    const isSheetOrTable = /^xl\/(tables\/|worksheets\/sheet)/.test(name) && name.endsWith(".xml");
+    if (!isSheetOrTable) continue;
+
+    const file = zip.file(name);
+    if (!file) continue;
+
+    const xml = await file.async("string");
+    const cleaned = xml
+      .replace(/<autoFilter[\s\S]*?<\/autoFilter>/g, "")
+      .replace(/<autoFilter[^>]*\/>/g, "");
+    if (cleaned !== xml) zip.file(name, cleaned);
+  }
+
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+async function loadWorkbook(buffer: Buffer): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+  try {
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+    return wb;
+  } catch (e) {
+    // Segunda tentativa sem os filtros. Se ainda falhar, aí é outra coisa.
+    try {
+      const clean = new ExcelJS.Workbook();
+      await clean.xlsx.load((await stripFilters(buffer)) as unknown as ArrayBuffer);
+      return clean;
+    } catch {
+      throw new SpreadsheetParseError(
+        `Não consegui ler o arquivo .xlsx: ${(e as Error).message}. Salve como CSV e tente de novo.`,
+      );
+    }
+  }
+}
+
+async function parseXlsx(buffer: Buffer): Promise<ParsedSpreadsheet> {
+  const wb = await loadWorkbook(buffer);
   const ws = wb.worksheets[0];
   if (!ws) throw new SpreadsheetParseError("Planilha sem abas.");
 

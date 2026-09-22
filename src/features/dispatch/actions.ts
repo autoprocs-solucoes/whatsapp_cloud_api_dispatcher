@@ -778,7 +778,7 @@ export async function extractPhonesFromSpreadsheetAction(
     parsed = await parseSpreadsheet(buffer, file.name, file.type);
   } catch (e) {
     if (e instanceof SpreadsheetParseError) return { ok: false, error: e.message };
-    return { ok: false, error: "Não consegui ler a planilha" };
+    return { ok: false, error: `Não consegui ler a planilha: ${(e as Error).message}` };
   }
 
   const chosenColumn =

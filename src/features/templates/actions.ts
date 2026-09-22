@@ -197,7 +197,10 @@ export async function uploadTemplateHeaderAction(
     });
     return { ok: true, data: { handle } };
   } catch (e) {
-    if (e instanceof GraphApiError) return { ok: false, error: `Meta: ${e.message}` };
+    if (e instanceof GraphApiError) {
+      console.error("[template] upload do cabeçalho recusado", JSON.stringify(e.payload));
+      return { ok: false, error: `Meta: ${e.message}` };
+    }
     return { ok: false, error: "Falha ao subir o arquivo do cabeçalho" };
   }
 }
@@ -307,7 +310,9 @@ export async function createTemplateAction(
         return { type: "PHONE_NUMBER", text: b.text, phone_number: b.phone_number };
       }
       if (b.type === "COPY_CODE") {
-        return { type: "COPY_CODE", text: b.text || "Copiar código", example: [b.example] };
+        // Sem `text` e com `example` em texto puro: qualquer um dos dois fora
+        // do formato faz a Meta devolver "Invalid parameter".
+        return { type: "COPY_CODE", example: b.example };
       }
       return { type: "QUICK_REPLY", text: b.text };
     });
@@ -324,7 +329,12 @@ export async function createTemplateAction(
       components,
     });
   } catch (e) {
-    if (e instanceof GraphApiError) return { ok: false, error: `Meta: ${e.message}` };
+    if (e instanceof GraphApiError) {
+      // O payload inteiro no log: a mensagem que vai pro toast é resumida, e
+      // quando ela não basta é aqui que dá pra ver o que a Meta reclamou.
+      console.error("[template] criação recusada pela Meta", JSON.stringify(e.payload));
+      return { ok: false, error: `Meta: ${e.message}` };
+    }
     return { ok: false, error: "Falha ao criar o modelo na Meta" };
   }
 

@@ -21,15 +21,30 @@ type GraphErrorPayload = {
     code?: number;
     error_subcode?: number;
     fbtrace_id?: string;
+    /** Explicação em linguagem de gente — quase sempre é aqui que a Meta diz
+     * o que de fato está errado ("Invalid parameter" sozinho não ajuda). */
+    error_user_title?: string;
+    error_user_msg?: string;
+    error_data?: { details?: string };
   };
 };
+
+/** Junta o que a Meta espalha em três campos numa frase só. */
+function graphErrorMessage(status: number, payload: GraphErrorPayload): string {
+  const error = payload.error;
+  const base = error?.message ?? `Meta Graph API error (${status})`;
+  const detail = error?.error_user_msg ?? error?.error_data?.details;
+  if (!detail) return base;
+  // "Invalid parameter" + "O anexo do cabeçalho não é válido", por exemplo.
+  return `${base} — ${detail}`;
+}
 
 export class GraphApiError extends Error {
   readonly status: number;
   readonly payload: GraphErrorPayload;
 
   constructor(status: number, payload: GraphErrorPayload) {
-    super(payload.error?.message ?? `Meta Graph API error (${status})`);
+    super(graphErrorMessage(status, payload));
     this.status = status;
     this.payload = payload;
     this.name = "GraphApiError";
@@ -519,10 +534,13 @@ export async function uploadMediaFromUrl(
 // ----------------------------------------------------------------------------
 export type MetaTemplateButton = {
   type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE" | string;
-  text: string;
+  /** COPY_CODE não leva texto: o WhatsApp escreve "Copiar código" sozinho. */
+  text?: string;
   url?: string;
   phone_number?: string;
-  example?: string[];
+  /** Lista no botão de link; texto puro no COPY_CODE — é assim que a Meta
+   * espera em cada um, e mandar o formato do outro dá "Invalid parameter". */
+  example?: string[] | string;
 };
 
 export type MetaTemplateComponent = {

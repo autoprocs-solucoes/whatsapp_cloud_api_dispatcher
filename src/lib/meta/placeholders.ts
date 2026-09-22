@@ -62,9 +62,14 @@ export function extractCopyCodeButton(
       );
       if (idx === -1) continue;
       const btn = buttons[idx] as Record<string, unknown>;
+      // A Meta devolve o exemplo em lista quando lê, mas aceita texto quando
+      // grava — daqui em diante os dois formatos podem aparecer.
       const example = btn.example;
       if (Array.isArray(example) && typeof example[0] === "string") {
         return { index: idx, code: example[0] };
+      }
+      if (typeof example === "string" && example) {
+        return { index: idx, code: example };
       }
     }
   }

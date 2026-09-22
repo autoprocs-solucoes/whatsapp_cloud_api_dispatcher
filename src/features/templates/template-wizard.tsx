@@ -541,13 +541,17 @@ export function TemplateWizard({ connections }: Props) {
               {buttons.map((b, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-line p-2">
                   <span className="label-caps w-24 shrink-0">{BUTTON_LABEL[b.type]}</span>
-                  <Input
-                    value={b.text}
-                    onChange={(e) => updateButton(i, { text: e.target.value })}
-                    placeholder={b.type === "COPY_CODE" ? "Copiar código" : "Nome do botão"}
-                    maxLength={25}
-                    className="min-w-[140px] flex-1"
-                  />
+                  {/* O botão de copiar código não tem nome editável: o
+                      WhatsApp escreve "Copiar código" no idioma do aparelho. */}
+                  {b.type !== "COPY_CODE" && (
+                    <Input
+                      value={b.text}
+                      onChange={(e) => updateButton(i, { text: e.target.value })}
+                      placeholder="Nome do botão"
+                      maxLength={25}
+                      className="min-w-[140px] flex-1"
+                    />
+                  )}
                   {b.type === "URL" && (
                     <>
                       <Input
