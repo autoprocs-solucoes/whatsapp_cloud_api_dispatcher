@@ -51,33 +51,17 @@ select cron.schedule(
 
 
 -- =============================================================================
--- Tick dos fluxos — retoma execuções paradas em bloco de atraso.
+-- Tick dos fluxos — NÃO precisa de agendamento próprio.
 --
--- Mora no app (rota Next), não numa edge function: o motor do fluxo é Node.
--- Substitua <APP_URL> pela URL pública do app (a mesma NEXT_PUBLIC_APP_URL) e
--- <SERVICE_ROLE_KEY> pela chave do projeto.
+-- Quem retoma os fluxos parados em bloco de atraso é o próprio
+-- `process-dispatch-queue`: ele já acorda de minuto em minuto por este cron e
+-- já tem a service_role key no ambiente da função, então chama
+-- `/api/internal/flow-tick` no app a cada invocação.
 --
---   Desinstalar: select cron.unschedule('flow-tick');
+-- Fazer disso um segundo `cron.schedule` obrigaria a escrever a service_role
+-- key dentro de `cron.job.command`, em texto puro, visível pra qualquer um que
+-- consultasse a tabela. Por isso a carona.
+--
+-- O que a função precisa ter configurado (uma vez por ambiente):
+--   supabase secrets set APP_URL=https://<dominio-do-app>
 -- =============================================================================
-
-do $$
-begin
-  perform cron.unschedule('flow-tick');
-exception when others then
-  null;
-end$$;
-
-select cron.schedule(
-  'flow-tick',
-  '* * * * *',
-  $$
-  select net.http_post(
-    url     := '<APP_URL>/api/internal/flow-tick',
-    headers := jsonb_build_object(
-      'Content-Type',  'application/json',
-      'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
-    ),
-    body    := '{}'::jsonb
-  );
-  $$
-);

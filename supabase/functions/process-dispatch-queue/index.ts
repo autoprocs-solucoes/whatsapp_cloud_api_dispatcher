@@ -375,6 +375,37 @@ async function notifyDispatchFinished(dispatchId: string): Promise<void> {
   }
 }
 
+/**
+ * Acorda os fluxos parados em bloco de atraso.
+ *
+ * Mora aqui de carona porque este worker já roda de minuto em minuto pelo
+ * cron e já tem a service_role key no ambiente — assim o agendamento no banco
+ * continua sendo um só, e nenhuma chave precisa ficar escrita dentro do
+ * `cron.job`. O motor do fluxo em si é Node, por isso a chamada é pro app.
+ */
+async function tickFlows(): Promise<void> {
+  if (!APP_URL) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(`${APP_URL.replace(/\/+$/, "")}/api/internal/flow-tick`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      },
+      body: "{}",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      console.warn("[worker] flow-tick respondeu", res.status);
+    }
+  } catch (e) {
+    console.warn("[worker] flow-tick falhou:", (e as Error).message);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -389,6 +420,10 @@ Deno.serve(async (_req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // Fluxos esperando a hora andam a cada invocação — independe de haver
+  // transmissão na fila.
+  await tickFlows();
 
   // Transmissão agendada cuja hora chegou entra na fila agora. Roda antes da
   // listagem pra ela já ser pega nesta mesma invocação.
