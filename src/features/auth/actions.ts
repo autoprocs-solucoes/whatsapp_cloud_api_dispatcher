@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { translateAuthError } from "@/features/auth/error-messages";
 import {
   acceptInviteSchema,
   forgotPasswordSchema,
@@ -44,7 +45,7 @@ export async function signUpAction(_prev: unknown, formData: FormData): Promise<
   });
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: translateAuthError(error.message) };
   }
 
   redirect("/onboarding");
@@ -116,7 +117,7 @@ export async function requestPasswordResetAction(
   });
 
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: translateAuthError(error.message) };
   }
 
   return { ok: true, data: undefined };
@@ -156,7 +157,7 @@ export async function acceptInviteAction(
   });
 
   if (updateError) {
-    return { ok: false, error: updateError.message };
+    return { ok: false, error: translateAuthError(updateError.message) };
   }
 
   const admin = createAdminClient();
