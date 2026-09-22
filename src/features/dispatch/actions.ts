@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  SpreadsheetParseError,
+  detectAutoMapping,
+  parseSpreadsheet,
+} from "@/lib/import/parse-spreadsheet";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
 import { getConnectionForPhoneNumber } from "@/server/meta";
@@ -746,3 +751,63 @@ export async function rescheduleDispatchAction(
   return { ok: true, data: undefined };
 }
 
+
+/**
+ * Público por planilha: lê o .xlsx/.csv e devolve os telefones da coluna que
+ * parecer ser a de contato. Não cadastra ninguém — a transmissão manda pra
+ * lista como ela veio, e quem quiser virar contato entra por Contatos →
+ * Importar.
+ */
+export async function extractPhonesFromSpreadsheetAction(
+  formData: FormData,
+): Promise<ActionResult<{ phones: string[]; column: string; total: number }>> {
+  const ctx = await ensureMember();
+  if (!ctx) return { ok: false, error: "Não autenticado" };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Selecione uma planilha" };
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    return { ok: false, error: "Planilha muito grande (máx. 10MB)" };
+  }
+
+  let parsed;
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    parsed = await parseSpreadsheet(buffer, file.name, file.type);
+  } catch (e) {
+    if (e instanceof SpreadsheetParseError) return { ok: false, error: e.message };
+    return { ok: false, error: "Não consegui ler a planilha" };
+  }
+
+  const chosenColumn =
+    formData.get("column")?.toString() ||
+    detectAutoMapping(parsed.headers).phoneColumn ||
+    // Sem cabeçalho reconhecível, vale a primeira coluna que tenha cara de
+    // telefone nas primeiras linhas.
+    parsed.headers.find((h) =>
+      parsed.rows.slice(0, 20).some((r) => (r[h] ?? "").replace(/\D/g, "").length >= 10),
+    ) ||
+    "";
+
+  if (!chosenColumn) {
+    return {
+      ok: false,
+      error: `Não achei a coluna de telefone. Cabeçalhos lidos: ${parsed.headers.join(", ")}`,
+    };
+  }
+
+  const phones = parsed.rows
+    .map((r) => (r[chosenColumn] ?? "").trim())
+    .filter((v) => v.replace(/\D/g, "").length >= 8);
+
+  if (phones.length === 0) {
+    return { ok: false, error: `A coluna "${chosenColumn}" não tem telefone nenhum` };
+  }
+
+  return {
+    ok: true,
+    data: { phones, column: chosenColumn, total: parsed.rows.length },
+  };
+}

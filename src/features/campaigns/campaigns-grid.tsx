@@ -48,12 +48,10 @@ import {
 import type { CampaignRow } from "@/server/campaigns";
 import { cn } from "@/lib/utils";
 
-type TemplateOption = { id: string; name: string; status: string; language: string };
-type FlowOption = { id: string; name: string };
+type FlowOption = { id: string; name: string; status: "draft" | "published" };
 
 type Props = {
   campaigns: CampaignRow[];
-  templates: TemplateOption[];
   flows: FlowOption[];
 };
 
@@ -62,7 +60,7 @@ type EditorState =
   | { mode: "edit"; campaign: CampaignRow }
   | null;
 
-export function CampaignsGrid({ campaigns, templates, flows }: Props) {
+export function CampaignsGrid({ campaigns, flows }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
@@ -72,7 +70,6 @@ export function CampaignsGrid({ campaigns, templates, flows }: Props) {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [templateId, setTemplateId] = useState("");
   const [flowId, setFlowId] = useState("");
 
   const rows = useMemo(() => {
@@ -93,24 +90,17 @@ export function CampaignsGrid({ campaigns, templates, flows }: Props) {
     if (state?.mode === "edit") {
       setName(state.campaign.name);
       setDescription(state.campaign.description ?? "");
-      setTemplateId(state.campaign.templateId ?? "");
       setFlowId(state.campaign.flowId ?? "");
     } else {
       setName("");
       setDescription("");
-      setTemplateId("");
       setFlowId("");
     }
   }
 
   function submit() {
     if (!editor) return;
-    const payload = {
-      name,
-      description,
-      templateId: templateId || null,
-      flowId: flowId || null,
-    };
+    const payload = { name, description, flowId: flowId || null };
 
     startTransition(async () => {
       const result =
@@ -253,23 +243,37 @@ export function CampaignsGrid({ campaigns, templates, flows }: Props) {
 
               <div className="space-y-1.5 p-3 text-[11px]">
                 <p className="flex items-center gap-1.5 text-ink-2">
+                  <Workflow className="size-3.5 shrink-0 text-ink-3" />
+                  <span className="truncate">
+                    {c.flowName ? (
+                      <>
+                        {c.flowName}
+                        {c.flowStatus !== "published" && (
+                          <span className="ml-1 text-amber">(rascunho)</span>
+                        )}
+                      </>
+                    ) : (
+                      "Sem fluxo"
+                    )}
+                  </span>
+                </p>
+                {/* O modelo não é escolhido aqui: vem do primeiro bloco do fluxo.
+                    Mostrar mesmo assim evita abrir o canvas só pra ver qual
+                    mensagem abre a conversa. */}
+                <p className="flex items-center gap-1.5 text-ink-2">
                   <MessageSquare className="size-3.5 shrink-0 text-ink-3" />
                   <span className="truncate">
                     {c.templateName ? (
                       <>
-                        {c.templateName}
+                        Abre com {c.templateName}
                         {c.templateStatus !== "APPROVED" && (
                           <span className="ml-1 text-amber">({c.templateStatus})</span>
                         )}
                       </>
                     ) : (
-                      "Sem modelo de abertura"
+                      "Fluxo ainda sem modelo de abertura"
                     )}
                   </span>
-                </p>
-                <p className="flex items-center gap-1.5 text-ink-2">
-                  <Workflow className="size-3.5 shrink-0 text-ink-3" />
-                  <span className="truncate">{c.flowName ?? "Sem fluxo de continuação"}</span>
                 </p>
               </div>
 
@@ -277,11 +281,7 @@ export function CampaignsGrid({ campaigns, templates, flows }: Props) {
                 <StatusBadge tone={c.status === "active" ? "ok" : "neutral"}>
                   {c.status === "active" ? "Ativa" : "Arquivada"}
                 </StatusBadge>
-                <Button
-                  asChild
-                  size="xs"
-                  disabled={c.status !== "active" || c.templateStatus !== "APPROVED"}
-                >
+                <Button asChild size="xs" disabled={!c.sendable}>
                   <Link href={`/transmissao/nova?campanha=${c.id}`}>
                     <Send className="size-3" /> Transmitir
                   </Link>
@@ -299,8 +299,8 @@ export function CampaignsGrid({ campaigns, templates, flows }: Props) {
               {editor?.mode === "create" ? "Nova campanha" : "Editar campanha"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              A campanha guarda o conteúdo: o modelo que abre a conversa e, se houver, o fluxo que
-              continua depois da resposta. A transmissão é o envio dela.
+              A campanha é o grupo da informação: ela aponta para um fluxo, e é o primeiro bloco
+              desse fluxo que abre a conversa. A transmissão é o envio dela.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -327,40 +327,25 @@ export function CampaignsGrid({ campaigns, templates, flows }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="camp-template">Modelo de abertura</Label>
-              <select
-                id="camp-template"
-                value={templateId}
-                onChange={(e) => setTemplateId(e.target.value)}
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              >
-                <option value="">Escolher depois</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id} disabled={t.status !== "APPROVED"}>
-                    {t.name} ({t.language}){t.status !== "APPROVED" ? ` — ${t.status}` : ""}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-ink-3">
-                Fora da janela de 24h a Meta só entrega modelo aprovado — é ele que abre a
-                transmissão.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="camp-flow">Fluxo de continuação</Label>
+              <Label htmlFor="camp-flow">Fluxo</Label>
               <select
                 id="camp-flow"
                 value={flowId}
                 onChange={(e) => setFlowId(e.target.value)}
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
               >
-                <option value="">Nenhum</option>
+                <option value="">Escolher depois</option>
                 {flows.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name}
+                    {f.status !== "published" ? " — rascunho" : ""}
                   </option>
                 ))}
               </select>
+              <p className="text-[11px] text-ink-3">
+                Só fluxo publicado transmite, e ele precisa ter o modelo de abertura escolhido no
+                primeiro bloco.
+              </p>
             </div>
           </div>
 

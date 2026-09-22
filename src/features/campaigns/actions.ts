@@ -14,9 +14,8 @@ export type ActionResult<T = void> =
 export const campaignSchema = z.object({
   name: z.string().trim().min(1, "Dê um nome à campanha").max(80),
   description: z.string().trim().max(280).default(""),
-  /** Template de abertura — sem ele a campanha existe, mas não transmite. */
-  templateId: z.string().uuid().nullable().default(null),
-  /** Fluxo que continua a conversa depois da resposta. Opcional. */
+  /** O fluxo é o conteúdo da campanha: o primeiro bloco dele é o modelo que
+   * abre, e o resto é a conversa depois da resposta. */
   flowId: z.string().uuid().nullable().default(null),
 });
 
@@ -37,7 +36,6 @@ export async function createCampaignAction(
       workspace_id: workspace.id,
       name: parsed.data.name,
       description: parsed.data.description || null,
-      template_id: parsed.data.templateId,
       flow_id: parsed.data.flowId,
       created_by: user.id,
     })
@@ -64,7 +62,6 @@ export async function updateCampaignAction(input: unknown): Promise<ActionResult
     .update({
       name: parsed.data.name,
       description: parsed.data.description || null,
-      template_id: parsed.data.templateId,
       flow_id: parsed.data.flowId,
     })
     .eq("id", parsed.data.id)

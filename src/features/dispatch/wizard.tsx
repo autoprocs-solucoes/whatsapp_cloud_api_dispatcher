@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, Loader2, Send, TestTube } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Loader2, Send, TestTube, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   createDispatchAction,
+  extractPhonesFromSpreadsheetAction,
   previewRecipientsAction,
   testSendAction,
 } from "@/features/dispatch/actions";
@@ -66,14 +67,17 @@ type Props = {
 export type CampaignOption = {
   id: string;
   name: string;
-  templateId: string | null;
-  flowId: string | null;
+  flowId: string;
+  flowName: string;
+  /** Modelo do primeiro bloco do fluxo — é o que esta transmissão dispara. */
+  templateId: string;
+  templateName: string;
 };
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 const STEPS: { id: Step; label: string }[] = [
-  { id: 1, label: "Template" },
+  { id: 1, label: "Campanha" },
   { id: 2, label: "Remetente" },
   { id: 3, label: "Variáveis" },
   { id: 4, label: "Destinatários" },
@@ -152,6 +156,10 @@ export function DispatchWizard({
       : "",
   );
   const [broadcastName, setBroadcastName] = useState("");
+  const selectedCampaign = campaigns.find((c) => c.id === campaignId) ?? null;
+  const sheetInputRef = useRef<HTMLInputElement>(null);
+  const [sheetSummary, setSheetSummary] = useState<string | null>(null);
+  const [sheetLoading, setSheetLoading] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
 
   const [templateId, setTemplateId] = useState(
@@ -259,12 +267,6 @@ export function DispatchWizard({
     }));
   }
 
-  const templateOptions = templates.map((t) => ({
-    value: t.id,
-    label: t.name,
-    hint: `${t.language} · ${t.category}`,
-  }));
-
   // Só mostra números da mesma conta (WABA) do template escolhido — evita
   // montar uma combinação que a Meta recusaria no envio.
   const phoneOptions = phoneNumbers
@@ -328,7 +330,7 @@ export function DispatchWizard({
 
   // Validação por step
   const canAdvance = useMemo(() => {
-    if (step === 1) return Boolean(templateId);
+    if (step === 1) return Boolean(campaignId && templateId);
     if (step === 2) return Boolean(phoneNumberId);
     if (step === 3) {
       return allMappingKeys.every((m) => {
@@ -345,6 +347,7 @@ export function DispatchWizard({
     return true;
   }, [
     step,
+    campaignId,
     templateId,
     phoneNumberId,
     allMappingKeys,
@@ -366,6 +369,27 @@ export function DispatchWizard({
     if (recipientSource === "manual") fd.append("manual_phones", manualPhonesText);
     fd.append("variable_mapping", JSON.stringify(variableMapping));
     return fd;
+  }
+
+  /** Planilha vira lista manual: a transmissão manda pros telefones do
+   * arquivo, sem cadastrar ninguém. */
+  function handleSpreadsheet(file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    setSheetLoading(true);
+    startTransition(async () => {
+      const res = await extractPhonesFromSpreadsheetAction(fd);
+      setSheetLoading(false);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setManualPhonesText(res.data.phones.join("\n"));
+      setSheetSummary(
+        `${res.data.phones.length} telefone(s) da coluna "${res.data.column}" (${res.data.total} linha(s) no arquivo)`,
+      );
+      toast.success("Planilha carregada");
+    });
   }
 
   function handleTestSend() {
@@ -472,46 +496,44 @@ export function DispatchWizard({
       <div className="rounded-md border p-3">
         {step === 1 && (
           <div className="space-y-3">
-            {campaigns.length > 0 && (
-              <div className="space-y-2">
-                <Label>Campanha</Label>
-                <select
-                  value={campaignId}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setCampaignId(id);
-                    // A campanha carrega o modelo de abertura — escolher a
-                    // campanha já resolve o passo do template.
-                    const campaign = campaigns.find((c) => c.id === id);
-                    if (campaign?.templateId) setTemplateId(campaign.templateId);
-                    if (campaign && !broadcastName) setBroadcastName(campaign.name);
-                  }}
-                  className="border-input bg-background h-9 w-full max-w-md rounded-md border px-3 text-sm"
-                >
-                  <option value="">Transmissão avulsa (sem campanha)</option>
-                  {campaigns.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-muted-foreground text-xs">
-                  A campanha traz o modelo de abertura. Sem campanha, escolha o template na mão.
-                </p>
-              </div>
-            )}
             <div className="space-y-2">
-              <Label>Template aprovado</Label>
-              <Combobox
-                value={templateId}
-                onChange={setTemplateId}
-                options={templateOptions}
-                placeholder={
-                  templates.length === 0 ? "Nenhum template APPROVED" : "Selecione…"
-                }
-                searchPlaceholder="Buscar template…"
-                triggerClassName="w-full max-w-md"
-              />
+              <Label>Campanha</Label>
+              {campaigns.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  Nenhuma campanha pronta para transmitir. Uma campanha só fica pronta quando
+                  aponta para um fluxo publicado cujo primeiro bloco tem um modelo aprovado.
+                </p>
+              ) : (
+                <>
+                  <select
+                    value={campaignId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setCampaignId(id);
+                      // O conteúdo vem todo da campanha: o fluxo dela e, no
+                      // primeiro bloco do fluxo, o modelo que abre a conversa.
+                      const campaign = campaigns.find((c) => c.id === id);
+                      setTemplateId(campaign?.templateId ?? "");
+                      if (campaign && !broadcastName) setBroadcastName(campaign.name);
+                    }}
+                    className="border-input bg-background h-9 w-full max-w-md rounded-md border px-3 text-sm"
+                  >
+                    <option value="">Selecione…</option>
+                    {campaigns.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedCampaign && (
+                    <p className="text-muted-foreground text-xs">
+                      Fluxo <strong>{selectedCampaign.flowName}</strong> · abre com o modelo{" "}
+                      <strong>{selectedCampaign.templateName}</strong>, que é a única mensagem
+                      cobrada. O resto do fluxo sai depois da resposta, dentro da janela de 24h.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
             {selectedTemplate && (
               <div className="bg-muted/40 space-y-1 rounded-md p-2 text-xs">
@@ -639,7 +661,7 @@ export function DispatchWizard({
                       : "text-muted-foreground",
                   )}
                 >
-                  {s === "segment" ? "Segmento salvo" : "Lista manual"}
+                  {s === "segment" ? "Segmento ou tag" : "Lista ou planilha"}
                 </button>
               ))}
             </div>
@@ -743,7 +765,37 @@ export function DispatchWizard({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Telefones (um por linha)</Label>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>Telefones (um por linha)</Label>
+                  <input
+                    ref={sheetInputRef}
+                    type="file"
+                    accept=".xlsx,.csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleSpreadsheet(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={sheetLoading}
+                    onClick={() => sheetInputRef.current?.click()}
+                  >
+                    {sheetLoading ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="size-3.5" />
+                    )}
+                    Carregar planilha
+                  </Button>
+                </div>
+                {sheetSummary && (
+                  <p className="text-muted-foreground text-xs">{sheetSummary}</p>
+                )}
                 <textarea
                   value={manualPhonesText}
                   onChange={(e) => setManualPhonesText(e.target.value)}
@@ -752,7 +804,8 @@ export function DispatchWizard({
                   className="border-input focus-visible:border-ring focus-visible:ring-ring/50 w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-[3px]"
                 />
                 <p className="text-muted-foreground text-xs">
-                  Normalizamos pra E.164 (default BR). Contatos não cadastrados são incluídos
+                  Cole os números ou carregue um .xlsx/.csv — a coluna de telefone é encontrada
+                  sozinha. Normalizamos pra E.164 (default BR). Contatos não cadastrados entram
                   como destinatários sem custom fields.
                 </p>
               </div>
@@ -825,7 +878,11 @@ export function DispatchWizard({
 
             <div className="space-y-1 text-sm">
               <p>
-                <span className="text-muted-foreground">Template:</span>{" "}
+                <span className="text-muted-foreground">Campanha:</span>{" "}
+                <strong>{selectedCampaign?.name}</strong>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Modelo de abertura:</span>{" "}
                 <strong>{selectedTemplate?.name}</strong>
               </p>
               <p>

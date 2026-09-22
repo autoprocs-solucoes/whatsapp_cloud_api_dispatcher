@@ -54,12 +54,7 @@ export default async function NovaTransmissaoPage({
         customKeys={customKeys}
         initialTemplateId={sp.template}
         initialPreset={preset}
-        campaigns={campaigns.map((c) => ({
-          id: c.id,
-          name: c.name,
-          templateId: c.templateId,
-          flowId: c.flowId,
-        }))}
+        campaigns={campaigns}
         initialCampaignId={sp.campanha}
       />
     </div>

@@ -638,7 +638,6 @@ export type Database = {
           workspace_id: string;
           name: string;
           description: string | null;
-          template_id: string | null;
           flow_id: string | null;
           status: "active" | "archived";
           created_by: string | null;
@@ -650,7 +649,6 @@ export type Database = {
           workspace_id: string;
           name: string;
           description?: string | null;
-          template_id?: string | null;
           flow_id?: string | null;
           status?: "active" | "archived";
           created_by?: string | null;
@@ -662,7 +660,6 @@ export type Database = {
           workspace_id?: string;
           name?: string;
           description?: string | null;
-          template_id?: string | null;
           flow_id?: string | null;
           status?: "active" | "archived";
           created_by?: string | null;
@@ -675,13 +672,6 @@ export type Database = {
             columns: ["workspace_id"];
             isOneToOne: false;
             referencedRelation: "workspace";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "campaign_template_id_fkey";
-            columns: ["template_id"];
-            isOneToOne: false;
-            referencedRelation: "template";
             referencedColumns: ["id"];
           },
           {

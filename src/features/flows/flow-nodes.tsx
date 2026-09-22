@@ -1,10 +1,16 @@
 "use client";
 
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { Clock, FileText, Image as ImageIcon, List, Play, Video } from "lucide-react";
+import { Clock, FileText, Image as ImageIcon, List, MessageSquare, Play, Video } from "lucide-react";
 
 import { WhatsAppMark } from "@/components/whatsapp-mark";
-import { NEXT_HANDLE, type DelayNodeData, type MessageNodeData, type StartNodeData } from "@/features/flows/schemas";
+import {
+  NEXT_HANDLE,
+  type DelayNodeData,
+  type MessageNodeData,
+  type StartNodeData,
+  type TemplateNodeData,
+} from "@/features/flows/schemas";
 import { cn } from "@/lib/utils";
 
 /**
@@ -77,6 +83,42 @@ export function StartNode({ data, selected }: NodeProps<Node<StartNodeData>>) {
         <span className="text-sm font-semibold text-ink">{data.label || "Início"}</span>
       </div>
       <OutHandle id={NEXT_HANDLE} />
+    </NodeShell>
+  );
+}
+
+/**
+ * Primeiro bloco: o template aprovado. Aparece diferente dos demais de
+ * propósito — é o único que sai fora da janela de 24h e o único que a Meta
+ * cobra.
+ */
+export function TemplateNode({ data, selected }: NodeProps<Node<TemplateNodeData>>) {
+  return (
+    <NodeShell selected={selected} className="border-brand-line">
+      <div className="flex items-center gap-2 border-b border-line bg-brand-soft px-3 py-2">
+        <MessageSquare className="size-4 text-brand" />
+        <span className="text-[13px] font-semibold text-brand-strong">Modelo de abertura</span>
+      </div>
+
+      <div className="space-y-1 p-3">
+        {data.templateId ? (
+          <>
+            <p className="truncate font-mono text-[12px] text-ink">{data.templateName}</p>
+            <p className="text-[11px] text-ink-3">
+              {data.templateLanguage} · sai na transmissão, fora da janela de 24h
+            </p>
+          </>
+        ) : (
+          <p className="text-[12px] text-ink-4 italic">Escolha um modelo aprovado</p>
+        )}
+      </div>
+
+      <div className="relative flex items-center justify-end gap-1 border-t border-line px-3 py-2 text-[11px] text-ink-3">
+        Quando responder
+        <OutHandle id={NEXT_HANDLE} className="!top-1/2 !-translate-y-1/2" />
+      </div>
+
+      <InHandle />
     </NodeShell>
   );
 }
@@ -195,6 +237,7 @@ export function DelayNode({ data, selected }: NodeProps<Node<DelayNodeData>>) {
 
 export const nodeTypes = {
   start: StartNode,
+  template: TemplateNode,
   message: MessageNode,
   delay: DelayNode,
 };

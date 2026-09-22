@@ -55,11 +55,20 @@ import { cn } from "@/lib/utils";
 
 type EditorNode = Node<FlowNodeData>;
 
+export type TemplateOption = {
+  id: string;
+  name: string;
+  language: string;
+  bodyText: string | null;
+};
+
 type Props = {
   flowId: string;
   flowName: string;
   status: "draft" | "published";
   graph: FlowGraph;
+  /** Modelos aprovados — só eles podem abrir um fluxo. */
+  templates: TemplateOption[];
 };
 
 function newId(prefix: string): string {
@@ -88,11 +97,13 @@ function emptyDelay(): DelayNodeData {
 // ----------------------------------------------------------------------------
 function Inspector({
   node,
+  templates,
   onChange,
   onClose,
   onDelete,
 }: {
   node: EditorNode;
+  templates: TemplateOption[];
   onChange: (data: FlowNodeData) => void;
   onClose: () => void;
   onDelete: () => void;
@@ -107,7 +118,9 @@ function Inspector({
             ? "Enviar mensagem"
             : data.kind === "delay"
               ? "Atraso inteligente"
-              : "Início"}
+              : data.kind === "template"
+                ? "Modelo de abertura"
+                : "Início"}
         </h2>
         <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Fechar">
           <X className="size-4" />
@@ -117,8 +130,61 @@ function Inspector({
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {data.kind === "start" && (
           <p className="text-sm text-ink-2">
-            É por aqui que o contato entra no fluxo. Ligue a saída dele no primeiro bloco.
+            É por aqui que o contato entra no fluxo. Ligue a saída dele no bloco do modelo.
           </p>
+        )}
+
+        {data.kind === "template" && (
+          <>
+            <p className="text-sm text-ink-2">
+              É esta mensagem que a transmissão dispara. Fora da janela de 24h a Meta só entrega
+              modelo aprovado — por isso a abertura é sempre um deles, e é a única cobrada.
+            </p>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="ins-template">Modelo aprovado</Label>
+              <select
+                id="ins-template"
+                value={data.templateId ?? ""}
+                onChange={(e) => {
+                  const chosen = templates.find((t) => t.id === e.target.value);
+                  onChange({
+                    ...data,
+                    templateId: chosen?.id ?? null,
+                    templateName: chosen?.name ?? "",
+                    templateLanguage: chosen?.language ?? "",
+                  });
+                }}
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              >
+                <option value="">Selecione…</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.language})
+                  </option>
+                ))}
+              </select>
+              {templates.length === 0 && (
+                <p className="text-[11px] text-amber">
+                  Nenhum modelo aprovado ainda. Crie em Templates e espere a revisão da Meta.
+                </p>
+              )}
+            </div>
+
+            {data.templateId && (
+              <div className="space-y-1.5">
+                <Label>Prévia</Label>
+                <p className="rounded-md bg-card-2 p-2.5 text-[12px] whitespace-pre-wrap text-ink-2">
+                  {templates.find((t) => t.id === data.templateId)?.bodyText ??
+                    "Sem corpo sincronizado."}
+                </p>
+                <p className="text-[11px] text-ink-3">
+                  As variáveis do modelo são preenchidas na transmissão, com os dados de cada
+                  contato.
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {data.kind === "message" && (
@@ -331,7 +397,7 @@ function Inspector({
         )}
       </div>
 
-      {data.kind !== "start" && (
+      {data.kind !== "start" && data.kind !== "template" && (
         <footer className="border-t border-line p-3">
           <Button variant="ghost" className="w-full text-destructive" onClick={onDelete}>
             <Trash2 className="size-4" /> Apagar bloco
@@ -342,14 +408,15 @@ function Inspector({
   );
 }
 
-function Canvas({ flowId, flowName, status, graph }: Props) {
+function Canvas({ flowId, flowName, status, graph, templates }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<EditorNode>(
     graph.nodes.map((n) => ({
       id: n.id,
       type: n.type,
       position: n.position,
       data: n.data,
-      deletable: n.type !== "start",
+      // Início e modelo de abertura são a espinha do fluxo: não se apagam.
+      deletable: n.type !== "start" && n.type !== "template",
     })),
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(
@@ -582,6 +649,7 @@ function Canvas({ flowId, flowName, status, graph }: Props) {
         {selected && (
           <Inspector
             node={selected}
+            templates={templates}
             onChange={updateSelected}
             onClose={() => setSelectedId(null)}
             onDelete={deleteSelected}

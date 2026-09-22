@@ -8,6 +8,7 @@ import {
   createFlowSchema,
   createFolderSchema,
   moveFlowSchema,
+  openingTemplateNode,
   parseGraph,
   renameSchema,
   saveFlowGraphSchema,
@@ -227,10 +228,28 @@ export async function publishFlowAction(id: string): Promise<ActionResult> {
   if (!flow) return { ok: false, error: "Fluxo não encontrado" };
 
   const graph = parseGraph(flow.graph);
-  const messages = graph.nodes.filter((n) => n.type === "message");
-  if (messages.length === 0) {
-    return { ok: false, error: "Adicione ao menos uma mensagem antes de publicar" };
+
+  // Sem modelo de abertura não há transmissão: é ele que sai fora da janela.
+  const opening = openingTemplateNode(graph);
+  if (!opening || opening.data.kind !== "template" || !opening.data.templateId) {
+    return { ok: false, error: "Escolha o modelo de abertura antes de publicar" };
   }
+
+  const { data: template } = await admin
+    .from("template")
+    .select("status, active")
+    .eq("id", opening.data.templateId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle();
+  if (!template) return { ok: false, error: "O modelo de abertura não existe mais" };
+  if (template.status !== "APPROVED") {
+    return { ok: false, error: `O modelo de abertura está ${template.status}, não aprovado` };
+  }
+  if (!template.active) {
+    return { ok: false, error: "O modelo de abertura está desativado" };
+  }
+
+  const messages = graph.nodes.filter((n) => n.type === "message");
   const empty = messages.find((n) => n.data.kind === "message" && !n.data.body.trim());
   if (empty) return { ok: false, error: "Tem mensagem sem texto no fluxo" };
 

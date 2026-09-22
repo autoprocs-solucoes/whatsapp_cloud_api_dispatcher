@@ -4,6 +4,10 @@ import { z } from "zod";
  * Desenho do fluxo. O canvas salva o grafo inteiro de uma vez, então o schema
  * descreve o `graph` jsonb da tabela `flow`.
  *
+ * O primeiro bloco é sempre um template aprovado: é ele que sai na transmissão,
+ * fora da janela de 24h, e é o único cobrado pela Meta. Da resposta em diante a
+ * janela está aberta e os blocos seguintes são mensagem livre.
+ *
  * Ramificação: cada botão do nó de mensagem vira uma saída própria
  * (`sourceHandle` = id do botão). Nó sem botão tem a saída única "next".
  */
@@ -35,6 +39,17 @@ export const messageNodeDataSchema = z.object({
   listTitle: z.string().trim().max(24).default(""),
 });
 
+/** Primeiro bloco: o template aprovado que abre a conversa. O conteúdo vive na
+ * Meta, aqui guarda-se só a referência — assim o fluxo acompanha edição e
+ * status do modelo sem cópia desatualizada. */
+export const templateNodeDataSchema = z.object({
+  kind: z.literal("template"),
+  templateId: z.string().uuid().nullable().default(null),
+  /** Nome e idioma guardados só pro canvas não precisar consultar o banco. */
+  templateName: z.string().trim().max(512).default(""),
+  templateLanguage: z.string().trim().max(10).default(""),
+});
+
 export const delayNodeDataSchema = z
   .object({
     kind: z.literal("delay"),
@@ -57,18 +72,20 @@ export const startNodeDataSchema = z.object({
 
 export const flowNodeDataSchema = z.discriminatedUnion("kind", [
   startNodeDataSchema,
+  templateNodeDataSchema,
   messageNodeDataSchema,
   delayNodeDataSchema,
 ]);
 
 export type FlowNodeData = z.infer<typeof flowNodeDataSchema>;
+export type TemplateNodeData = z.infer<typeof templateNodeDataSchema>;
 export type MessageNodeData = z.infer<typeof messageNodeDataSchema>;
 export type DelayNodeData = z.infer<typeof delayNodeDataSchema>;
 export type StartNodeData = z.infer<typeof startNodeDataSchema>;
 
 export const flowNodeSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(["start", "message", "delay"]),
+  type: z.enum(["start", "template", "message", "delay"]),
   position: z.object({ x: z.number(), y: z.number() }),
   data: flowNodeDataSchema,
 });
@@ -98,9 +115,35 @@ export const EMPTY_GRAPH: FlowGraph = {
       position: { x: 0, y: 0 },
       data: { kind: "start", label: "Início" },
     },
+    // Fluxo já nasce com o bloco do template: sem ele não há o que transmitir.
+    {
+      id: "opening",
+      type: "template",
+      position: { x: 280, y: -30 },
+      data: { kind: "template", templateId: null, templateName: "", templateLanguage: "" },
+    },
   ],
-  edges: [],
+  edges: [
+    {
+      id: "edge_start",
+      source: "start",
+      target: "opening",
+      sourceHandle: NEXT_HANDLE,
+      targetHandle: null,
+    },
+  ],
 };
+
+/** O bloco de template do fluxo — o que a transmissão dispara. */
+export function openingTemplateNode(graph: FlowGraph): FlowNode | null {
+  return graph.nodes.find((n) => n.data.kind === "template") ?? null;
+}
+
+/** Id do template que abre o fluxo, se já escolhido. */
+export function openingTemplateId(graph: FlowGraph): string | null {
+  const node = openingTemplateNode(graph);
+  return node && node.data.kind === "template" ? node.data.templateId : null;
+}
 
 /** Lê o `graph` jsonb com tolerância: fluxo salvo por versão antiga do editor
  * não pode quebrar a tela — cai no grafo vazio. */

@@ -1,4 +1,4 @@
-import { EMPTY_GRAPH, type FlowGraph } from "@/features/flows/schemas";
+import { NEXT_HANDLE, type FlowGraph } from "@/features/flows/schemas";
 
 /**
  * Fluxos padrões básicos — os mesmos atalhos que o BotConversa oferece na
@@ -18,8 +18,35 @@ export function isPresetKey(value: string): value is FlowPresetKey {
   return FLOW_PRESETS.some((p) => p.key === value);
 }
 
-function start(): FlowGraph["nodes"][number] {
-  return EMPTY_GRAPH.nodes[0]!;
+/** Todo padrão começa igual: entrada + bloco do modelo (ainda sem escolher).
+ * O modelo é o que sai na transmissão; o resto do desenho é a conversa depois
+ * da resposta. */
+function opening(): { nodes: FlowGraph["nodes"]; edges: FlowGraph["edges"] } {
+  return {
+    nodes: [
+      {
+        id: "start",
+        type: "start",
+        position: { x: -180, y: 0 },
+        data: { kind: "start", label: "Início" },
+      },
+      {
+        id: "opening",
+        type: "template",
+        position: { x: 60, y: -30 },
+        data: { kind: "template", templateId: null, templateName: "", templateLanguage: "" },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_start",
+        source: "start",
+        target: "opening",
+        sourceHandle: NEXT_HANDLE,
+        targetHandle: null,
+      },
+    ],
+  };
 }
 
 export function presetGraph(key: FlowPresetKey): FlowGraph {
@@ -27,7 +54,7 @@ export function presetGraph(key: FlowPresetKey): FlowGraph {
     case "welcome":
       return {
         nodes: [
-          start(),
+          ...opening().nodes,
           {
             id: "msg_welcome",
             type: "message",
@@ -75,7 +102,8 @@ export function presetGraph(key: FlowPresetKey): FlowGraph {
           },
         ],
         edges: [
-          { id: "e1", source: "start", target: "msg_welcome", sourceHandle: "next", targetHandle: null },
+          ...opening().edges,
+          { id: "e1", source: "opening", target: "msg_welcome", sourceHandle: "next", targetHandle: null },
           {
             id: "e2",
             source: "msg_welcome",
@@ -96,7 +124,7 @@ export function presetGraph(key: FlowPresetKey): FlowGraph {
     case "default_reply":
       return {
         nodes: [
-          start(),
+          ...opening().nodes,
           {
             id: "msg_default",
             type: "message",
@@ -113,14 +141,15 @@ export function presetGraph(key: FlowPresetKey): FlowGraph {
           },
         ],
         edges: [
-          { id: "e1", source: "start", target: "msg_default", sourceHandle: "next", targetHandle: null },
+          ...opening().edges,
+          { id: "e1", source: "opening", target: "msg_default", sourceHandle: "next", targetHandle: null },
         ],
       };
 
     case "media":
       return {
         nodes: [
-          start(),
+          ...opening().nodes,
           {
             id: "msg_media",
             type: "message",
@@ -137,14 +166,15 @@ export function presetGraph(key: FlowPresetKey): FlowGraph {
           },
         ],
         edges: [
-          { id: "e1", source: "start", target: "msg_media", sourceHandle: "next", targetHandle: null },
+          ...opening().edges,
+          { id: "e1", source: "opening", target: "msg_media", sourceHandle: "next", targetHandle: null },
         ],
       };
 
     case "post_service":
       return {
         nodes: [
-          start(),
+          ...opening().nodes,
           {
             id: "delay_wait",
             type: "delay",
@@ -198,7 +228,8 @@ export function presetGraph(key: FlowPresetKey): FlowGraph {
           },
         ],
         edges: [
-          { id: "e1", source: "start", target: "delay_wait", sourceHandle: "next", targetHandle: null },
+          ...opening().edges,
+          { id: "e1", source: "opening", target: "delay_wait", sourceHandle: "next", targetHandle: null },
           {
             id: "e2",
             source: "delay_wait",

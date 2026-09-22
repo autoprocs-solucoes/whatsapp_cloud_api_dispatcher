@@ -20,6 +20,10 @@ import type { FlowRun } from "@/lib/supabase/database.types";
 /**
  * Motor do fluxo: leva um contato de bloco em bloco.
  *
+ * O primeiro bloco do desenho é o modelo aprovado, e quem o envia é a
+ * transmissão — o motor entra depois, quando a pessoa responde e a janela de
+ * 24h abre. Daí em diante ele manda mensagem livre.
+ *
  * O caminhar para em dois lugares — bloco de mensagem com botões (espera a
  * resposta) e bloco de atraso (espera a hora). Fora isso ele segue as ligações
  * até acabar o desenho. Estado fica em `flow_run`, então nada depende de
@@ -154,6 +158,14 @@ export async function advanceFlowRun(run: FlowRun): Promise<void> {
     }
 
     if (node.type === "start" || node.data.kind === "start") {
+      currentId = nextNodeId(graph, node.id, NEXT_HANDLE);
+      continue;
+    }
+
+    // O bloco do modelo já saiu na transmissão — é ele que abre a conversa,
+    // fora da janela de 24h. Aqui ele é só o ponto de partida: reenviar seria
+    // mandar a mesma mensagem duas vezes e gastar outra conversa cobrada.
+    if (node.data.kind === "template") {
       currentId = nextNodeId(graph, node.id, NEXT_HANDLE);
       continue;
     }
