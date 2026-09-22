@@ -264,7 +264,7 @@ export function TemplateWizard({ connections }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_440px]">
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -563,6 +563,7 @@ export function TemplateWizard({ connections }: Props) {
             pessoa vê aqui é o que ela vai ver na hora de disparar. */}
         <div className="lg:sticky lg:top-4 lg:self-start">
           <WhatsAppPreview
+            size="device"
             headerText={headerType === "TEXT" ? headerText : null}
             bodyText={bodyText}
             footerText={footerText}

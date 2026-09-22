@@ -22,6 +22,12 @@ type Props = {
   className?: string;
   /** Override do tamanho da área de chat (default: min-h-[120px] max-h-[260px]). */
   chatClassName?: string;
+  /**
+   * `compact` cabe num card de listagem; `device` desenha o aparelho no
+   * tamanho real (390x844, a medida de um iPhone), com a tipografia do
+   * WhatsApp no iOS — é o que serve pra conferir como a mensagem chega.
+   */
+  size?: "compact" | "device";
 };
 
 function renderText(
@@ -71,9 +77,14 @@ function nowLabel(): string {
 }
 
 /** Barra de status do iOS: relógio à esquerda, sinal/wi-fi/bateria à direita. */
-function StatusBar() {
+function StatusBar({ device }: { device: boolean }) {
   return (
-    <div className="relative z-10 flex h-[26px] items-center justify-between px-5 text-[10px] font-semibold text-wa-ink">
+    <div
+      className={cn(
+        "relative z-10 flex items-center justify-between font-semibold text-wa-ink",
+        device ? "h-[44px] px-7 text-[14px]" : "h-[26px] px-5 text-[10px]",
+      )}
+    >
       <span className="tabular-nums">{nowLabel()}</span>
       <span className="flex items-center gap-1" aria-hidden>
         {/* Sinal: quatro barras crescentes. */}
@@ -128,16 +139,25 @@ export function WhatsAppPreview({
   placeholderLabels = {},
   className,
   chatClassName,
+  size = "compact",
 }: Props) {
   const hasContent = Boolean(headerText || bodyText || footerText || (buttons && buttons.length > 0));
   const initials = (senderName ?? "Empresa").slice(0, 2).toUpperCase();
+  const device = size === "device";
+  /** Escolhe a classe conforme o tamanho — deixa as duas medidas lado a lado
+   * em vez de espalhar `device ? … : …` pelo JSX inteiro. */
+  const v = (compact: string, real: string) => (device ? real : compact);
 
   return (
     <div
       className={cn(
         // Corpo do aparelho: titânio escuro, borda fina clara imitando o
         // chanfro da lateral, e sombra baixa pra assentar no card.
-        "relative mx-auto w-full max-w-[270px] rounded-[2.75rem] bg-neutral-900 p-[10px]",
+        "relative mx-auto w-full bg-neutral-900",
+        v(
+          "max-w-[270px] rounded-[2.75rem] p-[10px]",
+          "max-w-[414px] rounded-[3.3rem] p-[12px]",
+        ),
         "shadow-[0_18px_40px_-12px_rgba(11,20,26,0.55)] ring-1 ring-white/10",
         className,
       )}
@@ -145,55 +165,94 @@ export function WhatsAppPreview({
       {/* Botões laterais: volume à esquerda, ação/power à direita. */}
       <span
         aria-hidden
-        className="absolute top-[110px] -left-[2px] h-8 w-[3px] rounded-l-sm bg-neutral-700"
+        className={cn(
+          "absolute -left-[2px] w-[3px] rounded-l-sm bg-neutral-700",
+          v("top-[110px] h-8", "top-[168px] h-12"),
+        )}
       />
       <span
         aria-hidden
-        className="absolute top-[152px] -left-[2px] h-8 w-[3px] rounded-l-sm bg-neutral-700"
+        className={cn(
+          "absolute -left-[2px] w-[3px] rounded-l-sm bg-neutral-700",
+          v("top-[152px] h-8", "top-[232px] h-12"),
+        )}
       />
       <span
         aria-hidden
-        className="absolute top-[130px] -right-[2px] h-12 w-[3px] rounded-r-sm bg-neutral-700"
+        className={cn(
+          "absolute -right-[2px] w-[3px] rounded-r-sm bg-neutral-700",
+          v("top-[130px] h-12", "top-[198px] h-20"),
+        )}
       />
 
-      <div className="relative overflow-hidden rounded-[2.1rem] bg-wa-panel">
+      <div
+        className={cn(
+          "relative overflow-hidden bg-wa-panel",
+          // Altura fixa da tela: 844 de um iPhone menos as bordas do aparelho.
+          v("rounded-[2.1rem]", "flex h-[820px] flex-col rounded-[2.7rem]"),
+        )}
+      >
         {/* Dynamic Island, sobreposta à barra de status. */}
         <span
           aria-hidden
-          className="absolute top-[7px] left-1/2 z-20 h-[20px] w-[72px] -translate-x-1/2 rounded-full bg-black"
+          className={cn(
+            "absolute left-1/2 z-20 -translate-x-1/2 rounded-full bg-black",
+            v("top-[7px] h-[20px] w-[72px]", "top-[11px] h-[31px] w-[116px]"),
+          )}
         />
 
-        <StatusBar />
+        <StatusBar device={device} />
 
         {/* Cabeçalho do WhatsApp no iOS: claro, nome centralizado. */}
-        <div className="flex items-center gap-1.5 border-b border-wa-line bg-wa-panel px-2 pt-0.5 pb-1.5">
-          <ChevronLeft className="size-4 shrink-0 text-wa-accent" />
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-wa-active text-[10px] font-semibold text-wa-ink-2">
+        <div
+          className={cn(
+            "flex shrink-0 items-center border-b border-wa-line bg-wa-panel",
+            v("gap-1.5 px-2 pt-0.5 pb-1.5", "gap-2.5 px-3 pt-1 pb-2.5"),
+          )}
+        >
+          <ChevronLeft className={cn("shrink-0 text-wa-accent", v("size-4", "size-6"))} />
+          <span
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-full bg-wa-active font-semibold text-wa-ink-2",
+              v("size-7 text-[10px]", "size-10 text-[13px]"),
+            )}
+          >
             {initials}
           </span>
           <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-[13px] font-semibold text-wa-ink">
+            <p className={cn("truncate font-semibold text-wa-ink", v("text-[13px]", "text-[17px]"))}>
               {senderName ?? "Empresa"}
             </p>
-            <p className="text-[10px] text-wa-ink-2">online</p>
+            <p className={cn("text-wa-ink-2", v("text-[10px]", "text-[13px]"))}>online</p>
           </div>
-          <Video className="size-4 shrink-0 text-wa-accent" />
+          <Video className={cn("shrink-0 text-wa-accent", v("size-4", "size-6"))} />
         </div>
 
         {/* Conversa */}
         <div
           className={cn(
-            "no-scrollbar overflow-y-auto bg-wa-bg px-3 py-2.5",
-            chatClassName ?? "max-h-[300px] min-h-[140px]",
+            "no-scrollbar overflow-y-auto bg-wa-bg",
+            v("px-3 py-2.5", "px-4 py-4"),
+            chatClassName ?? v("max-h-[300px] min-h-[140px]", "flex-1"),
           )}
         >
           {!hasContent ? (
-            <p className="mt-12 text-center text-xs text-wa-ink-2">
+            <p
+              className={cn(
+                "text-center text-wa-ink-2",
+                v("mt-12 text-xs", "mt-20 text-[15px]"),
+              )}
+            >
               Selecione um template pra visualizar.
             </p>
           ) : (
             <div className="flex flex-col items-start gap-1">
-              <div className="relative max-w-[88%] rounded-[7.5px] rounded-tl-none bg-wa-in px-2 py-1.5 text-[13px] leading-[18px] text-wa-ink shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+              <div
+                className={cn(
+                  "relative max-w-[88%] rounded-[7.5px] rounded-tl-none bg-wa-in text-wa-ink shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]",
+                  v("px-2 py-1.5 text-[13px] leading-[18px]", "px-2.5 py-2 text-[16px] leading-[22px]"),
+                )}
+              >
                 <span
                   aria-hidden
                   className="absolute top-0 -left-[7px] size-0 border-[5px] border-transparent border-t-wa-in border-r-wa-in"
@@ -211,9 +270,18 @@ export function WhatsAppPreview({
                   </p>
                 )}
 
-                {footerText && <p className="mt-1 text-[11px] text-wa-ink-2">{footerText}</p>}
+                {footerText && (
+                  <p className={cn("mt-1 text-wa-ink-2", v("text-[11px]", "text-[13px]"))}>
+                    {footerText}
+                  </p>
+                )}
 
-                <span className="mt-0.5 flex items-center justify-end text-[10px] text-wa-ink-2">
+                <span
+                  className={cn(
+                    "mt-0.5 flex items-center justify-end text-wa-ink-2",
+                    v("text-[10px]", "text-[12px]"),
+                  )}
+                >
                   {nowLabel()}
                 </span>
               </div>
@@ -223,7 +291,10 @@ export function WhatsAppPreview({
                   {buttons.map((b, i) => (
                     <div
                       key={`${b.text}-${i}`}
-                      className="w-full rounded-[7.5px] bg-wa-in py-1.5 text-center text-[12px] font-medium text-wa-accent shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]"
+                      className={cn(
+                        "w-full rounded-[7.5px] bg-wa-in text-center font-medium text-wa-accent shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]",
+                        v("py-1.5 text-[12px]", "py-2.5 text-[15px]"),
+                      )}
                     >
                       {b.text}
                     </div>
@@ -235,16 +306,24 @@ export function WhatsAppPreview({
         </div>
 
         {/* Campo de mensagem + indicador de home do iPhone. */}
-        <div className="bg-wa-panel px-2 pt-1.5 pb-1">
-          <div className="flex items-center gap-1.5">
-            <Plus className="size-4 shrink-0 text-wa-accent" />
-            <div className="flex-1 rounded-full border border-wa-line bg-wa-in px-2.5 py-[3px] text-[11px] text-wa-ink-2">
+        <div className={cn("shrink-0 bg-wa-panel", v("px-2 pt-1.5 pb-1", "px-3 pt-2.5 pb-2"))}>
+          <div className={cn("flex items-center", v("gap-1.5", "gap-2.5"))}>
+            <Plus className={cn("shrink-0 text-wa-accent", v("size-4", "size-6"))} />
+            <div
+              className={cn(
+                "flex-1 rounded-full border border-wa-line bg-wa-in text-wa-ink-2",
+                v("px-2.5 py-[3px] text-[11px]", "px-3.5 py-[7px] text-[15px]"),
+              )}
+            >
               Mensagem
             </div>
           </div>
           <span
             aria-hidden
-            className="mx-auto mt-1.5 block h-[3px] w-[90px] rounded-full bg-wa-ink opacity-30"
+            className={cn(
+              "mx-auto block rounded-full bg-wa-ink opacity-30",
+              v("mt-1.5 h-[3px] w-[90px]", "mt-3 h-[5px] w-[140px]"),
+            )}
           />
         </div>
       </div>
