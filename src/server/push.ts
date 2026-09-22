@@ -65,6 +65,7 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
 
   const body = JSON.stringify(payload);
   const dead: string[] = [];
+  const errors: { status?: number; message: string }[] = [];
   let sent = 0;
 
   await Promise.all(
@@ -77,7 +78,10 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
         sent++;
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode;
+        errors.push({ status, message: (err as Error).message.slice(0, 200) });
         if (status === 404 || status === 410) {
+          // Inscrição morta: o navegador já descartou. Apagar evita insistir
+          // pra sempre num endereço que não existe mais.
           dead.push(s.id);
         } else {
           console.error("[push] envio falhou:", status, (err as Error).message);
@@ -99,6 +103,21 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
       );
   }
 
+  // Rastro da tentativa: é o que responde "foi enviado?" depois do fato.
+  await admin.from("push_log").insert({
+    title: payload.title.slice(0, 120),
+    tag: payload.tag ?? null,
+    targets: subs.length,
+    sent,
+    failed: subs.length - sent,
+    detail: errors.length > 0 ? (errors as never) : null,
+  });
+  // Sete dias bastam pra investigar e evitam a tabela virar depósito.
+  await admin
+    .from("push_log")
+    .delete()
+    .lt("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
   return sent;
 }
 
@@ -110,5 +129,18 @@ export async function getWorkspaceOwnerIds(workspaceId: string): Promise<string[
     .select("user_id")
     .eq("workspace_id", workspaceId)
     .eq("role", "owner");
+  return (data ?? []).map((m) => m.user_id);
+}
+
+/**
+ * Todo mundo do workspace — quem atende precisa saber que chegou mensagem,
+ * não só o dono. Diferente do aviso de transmissão, que é coisa de owner.
+ */
+export async function getWorkspaceMemberIds(workspaceId: string): Promise<string[]> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("workspace_member")
+    .select("user_id")
+    .eq("workspace_id", workspaceId);
   return (data ?? []).map((m) => m.user_id);
 }

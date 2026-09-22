@@ -28,10 +28,10 @@ self.addEventListener("push", (event) => {
     body: payload.body || "",
     icon: "/autoprocs-logo.png",
     badge: "/autoprocs-logo.png",
-    // `tag` faz a notificação do mesmo comunicado substituir a anterior em vez
-    // de empilhar, caso o worker reenvie.
+    // `tag` faz a notificação da mesma conversa (ou da mesma transmissão)
+    // substituir a anterior em vez de empilhar.
     tag: payload.tag || "dispatcher",
-    data: { url: payload.url || "/comunicados" },
+    data: { url: payload.url || "/conversas" },
     // Vibração curta: o aviso é informativo, não urgente.
     vibrate: [80, 40, 80],
   };
@@ -41,11 +41,11 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || "/comunicados";
+  const target = (event.notification.data && event.notification.data.url) || "/conversas";
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-      // Se já existe uma aba do Dispatcher aberta, leva ela pro comunicado em
+      // Se já existe uma aba do Dispatcher aberta, leva ela pro destino em
       // vez de abrir mais uma.
       for (const client of clients) {
         if (client.url.includes(self.location.origin) && "focus" in client) {

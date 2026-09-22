@@ -1,4 +1,5 @@
 import { AppHeader } from "@/components/app-header";
+import { PushAutoEnroll } from "@/features/notifications/push-enroll";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { requireUser } from "@/server/auth";
@@ -28,7 +29,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
       <SidebarInset className="min-w-0 bg-paper">
         <AppHeader />
-        <main className="min-w-0 flex-1 p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-6">
+          <PushAutoEnroll />
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

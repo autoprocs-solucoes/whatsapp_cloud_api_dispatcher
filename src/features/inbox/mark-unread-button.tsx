@@ -24,6 +24,9 @@ export function MarkUnreadButton({ phone }: { phone: string }) {
       }
       toast.success("Marcada como não lida");
       router.push("/conversas?fechado=1");
+      // Sem o refresh a lista vem do cache do router e o selo de não lida não
+      // aparece — foi o "cliquei e não aconteceu nada".
+      router.refresh();
     });
   }
 

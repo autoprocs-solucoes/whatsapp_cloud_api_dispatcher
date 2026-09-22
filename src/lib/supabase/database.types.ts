@@ -632,6 +632,39 @@ export type Database = {
           },
         ];
       };
+      push_log: {
+        Row: {
+          id: number;
+          created_at: string;
+          title: string;
+          tag: string | null;
+          targets: number;
+          sent: number;
+          failed: number;
+          detail: Json | null;
+        };
+        Insert: {
+          id?: number;
+          created_at?: string;
+          title: string;
+          tag?: string | null;
+          targets?: number;
+          sent?: number;
+          failed?: number;
+          detail?: Json | null;
+        };
+        Update: {
+          id?: number;
+          created_at?: string;
+          title?: string;
+          tag?: string | null;
+          targets?: number;
+          sent?: number;
+          failed?: number;
+          detail?: Json | null;
+        };
+        Relationships: [];
+      };
       campaign: {
         Row: {
           id: string;

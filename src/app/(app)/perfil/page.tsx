@@ -46,12 +46,12 @@ export default async function PerfilPage() {
         <CardHeader>
           <CardTitle>Notificações</CardTitle>
           <CardDescription>
-            Avisa quando uma transmissão termina de ser enviada. Vale só para os workspaces em que
+            Avisa quando chega mensagem nas conversas e quando uma transmissão termina. Vale só para os workspaces em que
             você é owner, e precisa ser ligado em cada navegador que você usa.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+          <PushToggle />
         </CardContent>
       </Card>
     </div>

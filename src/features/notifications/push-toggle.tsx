@@ -9,6 +9,7 @@ import {
   subscribeToPushAction,
   unsubscribeFromPushAction,
 } from "@/features/notifications/actions";
+import { vapidPublicKey } from "@/lib/push/vapid";
 
 type State = "checking" | "unsupported" | "denied" | "off" | "on";
 
@@ -29,17 +30,21 @@ function urlBase64ToBuffer(base64: string): ArrayBuffer {
 }
 
 /**
- * Liga/desliga a notificação de transmissão concluída NESTE navegador.
+ * Liga/desliga as notificações NESTE navegador: mensagem nova nas conversas e
+ * transmissão concluída.
  *
  * É por aparelho, não por conta: o endpoint é emitido pelo navegador, então
  * quem usa desktop e celular precisa ligar nos dois.
  */
-export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }) {
+export function PushToggle() {
+  // A chave vem do módulo, com a env tendo precedência: valor colado no painel
+  // costuma chegar com caractere invisível e derrubar o atob.
+  const key = vapidPublicKey();
   const [state, setState] = useState<State>("checking");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (!vapidPublicKey) {
+    if (!key) {
       setState("unsupported");
       return;
     }
@@ -57,7 +62,7 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
       .then((reg) => reg.pushManager.getSubscription())
       .then((sub) => setState(sub ? "on" : "off"))
       .catch(() => setState("unsupported"));
-  }, [vapidPublicKey]);
+  }, [key]);
 
   async function enable() {
     try {
@@ -71,7 +76,7 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
       await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToBuffer(vapidPublicKey!),
+        applicationServerKey: urlBase64ToBuffer(key),
       });
 
       const json = sub.toJSON();

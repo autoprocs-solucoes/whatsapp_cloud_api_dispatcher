@@ -201,11 +201,18 @@ npx web-push generate-vapid-keys
 
 ```
 VAPID_PUBLIC_KEY="<public>"
+NEXT_PUBLIC_VAPID_PUBLIC_KEY="<public>"   # a mesma, pro navegador
 VAPID_PRIVATE_KEY="<private>"
 VAPID_SUBJECT="mailto:voce@empresa.com"
 ```
 
-Sem essas variáveis o resto do app funciona normal; só o push fica desligado.
+A pública vai duas vezes de propósito: o servidor assina com ela e o navegador
+precisa dela pra criar a assinatura. Sem essas variáveis o resto do app funciona
+normal; só o push fica desligado.
+
+Avisa em dois momentos: mensagem nova nas conversas (pra todos os membros do
+workspace) e transmissão concluída (só pros owners). Cada pessoa liga no
+**Perfil**, por navegador — celular e desktop contam como dois.
 
 ---
 

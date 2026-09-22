@@ -7,6 +7,7 @@ import type { NextRequest } from "next/server";
 import { conversationKey } from "@/lib/phone/e164";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { handleFlowReply, startCampaignFlowOnReply } from "@/server/flow-engine";
+import { getWorkspaceMemberIds, sendPushToUsers } from "@/server/push";
 import { serverEnv } from "@/lib/env";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -200,6 +201,46 @@ async function resolveTenant(
   }
 
   return null;
+}
+
+/** Prévia curta pra notificação: mídia não tem texto, então vira o rótulo. */
+const PUSH_PREVIEW: Record<string, string> = {
+  image: "📷 Imagem",
+  video: "🎥 Vídeo",
+  audio: "🎤 Áudio",
+  sticker: "Figurinha",
+  document: "📄 Documento",
+  location: "📍 Localização",
+  contacts: "Contato",
+};
+
+/**
+ * Avisa o time que chegou mensagem.
+ *
+ * A `tag` é a conversa: mensagens seguidas da mesma pessoa substituem a
+ * notificação anterior em vez de empilhar cinco avisos na tela de quem está
+ * atendendo.
+ */
+async function notifyInbound(
+  tenant: Tenant,
+  msg: MetaInboundMessage,
+  contactName: string | null,
+): Promise<void> {
+  const phone = conversationKey(msg.from);
+  if (!phone) return;
+
+  const content = extractContent(msg);
+  const body = content.body?.trim() || PUSH_PREVIEW[content.type] || "Nova mensagem";
+
+  const members = await getWorkspaceMemberIds(tenant.workspaceId);
+  if (members.length === 0) return;
+
+  await sendPushToUsers(members, {
+    title: contactName || phone,
+    body: body.slice(0, 120),
+    url: `/conversas?tel=${encodeURIComponent(phone)}`,
+    tag: `conversa:${phone}`,
+  });
 }
 
 /** Casa o número da conversa com um contato já cadastrado, se existir. */
@@ -456,6 +497,14 @@ export async function POST(req: NextRequest) {
                 continue;
               }
               await mirrorMessage(admin, tenant, msg, "in", nameOf(msg.from));
+
+              // Notificação vem depois do espelho: se o push falhar, a
+              // conversa já está gravada e a tela mostra a mensagem.
+              try {
+                await notifyInbound(tenant, msg, nameOf(msg.from));
+              } catch (e) {
+                console.error("[meta/webhook] push:", (e as Error).message);
+              }
 
               // A resposta pode ser o que o fluxo estava esperando. Vai depois
               // do espelho pra conversa nunca depender do motor ter dado certo.
