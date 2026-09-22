@@ -170,14 +170,13 @@ async function analyzeRows(
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("contact")
-    .select("phone_e164, tags")
+    .select("phone_e164, full_name, custom_fields, tags")
     .eq("workspace_id", ctx.workspaceId);
   const existingSet = new Set((existing ?? []).map((c) => c.phone_e164));
-  // Etiqueta de quem já existe não pode ser apagada pela planilha: o upsert
-  // troca a linha inteira, então a união é montada aqui.
-  const tagsByPhone = new Map(
-    (existing ?? []).map((c) => [c.phone_e164, c.tags ?? []] as const),
-  );
+  // O upsert troca a linha inteira, então o que a planilha não traz precisa
+  // ser remontado aqui — sem isso, importar uma lista só de telefones apagava
+  // nome, campos custom e etiquetas de quem já era contato.
+  const currentByPhone = new Map((existing ?? []).map((c) => [c.phone_e164, c] as const));
 
   const seenInFile = new Set<string>();
   const analysis: ImportAnalysis = {
@@ -229,17 +228,20 @@ async function analyzeRows(
       }
     }
 
+    const current = currentByPhone.get(norm.e164);
+    const currentCustom = (current?.custom_fields ?? {}) as Record<string, string>;
     const rowTags = [
       ...mapping.tags,
       ...(mapping.tagsColumn ? splitTags(row[mapping.tagsColumn]) : []),
-      ...(tagsByPhone.get(norm.e164) ?? []),
+      ...(current?.tags ?? []),
     ];
 
     upserts.push({
       workspace_id: ctx.workspaceId,
       phone_e164: norm.e164,
-      full_name: fullName,
-      custom_fields: customFields,
+      // Planilha sem nome não zera o nome que já existia.
+      full_name: fullName || current?.full_name || null,
+      custom_fields: { ...currentCustom, ...customFields },
       tags: [...new Set(rowTags)],
       created_by: ctx.userId,
     });

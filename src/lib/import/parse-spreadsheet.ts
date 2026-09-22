@@ -161,7 +161,15 @@ const PHONE_HEADER_PATTERNS = [
   /^contato$/i,
 ];
 
-const NAME_HEADER_PATTERNS = [/^nome$/i, /^name$/i, /^cliente$/i, /nome\s*completo/i];
+const NAME_HEADER_PATTERNS = [
+  /^nomes?$/i,
+  /^names?$/i,
+  /^clientes?$/i,
+  /nome\s*completo/i,
+  /^nome\s*do\s*(cliente|contato)$/i,
+  /^raz(a|ã)o\s*social$/i,
+  /^respons(a|á)vel$/i,
+];
 
 const EMAIL_HEADER_PATTERNS = [/^e-?mail$/i];
 
