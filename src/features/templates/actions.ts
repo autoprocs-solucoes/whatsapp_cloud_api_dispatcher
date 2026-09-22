@@ -223,6 +223,23 @@ export async function createTemplateAction(
   if (!match) return { ok: false, error: "Conexão Meta não encontrada" };
   const { connection } = match;
 
+  // Nome repetido no mesmo idioma é o motivo mais comum de recusa, e a Meta
+  // responde só "Invalid parameter". Barrar aqui evita a viagem e diz o que é.
+  const adminCheck = createAdminClient();
+  const { data: duplicate } = await adminCheck
+    .from("template")
+    .select("id, status")
+    .eq("workspace_id", workspace.id)
+    .eq("name", data.name)
+    .eq("language", data.language)
+    .maybeSingle();
+  if (duplicate) {
+    return {
+      ok: false,
+      error: `Já existe um modelo chamado "${data.name}" nesse idioma (${duplicate.status}). Use outro nome.`,
+    };
+  }
+
   const headerPlaceholders =
     data.headerType === "TEXT" ? extractPlaceholders(data.headerText) : [];
   const bodyPlaceholders = extractPlaceholders(data.bodyText);

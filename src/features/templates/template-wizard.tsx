@@ -85,7 +85,10 @@ const MEDIA_ACCEPT: Partial<Record<TemplateHeaderType, string>> = {
 
 type Connection = { id: string; label: string };
 
-type Props = { connections: Connection[] };
+/** Modelos que já existem, pra avisar de nome repetido antes de enviar. */
+export type ExistingTemplate = { name: string; language: string };
+
+type Props = { connections: Connection[]; existing: ExistingTemplate[] };
 
 const BUTTON_LABEL: Record<TemplateButtonInput["type"], string> = {
   QUICK_REPLY: "Resposta",
@@ -102,7 +105,7 @@ function Counter({ value, max }: { value: number; max: number }) {
   );
 }
 
-export function TemplateWizard({ connections }: Props) {
+export function TemplateWizard({ connections, existing }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isUploading, setIsUploading] = useState(false);
@@ -144,6 +147,13 @@ export function TemplateWizard({ connections }: Props) {
     type: b.type,
     text: b.type === "COPY_CODE" ? b.text || "Copiar código" : b.text,
   }));
+
+  // A Meta recusa nome repetido no mesmo idioma, e a mensagem dela é só
+  // "Invalid parameter" — melhor avisar enquanto a pessoa digita.
+  const nameTaken = useMemo(
+    () => existing.some((t) => t.name === name && t.language === language),
+    [existing, name, language],
+  );
 
   const previewMedia =
     headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT"
@@ -330,9 +340,15 @@ export function TemplateWizard({ connections }: Props) {
                   }
                   placeholder="cobranca_mensal"
                 />
-                <p className="text-[11px] text-ink-3">
-                  Só letras minúsculas, números e underscore.
-                </p>
+                {nameTaken ? (
+                  <p className="text-[11px] text-red">
+                    Já existe um modelo com esse nome nesse idioma.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-ink-3">
+                    Só letras minúsculas, números e underscore.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tpl-lang">Idioma</Label>
@@ -670,7 +686,7 @@ export function TemplateWizard({ connections }: Props) {
           <span className="text-xs text-ink-3">
             A edição não fica disponível enquanto a Meta revisa.
           </span>
-          <Button onClick={handleSubmit} disabled={isPending || isUploading}>
+          <Button onClick={handleSubmit} disabled={isPending || isUploading || nameTaken}>
             {isPending && <Loader2 className="size-4 animate-spin" />}
             Enviar para revisão
           </Button>
