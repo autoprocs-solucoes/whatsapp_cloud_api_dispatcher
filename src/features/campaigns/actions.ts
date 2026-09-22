@@ -1,23 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { campaignSchema, updateCampaignSchema } from "@/features/campaigns/schemas";
 import { requireUser } from "@/server/auth";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string };
-
-export const campaignSchema = z.object({
-  name: z.string().trim().min(1, "Dê um nome à campanha").max(80),
-  description: z.string().trim().max(280).default(""),
-  /** O fluxo é o conteúdo da campanha: o primeiro bloco dele é o modelo que
-   * abre, e o resto é a conversa depois da resposta. */
-  flowId: z.string().uuid().nullable().default(null),
-});
 
 export async function createCampaignAction(
   input: unknown,
@@ -47,11 +39,9 @@ export async function createCampaignAction(
   return { ok: true, data: { id: data.id } };
 }
 
-const updateSchema = campaignSchema.extend({ id: z.string().uuid() });
-
 export async function updateCampaignAction(input: unknown): Promise<ActionResult> {
   const workspace = await requireActiveWorkspace();
-  const parsed = updateSchema.safeParse(input);
+  const parsed = updateCampaignSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
   }
