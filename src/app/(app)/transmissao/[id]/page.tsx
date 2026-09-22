@@ -17,6 +17,7 @@ import {
   TableShell,
   TableToolbar,
 } from "@/components/ui/table";
+import { formatDateTimeBR, formatTimeBR } from "@/lib/format/datetime";
 import { DispatchExecutePanel } from "@/features/dispatch/dispatch-execute-panel";
 import { getDispatch } from "@/features/dispatch/actions";
 import { BiggestLossCard } from "@/features/dashboard/biggest-loss-card";
@@ -128,7 +129,7 @@ export default async function TransmissaoDetalhe({
               {template?.language} ·{" "}
               {dispatch.recipient_source === "segment" ? "Segmento" : "Lista manual"} ·{" "}
               <span className="font-mono text-xs">
-                {new Date(dispatch.created_at).toLocaleString("pt-BR")}
+                {formatDateTimeBR(dispatch.created_at)}
               </span>
             </p>
           </div>
@@ -343,27 +344,27 @@ export default async function TransmissaoDetalhe({
                           <span className="text-[10px] whitespace-nowrap text-amber">
                             {r.attempts}ª tentativa
                             {r.next_attempt_at
-                              ? ` · nova às ${new Date(r.next_attempt_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                              ? ` · nova às ${formatTimeBR(r.next_attempt_at)}`
                               : ""}
                           </span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-3">
-                      {r.sent_at ? new Date(r.sent_at).toLocaleString("pt-BR") : ""}
+                      {r.sent_at ? formatDateTimeBR(r.sent_at) : ""}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-3">
-                      {r.delivered_at ? new Date(r.delivered_at).toLocaleString("pt-BR") : ""}
+                      {r.delivered_at ? formatDateTimeBR(r.delivered_at) : ""}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-3">
-                      {r.read_at ? new Date(r.read_at).toLocaleString("pt-BR") : ""}
+                      {r.read_at ? formatDateTimeBR(r.read_at) : ""}
                     </TableCell>
                     <TableCell>
                       {r.reaction_emoji ? (
                         <span
                           title={
                             r.reaction_at
-                              ? new Date(r.reaction_at).toLocaleString("pt-BR")
+                              ? formatDateTimeBR(r.reaction_at)
                               : undefined
                           }
                           className="text-base leading-none"

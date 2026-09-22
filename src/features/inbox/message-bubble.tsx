@@ -11,6 +11,7 @@ import {
   Video,
 } from "lucide-react";
 
+import { formatTimeBR } from "@/lib/format/datetime";
 import type { WhatsappMessage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 
@@ -61,10 +62,7 @@ export function MessageBubble({ message }: { message: WhatsappMessage }) {
   const isDocumentCard = !isImage && !isAudio && Boolean(MEDIA_ICON[message.type]);
   const label = TYPE_LABEL[message.type];
 
-  const time = new Date(message.sent_at).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const time = formatTimeBR(message.sent_at);
 
   return (
     <div className={cn("flex px-1", isOut ? "justify-end" : "justify-start")}>

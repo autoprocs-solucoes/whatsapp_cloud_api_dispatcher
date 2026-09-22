@@ -10,6 +10,7 @@ import { RegisterPhoneNumberButton } from "@/features/meta/register-phone-number
 import { SyncMetaButton } from "@/features/meta/sync-meta-button";
 import type { MetaConnectionView } from "@/server/meta";
 import type { ConversationCostSummary, WabaHealthStatus } from "@/lib/meta/graph-api";
+import { formatDateTimeBR } from "@/lib/format/datetime";
 
 const CONNECTION_METHOD_LABEL: Record<string, string> = {
   coexistence: "Coexistência (WhatsApp Business app + Cloud API)",
@@ -166,12 +167,12 @@ function ConnectionCard({
   cost: ConversationCostSummary | null | undefined;
 }) {
   const { connection: conn, phoneNumbers } = view;
-  const connectedAt = new Date(conn.connected_at).toLocaleString("pt-BR");
+  const connectedAt = formatDateTimeBR(conn.connected_at);
   const lastSyncedAt =
     phoneNumbers.length > 0
       ? new Date(
           Math.max(...phoneNumbers.map((p) => new Date(p.last_synced_at).getTime())),
-        ).toLocaleString("pt-BR")
+        )
       : null;
   const health = conn.health_status as WabaHealthStatus | null;
   // Vem do método guardado na conexão, não de um campo da Meta: o

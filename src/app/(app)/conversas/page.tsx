@@ -10,6 +10,7 @@ import { MessageBubble } from "@/features/inbox/message-bubble";
 import { ReplyForm } from "@/features/inbox/reply-form";
 import { getThread, listConversations, markThreadRead } from "@/server/inbox";
 import { requireActiveWorkspace } from "@/server/workspace";
+import { dayKeyBR, formatDateBR, formatTimeBR } from "@/lib/format/datetime";
 import { cn } from "@/lib/utils";
 
 type SearchParams = Promise<{ tel?: string; q?: string; fechado?: string }>;
@@ -39,23 +40,18 @@ function initials(name: string | null, phone: string): string {
 
 /** Hoje mostra a hora; antes disso, a data — como o WhatsApp. */
 function shortTime(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  return sameDay
-    ? d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const sameDay = dayKeyBR(iso) === dayKeyBR(new Date());
+  return sameDay ? formatTimeBR(iso) : formatDateBR(iso, { day: "2-digit", month: "2-digit" });
 }
 
 /** Separador de dia entre as bolhas, como no app. */
 function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
   const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return "HOJE";
-  if (d.toDateString() === yesterday.toDateString()) return "ONTEM";
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (dayKeyBR(iso) === dayKeyBR(new Date())) return "HOJE";
+  if (dayKeyBR(iso) === dayKeyBR(yesterday)) return "ONTEM";
+  return formatDateBR(iso, { day: "2-digit", month: "long", year: "numeric" });
 }
 
 export default async function ConversasPage({ searchParams }: { searchParams: SearchParams }) {
@@ -236,10 +232,7 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
                 <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain px-6 py-4">
                   {thread.messages.map((m, i) => {
                     const prev = thread.messages[i - 1];
-                    const newDay =
-                      !prev ||
-                      new Date(prev.sent_at).toDateString() !==
-                        new Date(m.sent_at).toDateString();
+                    const newDay = !prev || dayKeyBR(prev.sent_at) !== dayKeyBR(m.sent_at);
                     return (
                       <div key={m.id} className="space-y-1.5">
                         {newDay && (

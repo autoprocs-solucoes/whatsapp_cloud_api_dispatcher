@@ -13,6 +13,7 @@ import { DashboardTimeline } from "@/features/dashboard/dashboard-timeline";
 import { ReadRateInfo } from "@/features/dashboard/read-rate-info";
 import { getDashboardStats } from "@/features/dashboard/queries";
 import { formatInt, formatPct, rate } from "@/lib/metrics/funnel";
+import { formatDateTimeBR } from "@/lib/format/datetime";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -202,7 +203,7 @@ export default async function DashboardPage() {
                     </StatusBadge>
                   </div>
                   <p className="font-mono text-[11px] text-ink-3">
-                    {new Date(last.created_at).toLocaleString("pt-BR")} ·{" "}
+                    {formatDateTimeBR(last.created_at)} ·{" "}
                     {formatInt(last.funnel.planned)} programadas
                   </p>
                 </div>
