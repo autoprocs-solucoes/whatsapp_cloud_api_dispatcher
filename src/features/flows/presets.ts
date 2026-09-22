@@ -66,8 +66,8 @@ export function presetGraph(key: FlowPresetKey): FlowGraph {
               footer: "",
               media: null,
               buttons: [
-                { id: "btn_help", label: "Falar com alguém", kind: "reply" as const, url: "" },
-                { id: "btn_info", label: "Ver informações", kind: "reply" as const, url: "" },
+                { id: "btn_help", label: "Falar com alguém", kind: "reply" as const, url: "", phone: "", code: "" },
+                { id: "btn_info", label: "Ver informações", kind: "reply" as const, url: "", phone: "", code: "" },
               ],
               listTitle: "",
             },
@@ -192,8 +192,8 @@ export function presetGraph(key: FlowPresetKey): FlowGraph {
               footer: "Sua resposta ajuda a melhorar o atendimento",
               media: null,
               buttons: [
-                { id: "btn_yes", label: "Sim, obrigado!", kind: "reply" as const, url: "" },
-                { id: "btn_no", label: "Ainda preciso de ajuda", kind: "reply" as const, url: "" },
+                { id: "btn_yes", label: "Sim, obrigado!", kind: "reply" as const, url: "", phone: "", code: "" },
+                { id: "btn_no", label: "Ainda preciso de ajuda", kind: "reply" as const, url: "", phone: "", code: "" },
               ],
               listTitle: "",
             },

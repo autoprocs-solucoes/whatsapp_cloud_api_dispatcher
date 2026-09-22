@@ -14,32 +14,61 @@ import { z } from "zod";
 
 export const NEXT_HANDLE = "next";
 
+export const BUTTON_KINDS = ["reply", "url", "phone", "copy_code", "opt_out"] as const;
+
+export type FlowButtonKind = (typeof BUTTON_KINDS)[number];
+
 /**
- * Botão do bloco de mensagem.
+ * Botão do bloco de mensagem. São os mesmos tipos do modelo, mas o que a Meta
+ * entrega muda conforme a janela:
  *
- * `reply` é resposta rápida: o contato toca, o WhatsApp devolve o texto e o
- * fluxo segue pela saída daquele botão. `url` é o botão de link (cta_url da
- * Cloud API): leva pra fora da conversa, não gera resposta e, por regra da
- * Meta, só pode existir sozinho na mensagem.
+ * - `reply` e `opt_out` viram botão de resposta de verdade (até 3 como botão,
+ *   acima disso vira lista). O fluxo segue pela saída do botão tocado, e o
+ *   `opt_out` ainda marca o contato como quem não quer mais receber.
+ * - `url` vira botão de link (cta_url): leva pra fora da conversa, não devolve
+ *   resposta e, por regra da Meta, vai sozinho na mensagem.
+ * - `phone` e `copy_code` não existem como botão fora de template aprovado.
+ *   Dentro da janela eles saem no corpo: o telefone numa linha própria, que o
+ *   WhatsApp deixa tocável, e o código numa linha pra copiar. A intenção é a
+ *   mesma; a forma é a que a plataforma entrega.
  */
 export type FlowButton = {
   id: string;
   label: string;
-  kind: "reply" | "url";
+  kind: FlowButtonKind;
   url: string;
+  phone: string;
+  code: string;
 };
 
 export const buttonSchema = z.object({
   id: z.string().min(1),
   label: z.string().trim().min(1, "Escreva o texto do botão").max(25),
-  kind: z.enum(["reply", "url"]).default("reply"),
+  kind: z.enum(BUTTON_KINDS).default("reply"),
   url: z.string().trim().max(2000).default(""),
+  phone: z.string().trim().max(20).default(""),
+  code: z.string().trim().max(15).default(""),
 });
+
+/** Botões que viram resposta de verdade — são eles que ramificam o desenho. */
+export function replyButtonsOf(buttons: FlowButton[]): FlowButton[] {
+  return buttons.filter((b) => b.kind === "reply" || b.kind === "opt_out");
+}
 
 /** Bloco que tem botão de link — ele manda pra fora e não pode dividir a
  * mensagem com resposta rápida. */
 export function linkButtonOf(buttons: FlowButton[]): FlowButton | null {
   return buttons.find((b) => b.kind === "url") ?? null;
+}
+
+/** Linhas que a Meta não entrega como botão e que vão no corpo da mensagem. */
+export function inlineButtonLines(buttons: FlowButton[]): string[] {
+  const lines: string[] = [];
+  for (const b of buttons) {
+    if (b.kind === "phone" && b.phone) lines.push(`${b.label}: ${b.phone}`);
+    if (b.kind === "copy_code" && b.code) lines.push(`${b.label}: ${b.code}`);
+  }
+  return lines;
 }
 
 export const mediaSchema = z.object({

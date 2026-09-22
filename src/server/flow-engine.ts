@@ -11,8 +11,10 @@ import {
 } from "@/lib/meta/graph-api";
 import {
   NEXT_HANDLE,
+  inlineButtonLines,
   linkButtonOf,
   parseGraph,
+  replyButtonsOf,
   type FlowGraph,
   type FlowNode,
   type MessageNodeData,
@@ -75,25 +77,30 @@ async function sendMessageNode(
   };
 
   const link = linkButtonOf(data.buttons);
-  const replies = data.buttons.filter((b) => b.kind === "reply");
+  const replies = replyButtonsOf(data.buttons);
+  // Telefone e código não existem como botão fora de template: entram no fim
+  // do corpo, em linha própria — o WhatsApp deixa o número tocável e o código
+  // copiável segurando.
+  const extraLines = inlineButtonLines(data.buttons);
+  const body = [data.body, ...extraLines].filter(Boolean).join("\n\n");
 
   if (data.media?.url) {
     await sendMediaMessage({
       ...common,
       kind: data.media.type,
       link: data.media.url,
-      caption: data.buttons.length === 0 ? data.body || null : null,
+      caption: data.buttons.length === 0 ? body || null : null,
       filename: data.media.filename ?? null,
     });
     // Com mídia legendada e sem botões a mensagem já foi inteira.
-    if (data.buttons.length === 0 && data.body) return;
+    if (data.buttons.length === 0 && body) return;
   }
 
   // Link é exclusivo: a Meta não entrega cta_url junto com resposta rápida.
   if (link) {
     await sendCtaUrlMessage({
       ...common,
-      body: data.body || link.label,
+      body: body || link.label,
       header: data.title || null,
       footer: data.footer || null,
       displayText: link.label,
@@ -103,15 +110,15 @@ async function sendMessageNode(
   }
 
   if (replies.length === 0) {
-    if (!data.body) return;
-    await sendTextMessage({ ...common, text: data.body });
+    if (!body) return;
+    await sendTextMessage({ ...common, text: body });
     return;
   }
 
   if (replies.length <= 3) {
     await sendInteractiveButtons({
       ...common,
-      body: data.body || "Escolha uma opção",
+      body: body || "Escolha uma opção",
       header: data.title || null,
       footer: data.footer || null,
       buttons: replies.map((b) => ({ id: b.id, title: b.label })),
@@ -121,7 +128,7 @@ async function sendMessageNode(
 
   await sendListMessage({
     ...common,
-    body: data.body || "Escolha uma opção",
+    body: body || "Escolha uma opção",
     header: data.title || null,
     footer: data.footer || null,
     buttonLabel: data.listTitle || "Ver opções",
@@ -352,10 +359,20 @@ export async function handleFlowReply(params: {
   if (!node || node.data.kind !== "message") return;
 
   const answer = params.text.trim().toLowerCase();
-  const button = node.data.buttons.find(
-    (b) => b.kind === "reply" && b.label.trim().toLowerCase() === answer,
+  const button = replyButtonsOf(node.data.buttons).find(
+    (b) => b.label.trim().toLowerCase() === answer,
   );
   if (!button) return;
+
+  // Tocou em "cancelar inscrição": some da próxima transmissão, e o fluxo
+  // encerra aqui mesmo se não tiver caminho desenhado pra isso.
+  if (button.kind === "opt_out") {
+    await admin
+      .from("contact")
+      .update({ opt_out: true, opt_out_at: new Date().toISOString() })
+      .eq("workspace_id", params.workspaceId)
+      .eq("phone_e164", params.phoneE164);
+  }
 
   const targetId = nextNodeId(graph, node.id, button.id);
   if (!targetId) {

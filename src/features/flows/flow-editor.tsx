@@ -16,12 +16,15 @@ import {
   type Node,
 } from "@xyflow/react";
 import {
+  BellOff,
   ChevronLeft,
   Clock,
+  Copy,
   ExternalLink,
   Loader2,
   Maximize2,
   MessageSquare,
+  Phone,
   Plus,
   Reply,
   Save,
@@ -54,7 +57,9 @@ import {
 import { nodeTypes } from "@/features/flows/flow-nodes";
 import {
   NEXT_HANDLE,
+  replyButtonsOf,
   type DelayNodeData,
+  type FlowButtonKind,
   type FlowGraph,
   type FlowNodeData,
   type MessageNodeData,
@@ -81,6 +86,42 @@ type Props = {
 
 function newId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+const BUTTON_KIND_OPTIONS: FlowButtonKind[] = [
+  "reply",
+  "url",
+  "phone",
+  "copy_code",
+  "opt_out",
+];
+
+const BUTTON_KIND_LABEL: Record<FlowButtonKind, string> = {
+  reply: "Resposta rápida",
+  url: "Link",
+  phone: "Telefone",
+  copy_code: "Copiar código",
+  opt_out: "Cancelar inscrição",
+};
+
+function buttonKindIcon(kind: FlowButtonKind) {
+  const className = "size-3.5";
+  if (kind === "url") return <ExternalLink className={className} />;
+  if (kind === "phone") return <Phone className={className} />;
+  if (kind === "copy_code") return <Copy className={className} />;
+  if (kind === "opt_out") return <BellOff className={className} />;
+  return <Reply className={className} />;
+}
+
+function newButton(kind: FlowButtonKind) {
+  return {
+    id: newId("btn"),
+    label: kind === "opt_out" ? "Parar promoções" : "",
+    kind,
+    url: "",
+    phone: "",
+    code: "",
+  };
 }
 
 function emptyMessage(): MessageNodeData {
@@ -362,10 +403,7 @@ function Inspector({
                   onClick={() =>
                     onChange({
                       ...data,
-                      buttons: [
-                        ...data.buttons,
-                        { id: newId("btn"), label: "", kind: "reply" as const, url: "" },
-                      ],
+                      buttons: [...data.buttons, newButton("reply")],
                     })
                   }
                   disabled={data.buttons.length >= 10}
@@ -382,28 +420,34 @@ function Inspector({
                 return (
                   <div key={b.id} className="space-y-1.5 rounded-md border border-line p-2">
                     <div className="flex items-center gap-1.5">
-                      <div className="flex items-center rounded-md border border-line-2 bg-card p-0.5">
-                        {(["reply", "url"] as const).map((k) => (
-                          <button
-                            key={k}
-                            type="button"
-                            title={k === "reply" ? "Resposta rápida" : "Link"}
-                            onClick={() => patch({ kind: k })}
-                            className={cn(
-                              "rounded-sm p-1 transition-colors",
-                              b.kind === k
-                                ? "bg-brand-soft text-brand-strong"
-                                : "text-ink-3 hover:text-ink",
-                            )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
+                            title={BUTTON_KIND_LABEL[b.kind]}
+                            aria-label="Tipo do botão"
                           >
-                            {k === "reply" ? (
-                              <Reply className="size-3.5" />
-                            ) : (
-                              <ExternalLink className="size-3.5" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
+                            {buttonKindIcon(b.kind)}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-56">
+                          {BUTTON_KIND_OPTIONS.map((k) => (
+                            <DropdownMenuItem
+                              key={k}
+                              onClick={() =>
+                                patch({
+                                  kind: k,
+                                  label:
+                                    k === "opt_out" && !b.label ? "Parar promoções" : b.label,
+                                })
+                              }
+                            >
+                              {buttonKindIcon(k)} {BUTTON_KIND_LABEL[k]}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Input
                         value={b.label}
                         maxLength={25}
@@ -431,6 +475,33 @@ function Inspector({
                         onChange={(e) => patch({ url: e.target.value })}
                       />
                     )}
+                    {b.kind === "phone" && (
+                      <>
+                        <Input
+                          value={b.phone}
+                          placeholder="+5511999999999"
+                          onChange={(e) => patch({ phone: e.target.value })}
+                        />
+                        <p className="text-[11px] text-ink-3">
+                          Dentro da janela de 24h a Meta não entrega botão de ligar: o número sai
+                          numa linha da mensagem, tocável no WhatsApp.
+                        </p>
+                      </>
+                    )}
+                    {b.kind === "copy_code" && (
+                      <>
+                        <Input
+                          value={b.code}
+                          maxLength={15}
+                          placeholder="PROMO10"
+                          onChange={(e) => patch({ code: e.target.value })}
+                        />
+                        <p className="text-[11px] text-ink-3">
+                          Botão de copiar só existe em modelo aprovado: aqui o código sai numa
+                          linha da mensagem, pra pessoa copiar segurando.
+                        </p>
+                      </>
+                    )}
                   </div>
                 );
               })}
@@ -440,7 +511,7 @@ function Inspector({
                   botões não aparecem.
                 </p>
               )}
-              {data.buttons.filter((b) => b.kind === "reply").length > 3 && (
+              {replyButtonsOf(data.buttons).length > 3 && (
                 <div className="space-y-1.5">
                   <Label htmlFor="ins-list">Título da lista</Label>
                   <Input

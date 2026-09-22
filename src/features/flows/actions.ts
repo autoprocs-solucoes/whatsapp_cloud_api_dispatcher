@@ -267,6 +267,16 @@ export async function publishFlowAction(id: string): Promise<ActionResult> {
     }
     const semUrl = links.find((b) => !b.url.trim());
     if (semUrl) return { ok: false, error: `O botão "${semUrl.label}" está sem endereço` };
+
+    const semTelefone = node.data.buttons.find((b) => b.kind === "phone" && !b.phone.trim());
+    if (semTelefone) {
+      return { ok: false, error: `O botão "${semTelefone.label}" está sem telefone` };
+    }
+
+    const semCodigo = node.data.buttons.find((b) => b.kind === "copy_code" && !b.code.trim());
+    if (semCodigo) {
+      return { ok: false, error: `O botão "${semCodigo.label}" está sem código` };
+    }
   }
 
   const { error } = await admin

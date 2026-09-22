@@ -2,12 +2,15 @@
 
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import {
+  BellOff,
   Clock,
+  Copy,
   ExternalLink,
   FileText,
   Image as ImageIcon,
   List,
   MessageSquare,
+  Phone,
   Play,
   Video,
 } from "lucide-react";
@@ -15,7 +18,9 @@ import {
 import { WhatsAppMark } from "@/components/whatsapp-mark";
 import {
   NEXT_HANDLE,
+  replyButtonsOf,
   type DelayNodeData,
+  type FlowButtonKind,
   type MessageNodeData,
   type StartNodeData,
   type TemplateNodeData,
@@ -27,6 +32,15 @@ import { cn } from "@/lib/utils";
  * saída única "next"; com botões, cada botão puxa a sua — é assim que o fluxo
  * ramifica pela resposta de quem recebeu.
  */
+
+function buttonIcon(kind: FlowButtonKind) {
+  const className = "size-3";
+  if (kind === "url") return <ExternalLink className={className} />;
+  if (kind === "phone") return <Phone className={className} />;
+  if (kind === "copy_code") return <Copy className={className} />;
+  if (kind === "opt_out") return <BellOff className={className} />;
+  return null;
+}
 
 const MEDIA_ICON = {
   image: ImageIcon,
@@ -134,7 +148,8 @@ export function TemplateNode({ data, selected }: NodeProps<Node<TemplateNodeData
 
 export function MessageNode({ data, selected }: NodeProps<Node<MessageNodeData>>) {
   const MediaIcon = data.media ? MEDIA_ICON[data.media.type] : null;
-  const asList = data.buttons.filter((b) => b.kind === "reply").length > 3;
+  const replies = replyButtonsOf(data.buttons);
+  const asList = replies.length > 3;
 
   return (
     <NodeShell selected={selected}>
@@ -178,14 +193,16 @@ export function MessageNode({ data, selected }: NodeProps<Node<MessageNodeData>>
               key={b.id}
               className="relative flex items-center justify-center gap-1.5 border-b border-line px-3 py-2 text-center text-[12px] font-medium text-ok-ink last:border-b-0"
             >
-              {b.kind === "url" && <ExternalLink className="size-3" />}
+              {buttonIcon(b.kind)}
               {b.label || "Botão"}
-              {/* Link não devolve resposta, então ele não abre caminho próprio
-                  no desenho — quem continua é o "Próximo passo" do bloco. */}
-              {b.kind === "reply" && <OutHandle id={b.id} className="!top-1/2 !-translate-y-1/2" />}
+              {/* Só resposta abre caminho próprio: link leva pra fora, e
+                  telefone e código saem no corpo da mensagem. */}
+              {(b.kind === "reply" || b.kind === "opt_out") && (
+                <OutHandle id={b.id} className="!top-1/2 !-translate-y-1/2" />
+              )}
             </div>
           ))}
-          {data.buttons.every((b) => b.kind === "url") && (
+          {replies.length === 0 && (
             <div className="relative flex items-center justify-end gap-1 border-t border-line px-3 py-2 text-[11px] text-ink-3">
               Próximo passo
               <OutHandle id={NEXT_HANDLE} className="!top-1/2 !-translate-y-1/2" />
