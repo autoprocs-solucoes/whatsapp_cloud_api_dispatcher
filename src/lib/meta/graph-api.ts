@@ -330,6 +330,13 @@ type TemplateAnalyticsRawResponse = {
   data?: { data_points?: TemplateAnalyticsRawDataPoint[] }[];
 };
 
+/**
+ * A Meta aceita no máximo 10 `template_ids` por chamada de analytics. Passar
+ * 11 devolve 400 com a mensagem "template_ids" e nada mais — foi o que fazia
+ * a conta com 42 modelos ficar com todos os números zerados.
+ */
+const ANALYTICS_IDS_PER_CALL = 10;
+
 // Best-effort — agrega por template_id somando os data_points diários do
 // período. Retorna mapa vazio (não lança) se a Meta recusar/mudar o formato.
 export async function getTemplateAnalytics(
@@ -342,20 +349,35 @@ export async function getTemplateAnalytics(
   const out = new Map<string, TemplateAnalyticsPoint>();
   if (templateMetaIds.length === 0) return out;
 
-  try {
-    const data = await request<TemplateAnalyticsRawResponse>(`/${wabaId}/template_analytics`, {
-      method: "GET",
-      token,
-      query: {
-        start: String(startUnix),
-        end: String(endUnix),
-        granularity: "DAILY",
-        template_ids: JSON.stringify(templateMetaIds),
-        metric_types: JSON.stringify(["sent", "delivered", "read", "clicked"]),
-      },
-    });
+  const chunks: string[][] = [];
+  for (let i = 0; i < templateMetaIds.length; i += ANALYTICS_IDS_PER_CALL) {
+    chunks.push(templateMetaIds.slice(i, i + ANALYTICS_IDS_PER_CALL));
+  }
 
-    for (const series of data.data ?? []) {
+  // Um lote que falhe não pode zerar os outros: cada um tem seu try.
+  const responses = await Promise.all(
+    chunks.map(async (ids) => {
+      try {
+        return await request<TemplateAnalyticsRawResponse>(`/${wabaId}/template_analytics`, {
+          method: "GET",
+          token,
+          query: {
+            start: String(startUnix),
+            end: String(endUnix),
+            granularity: "DAILY",
+            template_ids: JSON.stringify(ids),
+            metric_types: JSON.stringify(["sent", "delivered", "read", "clicked"]),
+          },
+        });
+      } catch (err) {
+        console.warn(`[getTemplateAnalytics] falhou pra WABA ${wabaId}`, err);
+        return null;
+      }
+    }),
+  );
+
+  for (const data of responses) {
+    for (const series of data?.data ?? []) {
       for (const point of series.data_points ?? []) {
         if (!point.template_id) continue;
         const clickedCount = (point.clicked ?? []).reduce((acc, c) => acc + (c.count ?? 0), 0);
@@ -373,8 +395,6 @@ export async function getTemplateAnalytics(
         out.set(point.template_id, existing);
       }
     }
-  } catch (err) {
-    console.warn(`[getTemplateAnalytics] falhou pra WABA ${wabaId}`, err);
   }
 
   return out;
