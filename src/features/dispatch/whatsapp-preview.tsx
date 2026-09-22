@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Plus, Video } from "lucide-react";
+import { ChevronLeft, FileText, Play, Plus, Video } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -9,8 +9,19 @@ export type PreviewButton = {
   text: string;
 };
 
+/** Cabeçalho de mídia. `url` pode ser o arquivo local que a pessoa acabou de
+ * escolher (object URL) — assim a prévia mostra a imagem de verdade antes de
+ * existir qualquer coisa na Meta. */
+export type PreviewMedia = {
+  kind: "image" | "video" | "document";
+  url?: string | null;
+  filename?: string | null;
+};
+
 type Props = {
   senderName?: string | null;
+  /** Cabeçalho de imagem, vídeo ou arquivo — vem antes do texto no balão. */
+  media?: PreviewMedia | null;
   headerText?: string | null;
   bodyText?: string | null;
   footerText?: string | null;
@@ -72,6 +83,75 @@ function renderText(
   return parts;
 }
 
+/**
+ * Mídia do cabeçalho dentro do balão, do jeito que o WhatsApp mostra: imagem e
+ * vídeo ocupam a largura toda com cantos arredondados, arquivo vira a fileira
+ * com ícone e nome.
+ */
+function MediaBubble({ media, device }: { media: PreviewMedia; device: boolean }) {
+  const box = device ? "h-[180px]" : "h-[120px]";
+
+  if (media.kind === "document") {
+    return (
+      <div
+        className={cn(
+          "mb-1 flex items-center gap-2 rounded-[6px] bg-black/5",
+          device ? "px-3 py-2.5" : "px-2 py-1.5",
+        )}
+      >
+        <FileText className={cn("shrink-0 text-wa-ink-2", device ? "size-6" : "size-4")} />
+        <span className={cn("truncate text-wa-ink", device ? "text-[14px]" : "text-[11px]")}>
+          {media.filename || "documento.pdf"}
+        </span>
+      </div>
+    );
+  }
+
+  if (media.kind === "image" && media.url) {
+    return (
+      // Arquivo local (blob:) ou URL pública — o next/image não ajuda aqui,
+      // porque o endereço só existe no navegador de quem está montando.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={media.url}
+        alt=""
+        className={cn("mb-1 w-full rounded-[6px] object-cover", box)}
+      />
+    );
+  }
+
+  if (media.kind === "video" && media.url) {
+    return (
+      <div className={cn("relative mb-1 w-full overflow-hidden rounded-[6px] bg-black", box)}>
+        <video src={media.url} className="size-full object-cover" muted playsInline />
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex size-10 items-center justify-center rounded-full bg-black/55">
+            <Play className="size-5 fill-white text-white" />
+          </span>
+        </span>
+      </div>
+    );
+  }
+
+  // Sem arquivo escolhido ainda: mostra a moldura pra pessoa ver onde entra.
+  return (
+    <div
+      className={cn(
+        "mb-1 flex w-full items-center justify-center rounded-[6px] bg-black/5 text-wa-ink-2",
+        box,
+      )}
+    >
+      {media.kind === "video" ? (
+        <Video className={device ? "size-8" : "size-6"} />
+      ) : (
+        <span className={cn("text-center", device ? "text-[13px]" : "text-[11px]")}>
+          imagem do cabeçalho
+        </span>
+      )}
+    </div>
+  );
+}
+
 function nowLabel(): string {
   return new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
@@ -131,6 +211,7 @@ function StatusBar({ device }: { device: boolean }) {
  */
 export function WhatsAppPreview({
   senderName,
+  media,
   headerText,
   bodyText,
   footerText,
@@ -141,7 +222,9 @@ export function WhatsAppPreview({
   chatClassName,
   size = "device",
 }: Props) {
-  const hasContent = Boolean(headerText || bodyText || footerText || (buttons && buttons.length > 0));
+  const hasContent = Boolean(
+    headerText || bodyText || footerText || media || (buttons && buttons.length > 0),
+  );
   const initials = (senderName ?? "Empresa").slice(0, 2).toUpperCase();
   const device = size === "device";
   /** Escolhe a classe conforme o tamanho — deixa as duas medidas lado a lado
@@ -257,6 +340,8 @@ export function WhatsAppPreview({
                   aria-hidden
                   className="absolute top-0 -left-[7px] size-0 border-[5px] border-transparent border-t-wa-in border-r-wa-in"
                 />
+
+                {media && <MediaBubble media={media} device={device} />}
 
                 {headerText && (
                   <p className="mb-1 leading-snug font-semibold">

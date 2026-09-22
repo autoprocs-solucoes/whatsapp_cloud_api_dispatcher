@@ -14,12 +14,33 @@ import { z } from "zod";
 
 export const NEXT_HANDLE = "next";
 
+/**
+ * Botão do bloco de mensagem.
+ *
+ * `reply` é resposta rápida: o contato toca, o WhatsApp devolve o texto e o
+ * fluxo segue pela saída daquele botão. `url` é o botão de link (cta_url da
+ * Cloud API): leva pra fora da conversa, não gera resposta e, por regra da
+ * Meta, só pode existir sozinho na mensagem.
+ */
+export type FlowButton = {
+  id: string;
+  label: string;
+  kind: "reply" | "url";
+  url: string;
+};
+
 export const buttonSchema = z.object({
   id: z.string().min(1),
   label: z.string().trim().min(1, "Escreva o texto do botão").max(25),
+  kind: z.enum(["reply", "url"]).default("reply"),
+  url: z.string().trim().max(2000).default(""),
 });
 
-export type FlowButton = z.infer<typeof buttonSchema>;
+/** Bloco que tem botão de link — ele manda pra fora e não pode dividir a
+ * mensagem com resposta rápida. */
+export function linkButtonOf(buttons: FlowButton[]): FlowButton | null {
+  return buttons.find((b) => b.kind === "url") ?? null;
+}
 
 export const mediaSchema = z.object({
   type: z.enum(["image", "video", "document"]),

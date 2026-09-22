@@ -1,7 +1,16 @@
 "use client";
 
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { Clock, FileText, Image as ImageIcon, List, MessageSquare, Play, Video } from "lucide-react";
+import {
+  Clock,
+  ExternalLink,
+  FileText,
+  Image as ImageIcon,
+  List,
+  MessageSquare,
+  Play,
+  Video,
+} from "lucide-react";
 
 import { WhatsAppMark } from "@/components/whatsapp-mark";
 import {
@@ -125,7 +134,7 @@ export function TemplateNode({ data, selected }: NodeProps<Node<TemplateNodeData
 
 export function MessageNode({ data, selected }: NodeProps<Node<MessageNodeData>>) {
   const MediaIcon = data.media ? MEDIA_ICON[data.media.type] : null;
-  const asList = data.buttons.length > 3;
+  const asList = data.buttons.filter((b) => b.kind === "reply").length > 3;
 
   return (
     <NodeShell selected={selected}>
@@ -167,12 +176,21 @@ export function MessageNode({ data, selected }: NodeProps<Node<MessageNodeData>>
           {data.buttons.map((b) => (
             <div
               key={b.id}
-              className="relative border-b border-line px-3 py-2 text-center text-[12px] font-medium text-ok-ink last:border-b-0"
+              className="relative flex items-center justify-center gap-1.5 border-b border-line px-3 py-2 text-center text-[12px] font-medium text-ok-ink last:border-b-0"
             >
+              {b.kind === "url" && <ExternalLink className="size-3" />}
               {b.label || "Botão"}
-              <OutHandle id={b.id} className="!top-1/2 !-translate-y-1/2" />
+              {/* Link não devolve resposta, então ele não abre caminho próprio
+                  no desenho — quem continua é o "Próximo passo" do bloco. */}
+              {b.kind === "reply" && <OutHandle id={b.id} className="!top-1/2 !-translate-y-1/2" />}
             </div>
           ))}
+          {data.buttons.every((b) => b.kind === "url") && (
+            <div className="relative flex items-center justify-end gap-1 border-t border-line px-3 py-2 text-[11px] text-ink-3">
+              Próximo passo
+              <OutHandle id={NEXT_HANDLE} className="!top-1/2 !-translate-y-1/2" />
+            </div>
+          )}
         </div>
       ) : (
         <div className="relative flex items-center justify-end gap-1 border-t border-line px-3 py-2 text-[11px] text-ink-3">

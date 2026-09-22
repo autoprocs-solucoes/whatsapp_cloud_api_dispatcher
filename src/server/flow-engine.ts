@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   GraphApiError,
+  sendCtaUrlMessage,
   sendInteractiveButtons,
   sendListMessage,
   sendMediaMessage,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/meta/graph-api";
 import {
   NEXT_HANDLE,
+  linkButtonOf,
   parseGraph,
   type FlowGraph,
   type FlowNode,
@@ -72,6 +74,9 @@ async function sendMessageNode(
     to: run.phone_e164,
   };
 
+  const link = linkButtonOf(data.buttons);
+  const replies = data.buttons.filter((b) => b.kind === "reply");
+
   if (data.media?.url) {
     await sendMediaMessage({
       ...common,
@@ -84,19 +89,32 @@ async function sendMessageNode(
     if (data.buttons.length === 0 && data.body) return;
   }
 
-  if (data.buttons.length === 0) {
+  // Link é exclusivo: a Meta não entrega cta_url junto com resposta rápida.
+  if (link) {
+    await sendCtaUrlMessage({
+      ...common,
+      body: data.body || link.label,
+      header: data.title || null,
+      footer: data.footer || null,
+      displayText: link.label,
+      url: link.url,
+    });
+    return;
+  }
+
+  if (replies.length === 0) {
     if (!data.body) return;
     await sendTextMessage({ ...common, text: data.body });
     return;
   }
 
-  if (data.buttons.length <= 3) {
+  if (replies.length <= 3) {
     await sendInteractiveButtons({
       ...common,
       body: data.body || "Escolha uma opção",
       header: data.title || null,
       footer: data.footer || null,
-      buttons: data.buttons.map((b) => ({ id: b.id, title: b.label })),
+      buttons: replies.map((b) => ({ id: b.id, title: b.label })),
     });
     return;
   }
@@ -107,7 +125,7 @@ async function sendMessageNode(
     header: data.title || null,
     footer: data.footer || null,
     buttonLabel: data.listTitle || "Ver opções",
-    rows: data.buttons.map((b) => ({ id: b.id, title: b.label })),
+    rows: replies.map((b) => ({ id: b.id, title: b.label })),
   });
 }
 
@@ -204,7 +222,9 @@ export async function advanceFlowRun(run: FlowRun): Promise<void> {
         return;
       }
 
-      if (node.data.buttons.length > 0) {
+      // Só espera resposta quem tem botão de resposta: botão de link leva pra
+      // fora da conversa e não volta como mensagem.
+      if (node.data.buttons.some((b) => b.kind === "reply")) {
         await admin
           .from("flow_run")
           .update({ status: "waiting_reply", current_node_id: node.id, resume_at: null })
@@ -332,7 +352,9 @@ export async function handleFlowReply(params: {
   if (!node || node.data.kind !== "message") return;
 
   const answer = params.text.trim().toLowerCase();
-  const button = node.data.buttons.find((b) => b.label.trim().toLowerCase() === answer);
+  const button = node.data.buttons.find(
+    (b) => b.kind === "reply" && b.label.trim().toLowerCase() === answer,
+  );
   if (!button) return;
 
   const targetId = nextNodeId(graph, node.id, button.id);

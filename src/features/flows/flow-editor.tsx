@@ -18,12 +18,15 @@ import {
 import {
   ChevronLeft,
   Clock,
+  ExternalLink,
   Loader2,
   Maximize2,
   MessageSquare,
   Plus,
+  Reply,
   Save,
   Trash2,
+  Upload,
   X,
   ZoomIn,
   ZoomOut,
@@ -42,7 +45,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { publishFlowAction, saveFlowGraphAction, unpublishFlowAction } from "@/features/flows/actions";
+import {
+  publishFlowAction,
+  saveFlowGraphAction,
+  unpublishFlowAction,
+  uploadFlowMediaAction,
+} from "@/features/flows/actions";
 import { nodeTypes } from "@/features/flows/flow-nodes";
 import {
   NEXT_HANDLE,
@@ -95,6 +103,12 @@ function emptyDelay(): DelayNodeData {
 // Painel de edição do bloco selecionado — o mesmo lugar do vídeo: abre à
 // esquerda, por cima do canvas, e o canvas continua navegável ao lado.
 // ----------------------------------------------------------------------------
+const MEDIA_ACCEPT: Record<"image" | "video" | "document", string> = {
+  image: "image/png,image/jpeg,image/webp",
+  video: "video/mp4,video/3gpp",
+  document: ".pdf,.doc,.docx,.xls,.xlsx",
+};
+
 function Inspector({
   node,
   templates,
@@ -109,6 +123,30 @@ function Inspector({
   onDelete: () => void;
 }) {
   const data = node.data;
+  const mediaInputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  /** Sobe o arquivo e grava a URL pública no bloco. */
+  function onUpload(kind: "image" | "video" | "document", file: File) {
+    if (data.kind !== "message") return;
+    const fd = new FormData();
+    fd.append("kind", kind);
+    fd.append("file", file);
+    setUploading(true);
+    void uploadFlowMediaAction(fd).then((result) => {
+      setUploading(false);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onChange({
+        ...data,
+        media: { type: kind, url: result.data.url, filename: result.data.filename },
+      });
+      toast.success("Arquivo enviado");
+    });
+  }
 
   return (
     <aside className="absolute top-0 left-0 z-10 flex h-full w-[340px] flex-col border-r border-line bg-card shadow-lg">
@@ -252,17 +290,66 @@ function Inspector({
                   </button>
                 ))}
               </div>
+
               {data.media && (
-                <Input
-                  value={data.media.url}
-                  placeholder="https://..."
-                  onChange={(e) =>
-                    onChange({
-                      ...data,
-                      media: { ...data.media!, url: e.target.value },
-                    })
-                  }
-                />
+                <>
+                  <input
+                    ref={mediaInputRef}
+                    type="file"
+                    accept={MEDIA_ACCEPT[data.media.type]}
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f && data.media) onUpload(data.media.type, f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragging(false);
+                      const f = e.dataTransfer.files?.[0];
+                      if (f && data.media) onUpload(data.media.type, f);
+                    }}
+                    className={cn(
+                      "flex flex-col items-center gap-2 rounded-lg border border-dashed px-3 py-5 text-center transition-colors",
+                      dragging ? "border-brand bg-brand-soft" : "border-line-2 bg-card",
+                    )}
+                  >
+                    {data.media.url && data.media.type === "image" ? (
+                      // Arquivo já no storage: mostra pra confirmar que subiu
+                      // o certo. eslint-disable-next-line @next/next/no-img-element
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={data.media.url}
+                        alt=""
+                        className="max-h-24 rounded-md object-cover"
+                      />
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploading}
+                      onClick={() => mediaInputRef.current?.click()}
+                    >
+                      {uploading ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="size-3.5" />
+                      )}
+                      {data.media.url ? "Trocar arquivo" : "Escolher arquivo"}
+                    </Button>
+                    <span className="text-[11px] text-ink-3">
+                      {data.media.filename || (data.media.url ? "arquivo enviado" : "ou arraste até aqui")}
+                    </span>
+                  </div>
+                </>
               )}
             </div>
 
@@ -275,7 +362,10 @@ function Inspector({
                   onClick={() =>
                     onChange({
                       ...data,
-                      buttons: [...data.buttons, { id: newId("btn"), label: "" }],
+                      buttons: [
+                        ...data.buttons,
+                        { id: newId("btn"), label: "", kind: "reply" as const, url: "" },
+                      ],
                     })
                   }
                   disabled={data.buttons.length >= 10}
@@ -283,37 +373,74 @@ function Inspector({
                   <Plus className="size-3.5" /> Botão
                 </Button>
               </div>
-              {data.buttons.map((b, i) => (
-                <div key={b.id} className="flex items-center gap-1.5">
-                  <Input
-                    value={b.label}
-                    maxLength={25}
-                    placeholder={`Botão ${i + 1}`}
-                    onChange={(e) =>
-                      onChange({
-                        ...data,
-                        buttons: data.buttons.map((x) =>
-                          x.id === b.id ? { ...x, label: e.target.value } : x,
-                        ),
-                      })
-                    }
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Remover botão"
-                    onClick={() =>
-                      onChange({
-                        ...data,
-                        buttons: data.buttons.filter((x) => x.id !== b.id),
-                      })
-                    }
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              ))}
-              {data.buttons.length > 3 && (
+              {data.buttons.map((b, i) => {
+                const patch = (fields: Partial<typeof b>) =>
+                  onChange({
+                    ...data,
+                    buttons: data.buttons.map((x) => (x.id === b.id ? { ...x, ...fields } : x)),
+                  });
+                return (
+                  <div key={b.id} className="space-y-1.5 rounded-md border border-line p-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center rounded-md border border-line-2 bg-card p-0.5">
+                        {(["reply", "url"] as const).map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            title={k === "reply" ? "Resposta rápida" : "Link"}
+                            onClick={() => patch({ kind: k })}
+                            className={cn(
+                              "rounded-sm p-1 transition-colors",
+                              b.kind === k
+                                ? "bg-brand-soft text-brand-strong"
+                                : "text-ink-3 hover:text-ink",
+                            )}
+                          >
+                            {k === "reply" ? (
+                              <Reply className="size-3.5" />
+                            ) : (
+                              <ExternalLink className="size-3.5" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      <Input
+                        value={b.label}
+                        maxLength={25}
+                        placeholder={`Botão ${i + 1}`}
+                        onChange={(e) => patch({ label: e.target.value })}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Remover botão"
+                        onClick={() =>
+                          onChange({
+                            ...data,
+                            buttons: data.buttons.filter((x) => x.id !== b.id),
+                          })
+                        }
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                    {b.kind === "url" && (
+                      <Input
+                        value={b.url}
+                        placeholder="https://..."
+                        onChange={(e) => patch({ url: e.target.value })}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+              {data.buttons.some((b) => b.kind === "url") && data.buttons.length > 1 && (
+                <p className="text-[11px] text-amber">
+                  O WhatsApp entrega botão de link sozinho: com um link na mensagem, os outros
+                  botões não aparecem.
+                </p>
+              )}
+              {data.buttons.filter((b) => b.kind === "reply").length > 3 && (
                 <div className="space-y-1.5">
                   <Label htmlFor="ins-list">Título da lista</Label>
                   <Input

@@ -253,6 +253,22 @@ export async function publishFlowAction(id: string): Promise<ActionResult> {
   const empty = messages.find((n) => n.data.kind === "message" && !n.data.body.trim());
   if (empty) return { ok: false, error: "Tem mensagem sem texto no fluxo" };
 
+  for (const node of messages) {
+    if (node.data.kind !== "message") continue;
+    const links = node.data.buttons.filter((b) => b.kind === "url");
+    if (links.length > 1) {
+      return { ok: false, error: "Cada mensagem só pode ter um botão de link" };
+    }
+    if (links.length === 1 && node.data.buttons.length > 1) {
+      return {
+        ok: false,
+        error: "Mensagem com botão de link não pode ter outros botões — a Meta entrega o link sozinho",
+      };
+    }
+    const semUrl = links.find((b) => !b.url.trim());
+    if (semUrl) return { ok: false, error: `O botão "${semUrl.label}" está sem endereço` };
+  }
+
   const { error } = await admin
     .from("flow")
     .update({ status: "published", published_at: new Date().toISOString() })
@@ -302,4 +318,71 @@ export async function createFlowFromPresetAction(
 
   revalidatePath("/fluxos");
   return { ok: true, data: { id: data.id } };
+}
+
+// ----------------------------------------------------------------------------
+// Mídia dos blocos
+// ----------------------------------------------------------------------------
+
+const MEDIA_LIMITS: Record<string, { mimes: string[]; maxBytes: number; label: string }> = {
+  image: { mimes: ["image/png", "image/jpeg", "image/webp"], maxBytes: 5 * 1024 * 1024, label: "imagem" },
+  video: { mimes: ["video/mp4", "video/3gpp"], maxBytes: 16 * 1024 * 1024, label: "vídeo" },
+  document: {
+    mimes: [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ],
+    maxBytes: 100 * 1024 * 1024,
+    label: "arquivo",
+  },
+};
+
+/**
+ * Sobe a mídia de um bloco e devolve a URL pública.
+ *
+ * Público de propósito: quem baixa o arquivo é o servidor da Meta na hora de
+ * entregar a mensagem, e ele não manda credencial nenhuma. Os limites de
+ * tamanho são os da Cloud API — passar deles faz a mensagem falhar só no
+ * envio, longe daqui.
+ */
+export async function uploadFlowMediaAction(
+  formData: FormData,
+): Promise<ActionResult<{ url: string; filename: string }>> {
+  const workspace = await requireActiveWorkspace();
+
+  const kind = String(formData.get("kind") ?? "");
+  const limits = MEDIA_LIMITS[kind];
+  if (!limits) return { ok: false, error: "Tipo de mídia inválido" };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Selecione um arquivo" };
+  }
+  if (!limits.mimes.includes(file.type)) {
+    return { ok: false, error: `Formato não aceito pra ${limits.label}: ${file.type || "desconhecido"}` };
+  }
+  if (file.size > limits.maxBytes) {
+    const mb = Math.round(limits.maxBytes / (1024 * 1024));
+    return { ok: false, error: `Arquivo muito grande (máx. ${mb}MB pra ${limits.label})` };
+  }
+
+  const admin = createAdminClient();
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
+  const path = `${workspace.id}/${Date.now()}-${safeName}`;
+
+  const { error } = await admin.storage.from("flow-media").upload(path, file, {
+    contentType: file.type,
+    cacheControl: "31536000",
+    upsert: false,
+  });
+  if (error) return { ok: false, error: `Falha no upload: ${error.message}` };
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from("flow-media").getPublicUrl(path);
+
+  return { ok: true, data: { url: publicUrl, filename: file.name } };
 }

@@ -350,7 +350,26 @@ export async function createTemplateAction(
   if (data.footerText) components.push({ type: "FOOTER", text: data.footerText });
 
   if (data.buttons.length > 0) {
-    components.push({ type: "BUTTONS", buttons: data.buttons as MetaTemplateButton[] });
+    // A Meta tem um formato por tipo: link com variável leva `example`, e o
+    // botão de copiar código leva o código como exemplo.
+    const buttons: MetaTemplateButton[] = data.buttons.map((b) => {
+      if (b.type === "URL") {
+        return {
+          type: "URL",
+          text: b.text,
+          url: b.url,
+          ...(b.url.includes("{{") ? { example: [b.urlExample] } : {}),
+        };
+      }
+      if (b.type === "PHONE_NUMBER") {
+        return { type: "PHONE_NUMBER", text: b.text, phone_number: b.phone_number };
+      }
+      if (b.type === "COPY_CODE") {
+        return { type: "COPY_CODE", text: b.text || "Copiar código", example: [b.example] };
+      }
+      return { type: "QUICK_REPLY", text: b.text };
+    });
+    components.push({ type: "BUTTONS", buttons });
   }
 
   let created;

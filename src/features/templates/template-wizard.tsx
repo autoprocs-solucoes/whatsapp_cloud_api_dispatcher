@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  BellOff,
   Check,
   ChevronLeft,
+  Copy,
   FileText,
   Image as ImageIcon,
+  Link2,
   Loader2,
   Megaphone,
   Phone,
@@ -84,6 +87,13 @@ type Connection = { id: string; label: string };
 
 type Props = { connections: Connection[] };
 
+const BUTTON_LABEL: Record<TemplateButtonInput["type"], string> = {
+  QUICK_REPLY: "Resposta",
+  URL: "Link",
+  PHONE_NUMBER: "Telefone",
+  COPY_CODE: "Código",
+};
+
 function Counter({ value, max }: { value: number; max: number }) {
   return (
     <span className={cn("text-[11px] tabular-nums", value > max ? "text-red" : "text-ink-3")}>
@@ -108,6 +118,9 @@ export function TemplateWizard({ connections }: Props) {
   const [headerText, setHeaderText] = useState("");
   const [headerHandle, setHeaderHandle] = useState("");
   const [headerFileName, setHeaderFileName] = useState("");
+  /** Arquivo escolhido, só pra prévia: a Meta guarda o dela pelo handle. */
+  const [headerFileUrl, setHeaderFileUrl] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [bodyText, setBodyText] = useState("");
   const [footerText, setFooterText] = useState("");
   const [buttons, setButtons] = useState<TemplateButtonInput[]>([]);
@@ -120,7 +133,26 @@ export function TemplateWizard({ connections }: Props) {
   const bodyPlaceholders = useMemo(() => extractPlaceholders(bodyText), [bodyText]);
   const hasVariables = headerPlaceholders.length + bodyPlaceholders.length > 0;
 
-  const previewButtons: PreviewButton[] = buttons.map((b) => ({ type: b.type, text: b.text }));
+  // Object URL vira memória presa se ninguém revogar.
+  useEffect(() => {
+    return () => {
+      if (headerFileUrl) URL.revokeObjectURL(headerFileUrl);
+    };
+  }, [headerFileUrl]);
+
+  const previewButtons: PreviewButton[] = buttons.map((b) => ({
+    type: b.type,
+    text: b.type === "COPY_CODE" ? b.text || "Copiar código" : b.text,
+  }));
+
+  const previewMedia =
+    headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT"
+      ? {
+          kind: headerType.toLowerCase() as "image" | "video" | "document",
+          url: headerFileUrl,
+          filename: headerFileName,
+        }
+      : null;
   const previewResolved = useMemo(() => {
     const out: Record<string, string> = {};
     for (const [k, v] of Object.entries(examples)) if (v.trim()) out[k] = v;
@@ -145,14 +177,24 @@ export function TemplateWizard({ connections }: Props) {
     });
   }
 
-  function addButton(type: TemplateButtonInput["type"]) {
+  function addButton(type: TemplateButtonInput["type"] | "OPT_OUT") {
     if (buttons.length >= 10) {
       toast.error("No máximo 10 botões");
       return;
     }
-    if (type === "URL") setButtons((b) => [...b, { type, text: "", url: "" }]);
-    else if (type === "PHONE_NUMBER") setButtons((b) => [...b, { type, text: "", phone_number: "" }]);
-    else setButtons((b) => [...b, { type, text: "" }]);
+    if (type === "URL") {
+      setButtons((b) => [...b, { type, text: "", url: "", urlExample: "" }]);
+    } else if (type === "PHONE_NUMBER") {
+      setButtons((b) => [...b, { type, text: "", phone_number: "" }]);
+    } else if (type === "COPY_CODE") {
+      setButtons((b) => [...b, { type, text: "Copiar código", example: "" }]);
+    } else if (type === "OPT_OUT") {
+      // Cancelamento de inscrição é uma resposta rápida com texto fixo — é
+      // assim que a Meta espera o opt-out em modelo de marketing.
+      setButtons((b) => [...b, { type: "QUICK_REPLY", text: "Parar promoções" }]);
+    } else {
+      setButtons((b) => [...b, { type: "QUICK_REPLY", text: "" }]);
+    }
   }
 
   function updateButton(index: number, patch: Partial<TemplateButtonInput>) {
@@ -176,6 +218,10 @@ export function TemplateWizard({ connections }: Props) {
       if (result.ok) {
         setHeaderHandle(result.data.handle);
         setHeaderFileName(file.name);
+        setHeaderFileUrl((old) => {
+          if (old) URL.revokeObjectURL(old);
+          return URL.createObjectURL(file);
+        });
         toast.success("Arquivo enviado");
       } else {
         toast.error(result.error);
@@ -372,7 +418,23 @@ export function TemplateWizard({ connections }: Props) {
                 )}
 
                 {["IMAGE", "VIDEO", "DOCUMENT"].includes(headerType) && (
-                  <div className="flex items-center gap-2">
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragging(false);
+                      const f = e.dataTransfer.files?.[0];
+                      if (f) handleFile(f);
+                    }}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors",
+                      dragging ? "border-brand bg-brand-soft" : "border-line-2 bg-card",
+                    )}
+                  >
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -396,10 +458,10 @@ export function TemplateWizard({ connections }: Props) {
                       ) : (
                         <Plus className="size-3.5" />
                       )}
-                      {headerHandle ? "Trocar arquivo" : "Enviar arquivo"}
+                      {headerHandle ? "Trocar arquivo" : "Escolher arquivo"}
                     </Button>
-                    <span className="truncate text-xs text-ink-3">
-                      {headerFileName || "O arquivo vira o exemplo aprovado pela Meta."}
+                    <span className="text-xs text-ink-3">
+                      {headerFileName || "ou arraste o arquivo até aqui"}
                     </span>
                   </div>
                 )}
@@ -457,44 +519,67 @@ export function TemplateWizard({ connections }: Props) {
                     <Plus className="size-3.5" /> Adicionar botão
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuContent align="start" className="w-60">
                   <DropdownMenuItem onClick={() => addButton("QUICK_REPLY")}>
                     <Reply className="size-3.5" /> Resposta rápida
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => addButton("URL")}>
-                    <FileText className="size-3.5" /> Link
+                    <Link2 className="size-3.5" /> Link
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => addButton("PHONE_NUMBER")}>
                     <Phone className="size-3.5" /> Telefone
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addButton("COPY_CODE")}>
+                    <Copy className="size-3.5" /> Copiar código
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addButton("OPT_OUT")}>
+                    <BellOff className="size-3.5" /> Cancelar inscrição
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
               {buttons.map((b, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-line p-2">
-                  <span className="label-caps w-24 shrink-0">
-                    {b.type === "QUICK_REPLY" ? "Resposta" : b.type === "URL" ? "Link" : "Telefone"}
-                  </span>
+                  <span className="label-caps w-24 shrink-0">{BUTTON_LABEL[b.type]}</span>
                   <Input
                     value={b.text}
                     onChange={(e) => updateButton(i, { text: e.target.value })}
-                    placeholder="Nome do botão"
+                    placeholder={b.type === "COPY_CODE" ? "Copiar código" : "Nome do botão"}
                     maxLength={25}
                     className="min-w-[140px] flex-1"
                   />
                   {b.type === "URL" && (
-                    <Input
-                      value={b.url}
-                      onChange={(e) => updateButton(i, { url: e.target.value })}
-                      placeholder="https://..."
-                      className="min-w-[180px] flex-1"
-                    />
+                    <>
+                      <Input
+                        value={b.url}
+                        onChange={(e) => updateButton(i, { url: e.target.value })}
+                        placeholder="https://site.com/{{1}}"
+                        className="min-w-[180px] flex-1"
+                      />
+                      {b.url.includes("{{") && (
+                        <Input
+                          value={b.urlExample}
+                          onChange={(e) => updateButton(i, { urlExample: e.target.value })}
+                          placeholder="Exemplo: https://site.com/pedido/123"
+                          className="min-w-[200px] flex-1"
+                        />
+                      )}
+                    </>
                   )}
                   {b.type === "PHONE_NUMBER" && (
                     <Input
                       value={b.phone_number}
                       onChange={(e) => updateButton(i, { phone_number: e.target.value })}
                       placeholder="+5511999999999"
+                      className="min-w-[160px] flex-1"
+                    />
+                  )}
+                  {b.type === "COPY_CODE" && (
+                    <Input
+                      value={b.example}
+                      onChange={(e) => updateButton(i, { example: e.target.value })}
+                      placeholder="Código, ex: PROMO10"
+                      maxLength={15}
                       className="min-w-[160px] flex-1"
                     />
                   )}
@@ -563,6 +648,7 @@ export function TemplateWizard({ connections }: Props) {
             pessoa vê aqui é o que ela vai ver na hora de disparar. */}
         <div className="lg:sticky lg:top-4 lg:self-start">
           <WhatsAppPreview
+            media={previewMedia}
             headerText={headerType === "TEXT" ? headerText : null}
             bodyText={bodyText}
             footerText={footerText}

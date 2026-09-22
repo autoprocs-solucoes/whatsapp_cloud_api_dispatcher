@@ -27,6 +27,11 @@ export const HEADER_TYPES = ["NONE", "TEXT", "IMAGE", "VIDEO", "DOCUMENT"] as co
 
 export type TemplateHeaderType = (typeof HEADER_TYPES)[number];
 
+/**
+ * Tipos de botão que a Meta aceita num template. O botão de link pode carregar
+ * uma variável no fim da URL (`https://site.com/{{1}}`) — nesse caso ela exige
+ * um exemplo de URL completa pra revisão.
+ */
 export const templateButtonSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("QUICK_REPLY"),
@@ -35,12 +40,26 @@ export const templateButtonSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("URL"),
     text: z.string().trim().min(1, "Nome do botão obrigatório").max(25),
-    url: z.string().trim().url("URL inválida").max(2000),
+    url: z
+      .string()
+      .trim()
+      .min(1, "Informe a URL")
+      .max(2000)
+      .refine((v) => /^https?:\/\//i.test(v), "A URL precisa começar com http:// ou https://"),
+    /** Exemplo da URL montada, exigido quando ela tem variável. */
+    urlExample: z.string().trim().max(2000).default(""),
   }),
   z.object({
     type: z.literal("PHONE_NUMBER"),
     text: z.string().trim().min(1, "Nome do botão obrigatório").max(25),
     phone_number: z.string().trim().min(5, "Telefone inválido").max(20),
+  }),
+  z.object({
+    type: z.literal("COPY_CODE"),
+    text: z.string().trim().max(25).default("Copiar código"),
+    /** O código que o botão copia. A Meta chama de exemplo, mas é ele que vai
+     * junto em todo envio. */
+    example: z.string().trim().min(1, "Informe o código").max(15),
   }),
 ]);
 
@@ -68,6 +87,13 @@ export const createTemplateSchema = z
     /** Exemplo por variável, com chave "header:<var>" / "body:<var>". */
     examples: z.record(z.string(), z.string().trim().max(500)).default({}),
   })
+  .refine(
+    (d) =>
+      d.buttons.every(
+        (b) => b.type !== "URL" || !b.url.includes("{{") || b.urlExample.length > 0,
+      ),
+    { message: "Botão de link com variável precisa de um exemplo de URL", path: ["buttons"] },
+  )
   .refine((d) => d.headerType !== "TEXT" || d.headerText.length > 0, {
     message: "Escreva o título do cabeçalho",
     path: ["headerText"],

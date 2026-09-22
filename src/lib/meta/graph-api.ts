@@ -815,6 +815,54 @@ export async function sendListMessage(params: {
   return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
 }
 
+/**
+ * Mensagem com botão de link (cta_url). A Meta entrega esse botão sozinho — ele
+ * não convive com resposta rápida na mesma mensagem, e não gera resposta.
+ */
+export async function sendCtaUrlMessage(params: {
+  phoneNumberId: string;
+  token: string;
+  to: string;
+  body: string;
+  header?: string | null;
+  footer?: string | null;
+  displayText: string;
+  url: string;
+}): Promise<{ messageId: string; waId: string | null }> {
+  const data = await request<SendTemplateResponse & { contacts?: { wa_id?: string }[] }>(
+    `/${params.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      token: params.token,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: params.to,
+        type: "interactive",
+        interactive: {
+          type: "cta_url",
+          ...(params.header ? { header: { type: "text", text: params.header } } : {}),
+          body: { text: params.body },
+          ...(params.footer ? { footer: { text: params.footer } } : {}),
+          action: {
+            name: "cta_url",
+            parameters: {
+              display_text: params.displayText.slice(0, 20),
+              url: params.url,
+            },
+          },
+        },
+      }),
+    },
+  );
+
+  const messageId = data.messages?.[0]?.id;
+  if (!messageId) {
+    throw new GraphApiError(500, { error: { message: "Resposta sem message id" } });
+  }
+  return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
+}
+
 /** Imagem, vídeo ou documento por link público. */
 export async function sendMediaMessage(params: {
   phoneNumberId: string;
