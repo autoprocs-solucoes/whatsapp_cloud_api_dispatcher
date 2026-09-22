@@ -21,6 +21,26 @@ type Props = {
  * enviar texto livre ali seria aceito pela Meta e descartado em seguida, com o
  * atendente achando que falou com o cliente.
  */
+/**
+ * Formatos de gravação que a Meta aceita, em ordem de preferência.
+ *
+ * O `webm` que o Chrome usa por padrão está fora de propósito: a Cloud API
+ * recusa com "Received file of type 'audio/webm'". Ogg/Opus é o único que vira
+ * mensagem de voz de verdade; os outros chegam como áudio comum.
+ */
+const RECORD_FORMATS: { mimeType: string; ext: string; voice: boolean }[] = [
+  { mimeType: "audio/ogg;codecs=opus", ext: "ogg", voice: true },
+  { mimeType: "audio/ogg", ext: "ogg", voice: true },
+  { mimeType: "audio/mp4;codecs=mp4a.40.2", ext: "m4a", voice: false },
+  { mimeType: "audio/mp4", ext: "m4a", voice: false },
+  { mimeType: "audio/mpeg", ext: "mp3", voice: false },
+];
+
+function pickRecordFormat() {
+  if (typeof MediaRecorder === "undefined") return null;
+  return RECORD_FORMATS.find((f) => MediaRecorder.isTypeSupported(f.mimeType)) ?? null;
+}
+
 export function ReplyForm({ phone, window: win }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -31,6 +51,9 @@ export function ReplyForm({ phone, window: win }: Props) {
   const chunksRef = useRef<BlobPart[]>([]);
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** Arquivo escolhido esperando confirmação — anexo não sai por engano. */
+  const [pending, setPending] = useState<{ file: File; previewUrl: string | null } | null>(null);
+  const [pendingCaption, setPendingCaption] = useState("");
 
   // Se a pessoa sair da conversa no meio da gravação, o microfone tem que
   // fechar junto — senão o indicador do navegador fica aceso pra sempre.
@@ -39,6 +62,27 @@ export function ReplyForm({ phone, window: win }: Props) {
       recorderRef.current?.stream.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  // A prévia é um object URL; sem revogar, fica preso na memória da aba.
+  useEffect(() => {
+    return () => {
+      if (pending?.previewUrl) URL.revokeObjectURL(pending.previewUrl);
+    };
+  }, [pending]);
+
+  function choose(file: File) {
+    setPendingCaption(text.trim());
+    setPending({
+      file,
+      previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+    });
+  }
+
+  function discardPending() {
+    if (pending?.previewUrl) URL.revokeObjectURL(pending.previewUrl);
+    setPending(null);
+    setPendingCaption("");
+  }
 
   if (win.open === false) {
     return (
@@ -59,13 +103,15 @@ export function ReplyForm({ phone, window: win }: Props) {
     );
   }
 
-  function sendMedia(file: File, opts: { voice?: boolean } = {}) {
+  function sendMedia(file: File, opts: { voice?: boolean; caption?: string } = {}) {
     const fd = new FormData();
     fd.append("phone", phone);
     fd.append("file", file);
     if (opts.voice) fd.append("voice", "1");
-    // Texto digitado vira legenda do anexo, como no WhatsApp.
-    if (text.trim() && !opts.voice) fd.append("caption", text.trim());
+    // Legenda vem do campo do diálogo (ou do texto já digitado, que ele
+    // herda ao abrir).
+    const caption = opts.caption ?? "";
+    if (caption && !opts.voice) fd.append("caption", caption);
 
     setBusy(true);
     startTransition(async () => {
@@ -76,6 +122,7 @@ export function ReplyForm({ phone, window: win }: Props) {
         return;
       }
       setText("");
+      discardPending();
       router.refresh();
     });
   }
@@ -87,15 +134,16 @@ export function ReplyForm({ phone, window: win }: Props) {
     }
 
     try {
+      const format = pickRecordFormat();
+      if (!format) {
+        toast.error(
+          "Este navegador só grava em webm, que o WhatsApp não aceita. Use o clipe pra anexar um áudio.",
+        );
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // OGG/Opus é o formato de mensagem de voz do WhatsApp; onde o navegador
-      // não suporta (Safari), cai no padrão dele e vai como áudio comum.
-      const mimeType = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
-        ? "audio/ogg;codecs=opus"
-        : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-          ? "audio/webm;codecs=opus"
-          : "";
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(stream, { mimeType: format.mimeType });
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
@@ -104,11 +152,12 @@ export function ReplyForm({ phone, window: win }: Props) {
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         setRecording(false);
-        const type = recorder.mimeType || "audio/ogg";
-        const blob = new Blob(chunksRef.current, { type });
+        const blob = new Blob(chunksRef.current, { type: format.mimeType });
         if (blob.size === 0) return;
-        const ext = type.includes("webm") ? "webm" : "ogg";
-        sendMedia(new File([blob], `audio.${ext}`, { type }), { voice: true });
+        sendMedia(
+          new File([blob], `audio.${format.ext}`, { type: format.mimeType.split(";")[0] }),
+          { voice: format.voice },
+        );
       };
 
       recorderRef.current = recorder;
@@ -155,7 +204,7 @@ export function ReplyForm({ phone, window: win }: Props) {
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) sendMedia(f);
+            if (f) choose(f);
             e.target.value = "";
           }}
         />
@@ -215,6 +264,53 @@ export function ReplyForm({ phone, window: win }: Props) {
           </button>
         )}
       </div>
+      {pending && (
+        <div className="space-y-2 rounded-lg border border-wa-line bg-wa-in p-3">
+          <div className="flex items-center gap-3">
+            {pending.previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={pending.previewUrl}
+                alt=""
+                className="size-16 shrink-0 rounded-md object-cover"
+              />
+            ) : (
+              <span className="flex size-16 shrink-0 items-center justify-center rounded-md bg-wa-panel text-wa-ink-2">
+                <Paperclip className="size-6" />
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium text-wa-ink">{pending.file.name}</p>
+              <p className="text-[11px] text-wa-ink-2">
+                {(pending.file.size / 1024 / 1024).toFixed(2)} MB ·{" "}
+                {pending.file.type || "tipo desconhecido"}
+              </p>
+            </div>
+          </div>
+
+          <input
+            value={pendingCaption}
+            onChange={(e) => setPendingCaption(e.target.value)}
+            placeholder="Legenda (opcional)"
+            aria-label="Legenda do anexo"
+            className="h-9 w-full rounded-lg border-0 bg-wa-panel px-3 text-[14px] text-wa-ink outline-none placeholder:text-wa-ink-2 focus-visible:ring-2 focus-visible:ring-wa-accent"
+          />
+
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={discardPending} disabled={busy}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => sendMedia(pending.file, { caption: pendingCaption.trim() })}
+            >
+              {busy && <Loader2 className="size-3.5 animate-spin" />} Enviar arquivo
+            </Button>
+          </div>
+        </div>
+      )}
+
       {recording && (
         <p className="text-[11px] text-red">Gravando… toque no quadrado pra parar e enviar.</p>
       )}
