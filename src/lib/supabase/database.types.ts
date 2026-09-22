@@ -545,6 +545,93 @@ export type Database = {
           },
         ];
       };
+      flow_run: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          flow_id: string;
+          campaign_id: string | null;
+          dispatch_id: string | null;
+          contact_id: string | null;
+          phone_e164: string;
+          phone_number_id: string;
+          connection_id: string;
+          current_node_id: string | null;
+          status:
+            | "active"
+            | "waiting_reply"
+            | "waiting_time"
+            | "done"
+            | "canceled"
+            | "failed";
+          resume_at: string | null;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          flow_id: string;
+          campaign_id?: string | null;
+          dispatch_id?: string | null;
+          contact_id?: string | null;
+          phone_e164: string;
+          phone_number_id: string;
+          connection_id: string;
+          current_node_id?: string | null;
+          status?:
+            | "active"
+            | "waiting_reply"
+            | "waiting_time"
+            | "done"
+            | "canceled"
+            | "failed";
+          resume_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          flow_id?: string;
+          campaign_id?: string | null;
+          dispatch_id?: string | null;
+          contact_id?: string | null;
+          phone_e164?: string;
+          phone_number_id?: string;
+          connection_id?: string;
+          current_node_id?: string | null;
+          status?:
+            | "active"
+            | "waiting_reply"
+            | "waiting_time"
+            | "done"
+            | "canceled"
+            | "failed";
+          resume_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "flow_run_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "flow_run_flow_id_fkey";
+            columns: ["flow_id"];
+            isOneToOne: false;
+            referencedRelation: "flow";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       campaign: {
         Row: {
           id: string;
@@ -986,6 +1073,7 @@ export type Template = Database["public"]["Tables"]["template"]["Row"];
 export type Segment = Database["public"]["Tables"]["segment"]["Row"];
 export type Flow = Database["public"]["Tables"]["flow"]["Row"];
 export type Campaign = Database["public"]["Tables"]["campaign"]["Row"];
+export type FlowRun = Database["public"]["Tables"]["flow_run"]["Row"];
 export type FlowFolder = Database["public"]["Tables"]["flow_folder"]["Row"];
 export type SegmentInsert = Database["public"]["Tables"]["segment"]["Insert"];
 export type Dispatch = Database["public"]["Tables"]["dispatch"]["Row"];

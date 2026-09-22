@@ -48,3 +48,36 @@ select cron.schedule(
 -- select * from cron.job_run_details
 --   where jobname = 'process-dispatch-queue'
 --   order by start_time desc limit 10;
+
+
+-- =============================================================================
+-- Tick dos fluxos — retoma execuções paradas em bloco de atraso.
+--
+-- Mora no app (rota Next), não numa edge function: o motor do fluxo é Node.
+-- Substitua <APP_URL> pela URL pública do app (a mesma NEXT_PUBLIC_APP_URL) e
+-- <SERVICE_ROLE_KEY> pela chave do projeto.
+--
+--   Desinstalar: select cron.unschedule('flow-tick');
+-- =============================================================================
+
+do $$
+begin
+  perform cron.unschedule('flow-tick');
+exception when others then
+  null;
+end$$;
+
+select cron.schedule(
+  'flow-tick',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url     := '<APP_URL>/api/internal/flow-tick',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+    ),
+    body    := '{}'::jsonb
+  );
+  $$
+);

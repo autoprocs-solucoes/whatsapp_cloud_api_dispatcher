@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { sendTextMessage } from "@/lib/meta/graph-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getThread, markThreadRead } from "@/server/inbox";
+import { cancelFlowRunForContact } from "@/server/flow-engine";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 export type ActionResult<T = void> = { ok: true; data: T } | { ok: false; error: string };
@@ -93,6 +94,14 @@ export async function sendReplyAction(formData: FormData): Promise<ActionResult>
   // echo/status do webhook reconcilia. Não é motivo pra dizer que deu erro.
   if (error) {
     console.error("[inbox] espelho da resposta:", error.message);
+  }
+
+  // Gente assumiu a conversa: o fluxo automático sai de cena pra não falar por
+  // cima do atendente.
+  try {
+    await cancelFlowRunForContact(workspace.id, conversationKey);
+  } catch (e) {
+    console.error("[inbox] encerrar fluxo:", (e as Error).message);
   }
 
   revalidatePath("/conversas");

@@ -718,6 +718,139 @@ export async function sendTextMessage(params: {
   return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
 }
 
+/**
+ * Mensagem com botões de resposta. Até 3 a Meta entrega como botões; acima
+ * disso só como lista, que é uma estrutura diferente (`sendListMessage`).
+ * Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-interactive
+ */
+export async function sendInteractiveButtons(params: {
+  phoneNumberId: string;
+  token: string;
+  to: string;
+  body: string;
+  header?: string | null;
+  footer?: string | null;
+  buttons: { id: string; title: string }[];
+}): Promise<{ messageId: string; waId: string | null }> {
+  const data = await request<SendTemplateResponse & { contacts?: { wa_id?: string }[] }>(
+    `/${params.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      token: params.token,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: params.to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          ...(params.header ? { header: { type: "text", text: params.header } } : {}),
+          body: { text: params.body },
+          ...(params.footer ? { footer: { text: params.footer } } : {}),
+          action: {
+            buttons: params.buttons.slice(0, 3).map((b) => ({
+              type: "reply",
+              reply: { id: b.id, title: b.title.slice(0, 20) },
+            })),
+          },
+        },
+      }),
+    },
+  );
+
+  const messageId = data.messages?.[0]?.id;
+  if (!messageId) {
+    throw new GraphApiError(500, { error: { message: "Resposta sem message id" } });
+  }
+  return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
+}
+
+/** Mensagem com lista de opções — o caminho pra mais de 3 respostas. */
+export async function sendListMessage(params: {
+  phoneNumberId: string;
+  token: string;
+  to: string;
+  body: string;
+  header?: string | null;
+  footer?: string | null;
+  buttonLabel: string;
+  rows: { id: string; title: string }[];
+}): Promise<{ messageId: string; waId: string | null }> {
+  const data = await request<SendTemplateResponse & { contacts?: { wa_id?: string }[] }>(
+    `/${params.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      token: params.token,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: params.to,
+        type: "interactive",
+        interactive: {
+          type: "list",
+          ...(params.header ? { header: { type: "text", text: params.header } } : {}),
+          body: { text: params.body },
+          ...(params.footer ? { footer: { text: params.footer } } : {}),
+          action: {
+            button: (params.buttonLabel || "Ver opções").slice(0, 20),
+            sections: [
+              {
+                title: "Opções",
+                rows: params.rows.slice(0, 10).map((r) => ({
+                  id: r.id,
+                  title: r.title.slice(0, 24),
+                })),
+              },
+            ],
+          },
+        },
+      }),
+    },
+  );
+
+  const messageId = data.messages?.[0]?.id;
+  if (!messageId) {
+    throw new GraphApiError(500, { error: { message: "Resposta sem message id" } });
+  }
+  return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
+}
+
+/** Imagem, vídeo ou documento por link público. */
+export async function sendMediaMessage(params: {
+  phoneNumberId: string;
+  token: string;
+  to: string;
+  kind: "image" | "video" | "document";
+  link: string;
+  caption?: string | null;
+  filename?: string | null;
+}): Promise<{ messageId: string; waId: string | null }> {
+  const media: Record<string, unknown> = { link: params.link };
+  if (params.caption) media.caption = params.caption;
+  if (params.kind === "document" && params.filename) media.filename = params.filename;
+
+  const data = await request<SendTemplateResponse & { contacts?: { wa_id?: string }[] }>(
+    `/${params.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      token: params.token,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: params.to,
+        type: params.kind,
+        [params.kind]: media,
+      }),
+    },
+  );
+
+  const messageId = data.messages?.[0]?.id;
+  if (!messageId) {
+    throw new GraphApiError(500, { error: { message: "Resposta sem message id" } });
+  }
+  return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
+}
+
 /** Marca a mensagem como lida no WhatsApp do contato (os dois tiques azuis). */
 export async function markMessageRead(params: {
   phoneNumberId: string;

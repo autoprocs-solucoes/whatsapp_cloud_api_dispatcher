@@ -5,6 +5,7 @@ import { after, NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { handleFlowReply, startCampaignFlowOnReply } from "@/server/flow-engine";
 import { serverEnv } from "@/lib/env";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -427,6 +428,27 @@ export async function POST(req: NextRequest) {
                 continue;
               }
               await mirrorMessage(admin, tenant, msg, "in", nameOf(msg.from));
+
+              // A resposta pode ser o que o fluxo estava esperando. Vai depois
+              // do espelho pra conversa nunca depender do motor ter dado certo.
+              try {
+                const content = extractContent(msg);
+                await handleFlowReply({
+                  workspaceId: tenant.workspaceId,
+                  phoneE164: msg.from ?? "",
+                  text: content.body,
+                });
+                // Sem fluxo em andamento, a resposta pode ser o gatilho da
+                // campanha que acabou de transmitir pra essa pessoa.
+                await startCampaignFlowOnReply({
+                  workspaceId: tenant.workspaceId,
+                  phoneE164: msg.from ?? "",
+                  connectionId: tenant.connectionId,
+                  phoneNumberId: tenant.phoneNumberId,
+                });
+              } catch (e) {
+                console.error("[meta/webhook] fluxo:", (e as Error).message);
+              }
             } catch (e) {
               console.error("[meta/webhook] mensagem recebida:", (e as Error).message);
             }
