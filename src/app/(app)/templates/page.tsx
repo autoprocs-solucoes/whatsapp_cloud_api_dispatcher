@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageSquare, Plug } from "lucide-react";
+import { MessageSquare, Plug, Plus } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,16 @@ export default async function TemplatesPage() {
     <div className="space-y-5">
       <PageHeader
         title="Templates"
-        description="Sincronizados da Meta. A criação é no WhatsApp Manager; aqui espelhamos status e conteúdo."
+        description="Crie o modelo aqui e acompanhe a revisão da Meta. O que já existe na WABA vem pelo Sincronizar."
+        actions={
+          workspace.role === "owner" && connections.length > 0 ? (
+            <Button asChild>
+              <Link href="/templates/novo">
+                <Plus className="size-4" /> Criar modelo
+              </Link>
+            </Button>
+          ) : null
+        }
       />
 
       {connections.length === 0 ? (

@@ -3,14 +3,29 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { EyeOff, Loader2, Plus, RefreshCw } from "lucide-react";
+import { EyeOff, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WhatsAppPreview, type PreviewButton } from "@/features/dispatch/whatsapp-preview";
-import { setTemplateActiveAction, syncTemplatesAction } from "@/features/templates/actions";
+import {
+  deleteTemplateAction,
+  setTemplateActiveAction,
+  syncTemplatesAction,
+} from "@/features/templates/actions";
 import { cn } from "@/lib/utils";
 import type { Template } from "@/lib/supabase/database.types";
 import type { TemplateAnalyticsPoint } from "@/lib/meta/graph-api";
@@ -142,6 +157,19 @@ function TemplateCard({
   const [hovered, setHovered] = useState(false);
   const router = useRouter();
   const [isToggling, startToggle] = useTransition();
+  const [isDeleting, startDelete] = useTransition();
+
+  function handleDelete() {
+    startDelete(async () => {
+      const result = await deleteTemplateAction(template.id);
+      if (result.ok) {
+        toast.success("Modelo apagado");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
 
   const examples = useMemo(
     () => extractExampleResolved(template.components_raw),
@@ -233,6 +261,41 @@ function TemplateCard({
                 "Reativar"
               )}
             </Button>
+          )}
+          {isOwner && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  aria-label="Apagar modelo"
+                  disabled={isDeleting}
+                  className="text-destructive"
+                >
+                  {isDeleting ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3" />
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Apagar {template.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O modelo sai da Meta e daqui. Comunicados já enviados continuam no histórico,
+                    mas não dá pra disparar esse modelo de novo sem criar outro e esperar a
+                    revisão.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction disabled={isDeleting} onClick={handleDelete}>
+                    Apagar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
           {isApproved && isActive && (
             <Button asChild size="xs">

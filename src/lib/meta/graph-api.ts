@@ -771,4 +771,133 @@ export async function downloadMedia(
   };
 }
 
+// ----------------------------------------------------------------------------
+// Criação de template de mensagem.
+// Docs: https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates
+//
+// O template nasce PENDING e a Meta revisa (normalmente até 24h). Cabeçalho de
+// mídia não manda o arquivo: manda um `header_handle` obtido antes na Resumable
+// Upload API (`uploadTemplateHeaderHandle`).
+// ----------------------------------------------------------------------------
+/** Exemplo de variável nomeada (`{{nome}}`), exigido quando o template usa
+ * `parameter_format: "NAMED"`. */
+export type NamedParamExample = { param_name: string; example: string };
+
+export type CreateTemplateComponent =
+  | {
+      type: "HEADER";
+      format: "TEXT";
+      text: string;
+      example?: { header_text?: string[]; header_text_named_params?: NamedParamExample[] };
+    }
+  | {
+      type: "HEADER";
+      format: "IMAGE" | "VIDEO" | "DOCUMENT";
+      example: { header_handle: string[] };
+    }
+  | {
+      type: "BODY";
+      text: string;
+      example?: { body_text?: string[][]; body_text_named_params?: NamedParamExample[] };
+    }
+  | { type: "FOOTER"; text: string }
+  | { type: "BUTTONS"; buttons: MetaTemplateButton[] };
+
+export type CreateTemplateParams = {
+  name: string;
+  language: string;
+  category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+  /** POSITIONAL (`{{1}}`) é o padrão da Meta; NAMED (`{{nome}}`) precisa ser
+   * declarado e muda o formato dos exemplos. */
+  parameter_format?: "POSITIONAL" | "NAMED";
+  components: CreateTemplateComponent[];
+};
+
+export type CreateTemplateResult = {
+  id: string;
+  status: string;
+  category: string;
+};
+
+export async function createTemplate(
+  wabaId: string,
+  token: string,
+  params: CreateTemplateParams,
+): Promise<CreateTemplateResult> {
+  return request<CreateTemplateResult>(`/${wabaId}/message_templates`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(params),
+  });
+}
+
+/**
+ * Apaga um template da WABA. A Meta apaga por nome (todos os idiomas) ou por
+ * `hsm_id` + nome (só aquele idioma).
+ */
+export async function deleteTemplate(
+  wabaId: string,
+  token: string,
+  name: string,
+  metaTemplateId?: string,
+): Promise<void> {
+  const query: Record<string, string> = { name };
+  if (metaTemplateId) query.hsm_id = metaTemplateId;
+  await request(`/${wabaId}/message_templates`, { method: "DELETE", token, query });
+}
+
+/**
+ * Sobe o arquivo do cabeçalho de mídia e devolve o `header_handle`.
+ *
+ * É a Resumable Upload API do app (não a mídia da Cloud API, que é por número
+ * e serve pra enviar mensagem): cria a sessão em `/{app_id}/uploads` e manda os
+ * bytes em `/{upload_session_id}` com `file_offset: 0`. O handle devolvido só
+ * vale pra criação de template.
+ */
+export async function uploadTemplateHeaderHandle(params: {
+  token: string;
+  file: File;
+}): Promise<string> {
+  const { token, file } = params;
+  if (!serverEnv.META_APP_ID) {
+    throw new Error("META_APP_ID ausente no .env.local");
+  }
+
+  const session = await request<{ id: string }>(`/${serverEnv.META_APP_ID}/uploads`, {
+    method: "POST",
+    token,
+    query: {
+      file_length: String(file.size),
+      file_type: file.type,
+    },
+  });
+
+  // O upload em si não passa pelo `request()`: o corpo são bytes crus e o
+  // header de autorização usa o formato `OAuth <token>` exigido aqui.
+  const res = await fetch(graphUrl(`/${session.id}`), {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${token}`,
+      file_offset: "0",
+      "Content-Type": "application/octet-stream",
+    },
+    body: await file.arrayBuffer(),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let payload: GraphErrorPayload = {};
+    try {
+      payload = (await res.json()) as GraphErrorPayload;
+    } catch {
+      // ignored
+    }
+    throw new GraphApiError(res.status, payload);
+  }
+
+  const { h } = (await res.json()) as { h?: string };
+  if (!h) throw new Error("Upload sem handle na resposta da Meta");
+  return h;
+}
+
 export { extractPlaceholders } from "./placeholders";
