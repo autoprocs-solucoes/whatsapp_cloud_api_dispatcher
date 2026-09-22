@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { sendMediaReplyAction, sendReplyAction } from "@/features/inbox/actions";
+import { webmToOgg } from "@/lib/audio/webm-to-ogg";
 import type { Window24h } from "@/server/inbox";
 import { cn } from "@/lib/utils";
 
@@ -22,18 +23,21 @@ type Props = {
  * atendente achando que falou com o cliente.
  */
 /**
- * Formatos de gravação que a Meta aceita, em ordem de preferência.
+ * Formatos de gravação, em ordem de preferência.
  *
- * O `webm` que o Chrome usa por padrão está fora de propósito: a Cloud API
- * recusa com "Received file of type 'audio/webm'". Ogg/Opus é o único que vira
- * mensagem de voz de verdade; os outros chegam como áudio comum.
+ * Nenhum navegador grava direto no que a Meta quer em todos os casos: o
+ * Firefox faz ogg/opus, o Chrome só webm/opus ou um MP4 fragmentado que a
+ * Cloud API rejeita ("on processing it is of type application/octet-stream").
+ * Por isso o webm é aceito aqui e convertido pra ogg antes de subir — mesma
+ * trilha de áudio, só troca a embalagem.
  */
-const RECORD_FORMATS: { mimeType: string; ext: string; voice: boolean }[] = [
-  { mimeType: "audio/ogg;codecs=opus", ext: "ogg", voice: true },
-  { mimeType: "audio/ogg", ext: "ogg", voice: true },
-  { mimeType: "audio/mp4;codecs=mp4a.40.2", ext: "m4a", voice: false },
-  { mimeType: "audio/mp4", ext: "m4a", voice: false },
-  { mimeType: "audio/mpeg", ext: "mp3", voice: false },
+const RECORD_FORMATS: { mimeType: string; ext: string; voice: boolean; convert: boolean }[] = [
+  { mimeType: "audio/ogg;codecs=opus", ext: "ogg", voice: true, convert: false },
+  { mimeType: "audio/ogg", ext: "ogg", voice: true, convert: false },
+  { mimeType: "audio/webm;codecs=opus", ext: "ogg", voice: true, convert: true },
+  { mimeType: "audio/mpeg", ext: "mp3", voice: false, convert: false },
+  { mimeType: "audio/mp4;codecs=mp4a.40.2", ext: "m4a", voice: false, convert: false },
+  { mimeType: "audio/mp4", ext: "m4a", voice: false, convert: false },
 ];
 
 function pickRecordFormat() {
@@ -137,7 +141,7 @@ export function ReplyForm({ phone, window: win }: Props) {
       const format = pickRecordFormat();
       if (!format) {
         toast.error(
-          "Este navegador só grava em webm, que o WhatsApp não aceita. Use o clipe pra anexar um áudio.",
+          "Este navegador não grava em nenhum formato que o WhatsApp aceita. Use o clipe pra anexar um áudio.",
         );
         return;
       }
@@ -149,15 +153,29 @@ export function ReplyForm({ phone, window: win }: Props) {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         setRecording(false);
+
         const blob = new Blob(chunksRef.current, { type: format.mimeType });
         if (blob.size === 0) return;
-        sendMedia(
-          new File([blob], `audio.${format.ext}`, { type: format.mimeType.split(";")[0] }),
-          { voice: format.voice },
-        );
+
+        if (!format.convert) {
+          sendMedia(new File([blob], `audio.${format.ext}`, { type: format.mimeType.split(";")[0] }), {
+            voice: format.voice,
+          });
+          return;
+        }
+
+        const ogg = webmToOgg(new Uint8Array(await blob.arrayBuffer()));
+        if (!ogg) {
+          toast.error("Não consegui preparar o áudio gravado. Tente de novo.");
+          return;
+        }
+        // `new Uint8Array(ogg)` copia pro buffer que o File aceita — o
+        // TypeScript não garante que o original não seja compartilhado.
+        const file = new File([new Uint8Array(ogg).buffer], "audio.ogg", { type: "audio/ogg" });
+        sendMedia(file, { voice: true });
       };
 
       recorderRef.current = recorder;
