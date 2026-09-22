@@ -294,7 +294,27 @@ async function processStatus(admin: ReturnType<typeof createAdminClient>, status
     }
   }
 
-  await admin.from("dispatch_recipient").update(patch).eq("meta_message_id", status.id);
+  const { data: updated } = await admin
+    .from("dispatch_recipient")
+    .update(patch)
+    .eq("meta_message_id", status.id)
+    .select("id");
+
+  // Status de mensagem que não é de transmissão (teste, resposta do inbox,
+  // fluxo) não casa aqui. Se for falha, registra: era o buraco em que sumia a
+  // explicação de "enviou mas não chegou".
+  if ((!updated || updated.length === 0) && status.status === "failed") {
+    const err = status.errors?.[0];
+    console.warn(
+      "[meta/webhook] falha em mensagem fora de transmissão",
+      JSON.stringify({
+        message_id: status.id,
+        code: err?.code,
+        title: err?.title,
+        details: err?.error_data?.details,
+      }),
+    );
+  }
 }
 
 /** Espelha o status de entrega nas mensagens que saíram pela plataforma. */
@@ -306,11 +326,16 @@ async function processMirrorStatus(
   if (!["sent", "delivered", "read", "failed"].includes(status.status)) return;
 
   const err = status.errors?.[0];
+  // Mesma regra do disparo: o detalhe costuma ter o motivo real.
+  const base = err ? String(err.title ?? err.message ?? "") : "";
+  const details = err?.error_data?.details;
+  const full = details && details !== base ? `${base} - ${details}` : base;
+
   await admin
     .from("whatsapp_message")
     .update({
       status: status.status as "sent" | "delivered" | "read" | "failed",
-      error_message: err ? String(err.title ?? err.message ?? "").slice(0, 500) : null,
+      error_message: err ? full.slice(0, 500) : null,
     })
     .eq("meta_message_id", status.id)
     .eq("direction", "out");

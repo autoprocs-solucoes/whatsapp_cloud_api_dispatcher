@@ -408,7 +408,7 @@ export function DispatchWizard({
         toast.error(res.error);
         return;
       }
-      toast.success(`Teste enviado (id ${res.data.messageId.slice(0, 12)}…)`);
+      toast.success("Teste aceito pela Meta — confira o WhatsApp. Se não chegar, a falha aparece em Conversas.");
     });
   }
 

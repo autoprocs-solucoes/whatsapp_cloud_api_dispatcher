@@ -467,6 +467,30 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
       headerImageLink: headerImageId ? undefined : (headerImageLink ?? undefined),
       copyCodeButton,
     });
+    // A Cloud API responde com o id na hora, mas isso é só "aceito": a falha
+    // (número inexistente, conta sem pagamento) chega minutos depois por
+    // webhook. Sem gravar o teste, esse status não tinha onde cair e a tela
+    // ficava dizendo "enviado" pra mensagem que nunca saiu.
+    const admin = createAdminClient();
+    const { error: mirrorError } = await admin.from("whatsapp_message").insert({
+      workspace_id: ctx.workspaceId,
+      connection_id: connection.id,
+      phone_number_id: parsed.data.phone_number_id,
+      contact_phone_e164: norm.e164,
+      contact_id: null,
+      contact_name: null,
+      direction: "out",
+      type: "template",
+      body: template.body_text ?? template.name,
+      meta_message_id: r.messageId,
+      status: "sent",
+      read_internally: true,
+      sent_at: new Date().toISOString(),
+    });
+    if (mirrorError) {
+      console.error("[testSend] espelho do teste falhou", mirrorError.message);
+    }
+
     return { ok: true, data: { messageId: r.messageId } };
   } catch (e) {
     if (e instanceof GraphApiError) return { ok: false, error: `Meta: ${e.message}` };
