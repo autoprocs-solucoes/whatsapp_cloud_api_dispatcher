@@ -12,6 +12,7 @@ import {
   createWorkspaceSchema,
   inviteMemberSchema,
   removeMemberSchema,
+  updateMemberRoleSchema,
   updateWorkspaceSchema,
 } from "@/features/workspace/schemas";
 import { ACTIVE_WORKSPACE_COOKIE } from "@/server/workspace";
@@ -361,5 +362,95 @@ export async function removeMemberAction(
   }
 
   revalidatePath("/configuracoes");
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Troca o papel de um membro (member ↔ owner). O workspace pode ter vários
+ * owners; o que não pode é ficar sem nenhum.
+ */
+export async function updateMemberRoleAction(input: unknown): Promise<ActionResult> {
+  const parsed = updateMemberRoleSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Dados inválidos" };
+  }
+  const { workspaceId, userId, role } = parsed.data;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Não autenticado" };
+  }
+
+  const admin = createAdminClient();
+  const [{ data: requester }, { data: requesterProfile }] = await Promise.all([
+    admin
+      .from("workspace_member")
+      .select("role")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    admin.from("profile").select("is_superadmin").eq("user_id", user.id).maybeSingle(),
+  ]);
+
+  // Mesma regra da tela de Configurações: owner do workspace ou time master.
+  const canManage = requester?.role === "owner" || requesterProfile?.is_superadmin === true;
+  if (!canManage) {
+    return { ok: false, error: "Apenas owners podem mudar o papel de um membro" };
+  }
+
+  const { data: target } = await admin
+    .from("workspace_member")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!target) {
+    return { ok: false, error: "Membro não encontrado" };
+  }
+  if (target.role === role) {
+    return { ok: true, data: undefined };
+  }
+
+  if (role === "member") {
+    const { data: owners } = await admin
+      .from("workspace_member")
+      .select("user_id")
+      .eq("workspace_id", workspaceId)
+      .eq("role", "owner");
+
+    // `workspace.owner_id` é not null, então além de exigir pelo menos um owner
+    // a coluna passa pra quem sobrou quando quem estava nela é rebaixado.
+    const nextOwner = (owners ?? []).find((o) => o.user_id !== userId);
+    if (!nextOwner) {
+      return { ok: false, error: "O workspace precisa de pelo menos um owner" };
+    }
+
+    const { data: workspace } = await admin
+      .from("workspace")
+      .select("owner_id")
+      .eq("id", workspaceId)
+      .maybeSingle();
+    if (workspace?.owner_id === userId) {
+      await admin
+        .from("workspace")
+        .update({ owner_id: nextOwner.user_id })
+        .eq("id", workspaceId);
+    }
+  }
+
+  const { error } = await admin
+    .from("workspace_member")
+    .update({ role })
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId);
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/configuracoes");
+  revalidatePath("/", "layout");
   return { ok: true, data: undefined };
 }

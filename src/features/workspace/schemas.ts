@@ -30,3 +30,11 @@ export const removeMemberSchema = z.object({
 });
 
 export type RemoveMemberInput = z.infer<typeof removeMemberSchema>;
+
+export const updateMemberRoleSchema = z.object({
+  workspaceId: z.string().uuid(),
+  userId: z.string().uuid(),
+  role: z.enum(["owner", "member"]),
+});
+
+export type UpdateMemberRoleInput = z.infer<typeof updateMemberRoleSchema>;

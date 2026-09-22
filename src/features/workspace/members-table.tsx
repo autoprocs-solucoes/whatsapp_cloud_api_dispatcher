@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
-import { Trash2 } from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -19,6 +19,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -27,6 +34,7 @@ import {
   TableRow,
   TableShell,
 } from "@/components/ui/table";
+import { updateMemberRoleAction } from "@/features/workspace/actions";
 import type { WorkspaceRole } from "@/lib/supabase/database.types";
 
 type Member = {
@@ -86,6 +94,68 @@ function MemberAvatar({
   );
 }
 
+function RoleBadge({ role }: { role: WorkspaceRole }) {
+  return <Badge variant={role === "owner" ? "owner" : "secondary"}>{role}</Badge>;
+}
+
+/**
+ * Papel do membro. Quem administra o workspace troca `member` ↔ `owner` aqui
+ * mesmo — o workspace pode ter mais de um owner, desde que sobre pelo menos um.
+ */
+function RoleCell({
+  member,
+  workspaceId,
+  canManage,
+  disabled,
+}: {
+  member: Member;
+  workspaceId: string;
+  canManage: boolean;
+  disabled: boolean;
+}) {
+  const [isPending, startTransition] = useTransition();
+
+  if (!canManage) return <RoleBadge role={member.role} />;
+
+  function handleChange(role: string) {
+    if (role === member.role) return;
+    startTransition(async () => {
+      const result = await updateMemberRoleAction({
+        workspaceId,
+        userId: member.user_id,
+        role,
+      });
+      if (result.ok) {
+        toast.success(role === "owner" ? "Agora é owner" : "Agora é membro");
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled || isPending}
+          aria-label={`Mudar papel de ${member.full_name || member.email}`}
+          className="flex items-center gap-1 rounded-full transition-opacity hover:opacity-80 disabled:opacity-50"
+        >
+          <RoleBadge role={member.role} />
+          <ChevronDown className="size-3 text-ink-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-40">
+        <DropdownMenuRadioGroup value={member.role} onValueChange={handleChange}>
+          <DropdownMenuRadioItem value="owner">owner</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="member">member</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function MembersTable({
   members,
   workspaceId,
@@ -135,7 +205,12 @@ export function MembersTable({
                   </TableCell>
                   <TableCell className="font-mono text-xs text-ink-2">{m.email}</TableCell>
                   <TableCell>
-                    <Badge variant={m.role === "owner" ? "owner" : "secondary"}>{m.role}</Badge>
+                    <RoleCell
+                      member={m}
+                      workspaceId={workspaceId}
+                      canManage={canManage}
+                      disabled={isPending}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     {canRemove && (
