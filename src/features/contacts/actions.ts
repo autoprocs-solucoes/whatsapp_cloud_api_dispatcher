@@ -115,8 +115,19 @@ type UpsertRow = {
   phone_e164: string;
   full_name: string | null;
   custom_fields: Record<string, string>;
+  tags: string[];
   created_by: string;
 };
+
+/** Célula de etiquetas: "vip, cliente antigo" vira duas. */
+function splitTags(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(/[,;|]/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
 
 async function parseFileAndMapping(
   formData: FormData,
@@ -159,9 +170,14 @@ async function analyzeRows(
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("contact")
-    .select("phone_e164")
+    .select("phone_e164, tags")
     .eq("workspace_id", ctx.workspaceId);
   const existingSet = new Set((existing ?? []).map((c) => c.phone_e164));
+  // Etiqueta de quem já existe não pode ser apagada pela planilha: o upsert
+  // troca a linha inteira, então a união é montada aqui.
+  const tagsByPhone = new Map(
+    (existing ?? []).map((c) => [c.phone_e164, c.tags ?? []] as const),
+  );
 
   const seenInFile = new Set<string>();
   const analysis: ImportAnalysis = {
@@ -213,11 +229,18 @@ async function analyzeRows(
       }
     }
 
+    const rowTags = [
+      ...mapping.tags,
+      ...(mapping.tagsColumn ? splitTags(row[mapping.tagsColumn]) : []),
+      ...(tagsByPhone.get(norm.e164) ?? []),
+    ];
+
     upserts.push({
       workspace_id: ctx.workspaceId,
       phone_e164: norm.e164,
       full_name: fullName,
       custom_fields: customFields,
+      tags: [...new Set(rowTags)],
       created_by: ctx.userId,
     });
   });

@@ -59,6 +59,19 @@ function downloadCsv(filename: string, rows: { row: number; phone: string; reaso
   URL.revokeObjectURL(url);
 }
 
+/** "vip, cliente antigo" → ["vip", "cliente antigo"]. */
+function parseTags(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .split(/[,;]/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .slice(0, 20),
+    ),
+  ];
+}
+
 export function ContactsImportWizard() {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
@@ -70,6 +83,9 @@ export function ContactsImportWizard() {
   const [phoneColumn, setPhoneColumn] = useState<string>("");
   const [fullNameColumn, setFullNameColumn] = useState<string>("");
   const [customColumns, setCustomColumns] = useState<CustomColumnConfig[]>([]);
+  /** Etiquetas digitadas, aplicadas a todos da planilha. */
+  const [tagsText, setTagsText] = useState("");
+  const [tagsColumn, setTagsColumn] = useState<string>("");
 
   const [analysis, setAnalysis] = useState<ImportAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -83,6 +99,8 @@ export function ContactsImportWizard() {
       customColumns: customColumns
         .filter((c) => c.enabled && c.fieldKey.trim())
         .map((c) => ({ sourceHeader: c.sourceHeader, fieldKey: c.fieldKey.trim() })),
+      tags: parseTags(tagsText),
+      tagsColumn: tagsColumn || null,
     };
     const fd = new FormData();
     fd.append("file", file);
@@ -95,6 +113,7 @@ export function ContactsImportWizard() {
     const name = p.autoMapping.fullNameColumn ?? "";
     setPhoneColumn(phone);
     setFullNameColumn(name);
+    setTagsColumn(p.autoMapping.tagsColumn ?? "");
     setCustomColumns(
       p.headers
         .filter((h) => h !== phone && h !== name)
@@ -303,6 +322,51 @@ export function ContactsImportWizard() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="import-tags">Etiquetas</Label>
+              <Input
+                id="import-tags"
+                value={tagsText}
+                onChange={(e) => setTagsText(e.target.value)}
+                placeholder="clientes_2026, promo_setembro"
+              />
+              <p className="text-muted-foreground text-xs">
+                Aplicadas a todo mundo do arquivo, separadas por vírgula. É por elas que o
+                segmento e a transmissão encontram essa lista depois. Quem já é contato mantém
+                as etiquetas que tinha.
+              </p>
+              {parseTags(tagsText).length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {parseTags(tagsText).map((t) => (
+                    <Badge key={t} variant="secondary">
+                      {t}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-1.5 pt-1">
+                <Label htmlFor="import-tags-column">Coluna de etiquetas (opcional)</Label>
+                <select
+                  id="import-tags-column"
+                  value={tagsColumn}
+                  onChange={(e) => setTagsColumn(e.target.value)}
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                >
+                  <option value="">Nenhuma</option>
+                  {preview.headers.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-muted-foreground text-xs">
+                  Use quando cada linha tem a própria etiqueta. Vários valores na mesma célula
+                  podem vir separados por vírgula.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label>Campos custom</Label>
               <p className="text-muted-foreground text-xs">
                 Demais colunas viram campos custom. Desmarque o que não quiser importar.
@@ -381,6 +445,15 @@ export function ContactsImportWizard() {
                       </>
                     )}{" "}
                     · {customColumns.filter((c) => c.enabled).length} campo(s) custom
+                    {parseTags(tagsText).length > 0 && (
+                      <> · etiquetas: {parseTags(tagsText).join(", ")}</>
+                    )}
+                    {tagsColumn && (
+                      <>
+                        {" "}
+                        · etiqueta da coluna <code>{tagsColumn}</code>
+                      </>
+                    )}
                   </p>
                 </div>
 

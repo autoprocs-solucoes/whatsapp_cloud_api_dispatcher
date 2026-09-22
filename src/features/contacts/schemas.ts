@@ -19,6 +19,11 @@ export const mappingSchema = z.object({
       }),
     )
     .default([]),
+  /** Etiquetas aplicadas a todo mundo da planilha. */
+  tags: z.array(z.string().trim().min(1).max(50)).max(20).default([]),
+  /** Coluna cujo conteúdo vira etiqueta (vários valores separados por vírgula
+   * ou ponto e vírgula na mesma célula). */
+  tagsColumn: z.string().nullable().default(null),
 });
 
 export type ImportMapping = z.infer<typeof mappingSchema>;

@@ -165,10 +165,13 @@ const NAME_HEADER_PATTERNS = [/^nome$/i, /^name$/i, /^cliente$/i, /nome\s*comple
 
 const EMAIL_HEADER_PATTERNS = [/^e-?mail$/i];
 
+const TAG_HEADER_PATTERNS = [/^tags?$/i, /^etiquetas?$/i, /^categoria$/i, /^grupo$/i];
+
 export type AutoMapping = {
   phoneColumn: string | null;
   fullNameColumn: string | null;
   emailColumn: string | null;
+  tagsColumn: string | null;
 };
 
 export function detectAutoMapping(headers: string[]): AutoMapping {
@@ -179,5 +182,6 @@ export function detectAutoMapping(headers: string[]): AutoMapping {
     phoneColumn: find(PHONE_HEADER_PATTERNS),
     fullNameColumn: find(NAME_HEADER_PATTERNS),
     emailColumn: find(EMAIL_HEADER_PATTERNS),
+    tagsColumn: find(TAG_HEADER_PATTERNS),
   };
 }
