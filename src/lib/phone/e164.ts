@@ -34,3 +34,28 @@ export function normalizeBR(rawInput: string | number | null | undefined): Norma
 
   return { ok: true, e164: parsed.number };
 }
+
+/**
+ * Chave da conversa, sempre no mesmo formato.
+ *
+ * A Meta devolve o `wa_id` de números brasileiros antigos sem o nono dígito
+ * (+556191255320), enquanto a gente envia para o número completo
+ * (+5561991255320). São a mesma pessoa, mas viravam duas conversas: o template
+ * numa, a resposta na outra.
+ *
+ * Canoniza para a forma com o 9 — a que os contatos usam e a que a pessoa
+ * digita. Número que não é celular brasileiro passa direto.
+ */
+export function conversationKey(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const digits = String(raw).replace(/\D/g, "");
+  if (!digits) return "";
+
+  // 55 + DDD (2) + 8 dígitos = celular que perdeu o nono. Fixo começa com
+  // 2 a 5, então só entram os que começam de 6 pra cima.
+  if (digits.length === 12 && digits.startsWith("55") && /^[6-9]/.test(digits.slice(4))) {
+    return `+${digits.slice(0, 4)}9${digits.slice(4)}`;
+  }
+
+  return `+${digits}`;
+}

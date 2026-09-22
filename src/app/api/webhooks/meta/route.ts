@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { after, NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { conversationKey } from "@/lib/phone/e164";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { handleFlowReply, startCampaignFlowOnReply } from "@/server/flow-engine";
 import { serverEnv } from "@/lib/env";
@@ -234,7 +235,9 @@ async function mirrorMessage(
   const contactPhone = direction === "in" ? msg.from : msg.to;
   if (!contactPhone) return;
 
-  const normalized = contactPhone.startsWith("+") ? contactPhone : `+${contactPhone}`;
+  // Canoniza aqui e não na leitura: a chave precisa ser a mesma da mensagem
+  // que saiu, senão a resposta abre uma conversa paralela.
+  const normalized = conversationKey(contactPhone);
   const { type, body, mediaId, mediaMime } = extractContent(msg);
 
   // Insert simples em vez de upsert: o índice único de (workspace, message_id)
@@ -460,14 +463,14 @@ export async function POST(req: NextRequest) {
                 const content = extractContent(msg);
                 await handleFlowReply({
                   workspaceId: tenant.workspaceId,
-                  phoneE164: msg.from ?? "",
+                  phoneE164: conversationKey(msg.from),
                   text: content.body,
                 });
                 // Sem fluxo em andamento, a resposta pode ser o gatilho da
                 // campanha que acabou de transmitir pra essa pessoa.
                 await startCampaignFlowOnReply({
                   workspaceId: tenant.workspaceId,
-                  phoneE164: msg.from ?? "",
+                  phoneE164: conversationKey(msg.from),
                   connectionId: tenant.connectionId,
                   phoneNumberId: tenant.phoneNumberId,
                 });

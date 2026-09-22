@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { conversationKey } from "@/lib/phone/e164";
 import { sendTextMessage } from "@/lib/meta/graph-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getThread, markThreadRead, markThreadUnread } from "@/server/inbox";
@@ -72,13 +73,13 @@ export async function sendReplyAction(formData: FormData): Promise<ActionResult>
 
   // Grava a bolha com o número que a Meta reconheceu, não o digitado — senão a
   // resposta abriria uma conversa paralela à que o webhook alimenta.
-  const conversationKey = waId ? `+${waId.replace(/^\+/, "")}` : phone;
+  const threadKey = conversationKey(waId ?? phone);
 
   const { error } = await admin.from("whatsapp_message").insert({
     workspace_id: workspace.id,
     connection_id: thread.connectionId,
     phone_number_id: thread.phoneNumberId,
-    contact_phone_e164: conversationKey,
+    contact_phone_e164: threadKey,
     contact_id: thread.contactId,
     contact_name: thread.contactName,
     direction: "out",
@@ -99,7 +100,7 @@ export async function sendReplyAction(formData: FormData): Promise<ActionResult>
   // Gente assumiu a conversa: o fluxo automático sai de cena pra não falar por
   // cima do atendente.
   try {
-    await cancelFlowRunForContact(workspace.id, conversationKey);
+    await cancelFlowRunForContact(workspace.id, threadKey);
   } catch (e) {
     console.error("[inbox] encerrar fluxo:", (e as Error).message);
   }
