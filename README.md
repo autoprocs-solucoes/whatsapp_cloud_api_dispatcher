@@ -17,6 +17,14 @@ Disparador de mensagens em massa via WhatsApp Cloud API (Meta) — multi-tenant,
 - npm 10+
 - Conta no [Supabase](https://supabase.com), [Vercel](https://vercel.com) e [Meta for Developers](https://developers.facebook.com)
 
+## Subir uma instância nova
+
+O passo a passo completo — Supabase, Meta, Vercel, worker, cron e verificação
+final — está em **[docs/replicar.md](docs/replicar.md)**.
+
+Para atender mais um cliente não é preciso replicar nada: crie um workspace no
+painel Master e conecte a WABA dele.
+
 ## Setup local
 
 ```bash
