@@ -901,6 +901,91 @@ export async function sendCtaUrlMessage(params: {
   return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
 }
 
+/**
+ * Sobe um arquivo pro número e devolve o media id.
+ *
+ * É o caminho certo pra mídia que sai do app: a Meta guarda o arquivo e a
+ * mensagem carrega só o id. Mandar por link obriga o servidor dela a baixar de
+ * algum lugar público, o que falha calado quando a URL não responde.
+ */
+export async function uploadMediaFile(params: {
+  phoneNumberId: string;
+  token: string;
+  file: Blob;
+  filename: string;
+  mimeType: string;
+}): Promise<{ id: string }> {
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("type", params.mimeType);
+  form.append("file", params.file, params.filename);
+
+  const res = await fetch(graphUrl(`/${params.phoneNumberId}/media`), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${params.token}` },
+    body: form,
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let payload: GraphErrorPayload = {};
+    try {
+      payload = (await res.json()) as GraphErrorPayload;
+    } catch {
+      // ignored
+    }
+    throw new GraphApiError(res.status, payload);
+  }
+
+  const data = (await res.json()) as { id?: string };
+  if (!data.id) throw new Error("Upload sem media id na resposta da Meta");
+  return { id: data.id };
+}
+
+/**
+ * Manda mídia já hospedada na Meta, pelo id. `voice` transforma o áudio em
+ * mensagem de voz (a bolha com onda), em vez de arquivo de áudio.
+ */
+export async function sendMediaById(params: {
+  phoneNumberId: string;
+  token: string;
+  to: string;
+  kind: "image" | "video" | "document" | "audio";
+  mediaId: string;
+  caption?: string | null;
+  filename?: string | null;
+  voice?: boolean;
+}): Promise<{ messageId: string; waId: string | null }> {
+  const media: Record<string, unknown> = { id: params.mediaId };
+  // Legenda não existe em áudio nem documento sem nome — a Meta recusa o campo.
+  if (params.caption && (params.kind === "image" || params.kind === "video")) {
+    media.caption = params.caption;
+  }
+  if (params.kind === "document" && params.filename) media.filename = params.filename;
+  if (params.kind === "audio" && params.voice) media.voice = true;
+
+  const data = await request<SendTemplateResponse & { contacts?: { wa_id?: string }[] }>(
+    `/${params.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      token: params.token,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: params.to,
+        type: params.kind,
+        [params.kind]: media,
+      }),
+    },
+  );
+
+  const messageId = data.messages?.[0]?.id;
+  if (!messageId) {
+    throw new GraphApiError(500, { error: { message: "Resposta sem message id" } });
+  }
+  return { messageId, waId: data.contacts?.[0]?.wa_id ?? null };
+}
+
 /** Imagem, vídeo ou documento por link público. */
 export async function sendMediaMessage(params: {
   phoneNumberId: string;

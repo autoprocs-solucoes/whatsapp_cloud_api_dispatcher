@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { conversationKey } from "@/lib/phone/e164";
-import { sendTextMessage } from "@/lib/meta/graph-api";
+import { GraphApiError, sendMediaById, sendTextMessage, uploadMediaFile } from "@/lib/meta/graph-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getThread, markThreadRead, markThreadUnread } from "@/server/inbox";
 import { cancelFlowRunForContact } from "@/server/flow-engine";
@@ -128,5 +128,128 @@ export async function markThreadUnreadAction(phone: string): Promise<ActionResul
 
   revalidatePath("/conversas");
   revalidatePath("/", "layout");
+  return { ok: true, data: undefined };
+}
+
+// ----------------------------------------------------------------------------
+// Anexo e áudio
+// ----------------------------------------------------------------------------
+
+/** Tipos que a Cloud API aceita, com o teto de tamanho de cada um. */
+const MEDIA_RULES: { kind: "image" | "video" | "document" | "audio"; test: RegExp; maxBytes: number }[] = [
+  { kind: "image", test: /^image\/(jpeg|png|webp)$/, maxBytes: 5 * 1024 * 1024 },
+  { kind: "video", test: /^video\/(mp4|3gpp)$/, maxBytes: 16 * 1024 * 1024 },
+  { kind: "audio", test: /^audio\//, maxBytes: 16 * 1024 * 1024 },
+  { kind: "document", test: /.*/, maxBytes: 100 * 1024 * 1024 },
+];
+
+function mediaRuleFor(mime: string) {
+  return MEDIA_RULES.find((r) => r.test.test(mime)) ?? MEDIA_RULES[MEDIA_RULES.length - 1]!;
+}
+
+/**
+ * Envia arquivo ou áudio na conversa. Mesma regra do texto: fora da janela de
+ * 24h a Meta aceita e descarta, então nem tenta.
+ */
+export async function sendMediaReplyAction(formData: FormData): Promise<ActionResult> {
+  const workspace = await requireActiveWorkspace();
+
+  const phone = String(formData.get("phone") ?? "").trim();
+  const file = formData.get("file");
+  const isVoice = String(formData.get("voice") ?? "") === "1";
+  const caption = String(formData.get("caption") ?? "").trim();
+
+  if (!phone) return { ok: false, error: "Conversa não identificada" };
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Selecione um arquivo" };
+  }
+
+  const rule = mediaRuleFor(file.type || "application/octet-stream");
+  if (file.size > rule.maxBytes) {
+    const mb = Math.round(rule.maxBytes / (1024 * 1024));
+    return { ok: false, error: `Arquivo muito grande (máx. ${mb}MB pra ${rule.kind})` };
+  }
+
+  const thread = await getThread(workspace.id, phone, 1);
+  if (!thread || !thread.connectionId || !thread.phoneNumberId) {
+    return { ok: false, error: "Conversa não encontrada" };
+  }
+  if (thread.window.open === false) {
+    return {
+      ok: false,
+      error:
+        "A janela de 24 horas fechou. Só é possível retomar com um template aprovado. Faça uma transmissão.",
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: connection } = await admin
+    .from("workspace_meta_connection")
+    .select("access_token")
+    .eq("id", thread.connectionId)
+    .maybeSingle();
+  if (!connection?.access_token) {
+    return { ok: false, error: "Conexão com a Meta indisponível" };
+  }
+
+  let messageId: string;
+  let waId: string | null;
+  let mediaId: string;
+  try {
+    const uploaded = await uploadMediaFile({
+      phoneNumberId: thread.phoneNumberId,
+      token: connection.access_token,
+      file,
+      filename: file.name || (isVoice ? "audio.ogg" : "arquivo"),
+      mimeType: file.type || "application/octet-stream",
+    });
+    mediaId = uploaded.id;
+
+    const sent = await sendMediaById({
+      phoneNumberId: thread.phoneNumberId,
+      token: connection.access_token,
+      to: phone.replace(/^\+/, ""),
+      kind: rule.kind,
+      mediaId,
+      caption: caption || null,
+      filename: rule.kind === "document" ? file.name : null,
+      voice: isVoice,
+    });
+    messageId = sent.messageId;
+    waId = sent.waId;
+  } catch (e) {
+    if (e instanceof GraphApiError) return { ok: false, error: `Meta: ${e.message}` };
+    return { ok: false, error: `Falha no envio: ${(e as Error).message}` };
+  }
+
+  const threadKey = conversationKey(waId ?? phone);
+  const { error } = await admin.from("whatsapp_message").insert({
+    workspace_id: workspace.id,
+    connection_id: thread.connectionId,
+    phone_number_id: thread.phoneNumberId,
+    contact_phone_e164: threadKey,
+    contact_id: thread.contactId,
+    contact_name: thread.contactName,
+    direction: "out",
+    type: rule.kind,
+    body: caption || (rule.kind === "document" ? file.name : null),
+    media_id: mediaId,
+    media_mime: file.type || null,
+    meta_message_id: messageId,
+    status: "sent",
+    read_internally: true,
+    sent_at: new Date().toISOString(),
+  });
+  if (error) {
+    console.error("[inbox] espelho do anexo:", error.message);
+  }
+
+  try {
+    await cancelFlowRunForContact(workspace.id, threadKey);
+  } catch (e) {
+    console.error("[inbox] encerrar fluxo:", (e as Error).message);
+  }
+
+  revalidatePath("/conversas");
   return { ok: true, data: undefined };
 }

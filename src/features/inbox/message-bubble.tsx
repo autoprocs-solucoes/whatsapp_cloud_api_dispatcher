@@ -55,6 +55,7 @@ export function MessageBubble({ message }: { message: WhatsappMessage }) {
   const isOut = message.direction === "out";
   const Icon = MEDIA_ICON[message.type];
   const isImage = message.type === "image" || message.type === "sticker";
+  const isAudio = message.type === "audio";
   const label = TYPE_LABEL[message.type];
 
   const time = new Date(message.sent_at).toLocaleTimeString("pt-BR", {
@@ -99,7 +100,18 @@ export function MessageBubble({ message }: { message: WhatsappMessage }) {
           />
         )}
 
-        {!isImage && Icon && (
+        {isAudio && message.media_id && (
+          // Player no lugar de link: áudio é pra ouvir ali mesmo, sem abrir
+          // outra aba. O arquivo vem pela rota autenticada do app.
+          <audio
+            controls
+            preload="none"
+            src={`/conversas/midia/${message.media_id}`}
+            className="mb-1 h-10 w-[240px] max-w-full"
+          />
+        )}
+
+        {!isImage && !isAudio && Icon && (
           <a
             href={message.media_id ? `/conversas/midia/${message.media_id}` : undefined}
             target="_blank"
