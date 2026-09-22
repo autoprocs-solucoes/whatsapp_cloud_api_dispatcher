@@ -23,9 +23,9 @@ type Props = {
   /** Override do tamanho da área de chat (default: min-h-[120px] max-h-[260px]). */
   chatClassName?: string;
   /**
-   * `compact` cabe num card de listagem; `device` desenha o aparelho no
-   * tamanho real (390x844, a medida de um iPhone), com a tipografia do
-   * WhatsApp no iOS — é o que serve pra conferir como a mensagem chega.
+   * `device` (padrão) desenha o aparelho no tamanho real — 390x844, a medida
+   * de um iPhone, com a tipografia do WhatsApp no iOS. `compact` é a versão
+   * reduzida, pra quando o aparelho inteiro não cabe no espaço.
    */
   size?: "compact" | "device";
 };
@@ -139,7 +139,7 @@ export function WhatsAppPreview({
   placeholderLabels = {},
   className,
   chatClassName,
-  size = "compact",
+  size = "device",
 }: Props) {
   const hasContent = Boolean(headerText || bodyText || footerText || (buttons && buttons.length > 0));
   const initials = (senderName ?? "Empresa").slice(0, 2).toUpperCase();

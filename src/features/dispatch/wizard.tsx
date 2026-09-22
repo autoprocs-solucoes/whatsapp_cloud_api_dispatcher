@@ -492,7 +492,7 @@ export function DispatchWizard({
       </ol>
 
       {/* Step content + preview side-by-side */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
       <div className="rounded-md border p-3">
         {step === 1 && (
           <div className="space-y-3">

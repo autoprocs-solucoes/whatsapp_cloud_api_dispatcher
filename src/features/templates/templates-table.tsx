@@ -238,7 +238,6 @@ function TemplateCard({
           footerText={template.footer_text}
           buttons={buttons}
           resolved={hovered ? examples : {}}
-          chatClassName="h-[280px]"
         />
       </div>
 
@@ -392,7 +391,9 @@ export function TemplatesTable({ templates, isOwner, analyticsByTemplateId }: Pr
           Nenhum template {activeFilter === "active" ? "ativo" : "desativado"} pra mostrar.
         </div>
       ) : (
-        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        // Duas colunas até 2xl: com o aparelho em tamanho real, três colunas
+        // espremeriam o card.
+        <div className="grid auto-rows-fr gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {filteredTemplates.map((t) => (
             <TemplateCard
               key={t.id}

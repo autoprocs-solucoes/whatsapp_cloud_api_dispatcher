@@ -563,7 +563,6 @@ export function TemplateWizard({ connections }: Props) {
             pessoa vê aqui é o que ela vai ver na hora de disparar. */}
         <div className="lg:sticky lg:top-4 lg:self-start">
           <WhatsAppPreview
-            size="device"
             headerText={headerType === "TEXT" ? headerText : null}
             bodyText={bodyText}
             footerText={footerText}
