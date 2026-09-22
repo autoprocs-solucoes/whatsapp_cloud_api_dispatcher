@@ -109,7 +109,10 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
           </CardContent>
         </Card>
       ) : (
-        <div className="grid h-[calc(100vh-13rem)] min-h-[32rem] overflow-hidden rounded-lg border border-wa-line shadow-card lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        // `dvh` em vez de `vh` por causa da barra do navegador no celular, e o
+        // mínimo baixo de propósito: com 32rem, janela baixa empurrava o campo
+        // de digitar pra fora da tela e só aparecia redimensionando.
+        <div className="grid h-[calc(100dvh-13rem)] max-h-[calc(100dvh-13rem)] min-h-[22rem] overflow-hidden rounded-lg border border-wa-line shadow-card lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
           {/* Lista de conversas. `min-h-0` é o que faz a lista rolar: sem ele a
               coluna cresce além da altura do container e o conteúdo some
               cortado pelo overflow-hidden de cima, sem barra nenhuma. */}
@@ -227,7 +230,7 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
                   </div>
                 </div>
 
-                <div className="flex-1 space-y-1.5 overflow-y-auto px-6 py-4">
+                <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain px-6 py-4">
                   {thread.messages.map((m, i) => {
                     const prev = thread.messages[i - 1];
                     const newDay =
