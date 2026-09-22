@@ -132,3 +132,57 @@ export async function demoteMasterMemberAction(input: unknown): Promise<ActionRe
   revalidatePath("/master/perfil");
   return { ok: true, data: undefined };
 }
+
+/**
+ * Apaga um cliente e tudo que é dele.
+ *
+ * O banco cascateia: contatos, segmentos, templates, fluxos, campanhas,
+ * transmissões com o histórico de cada destinatário, conversas e a conexão com
+ * a Meta somem junto. Não há lixeira — por isso a ação exige que quem está
+ * apagando escreva o nome do cliente.
+ *
+ * O que NÃO é tocado: a conta das pessoas. Quem era membro continua existindo
+ * e com acesso aos outros workspaces.
+ */
+export async function deleteClientWorkspaceAction(input: unknown): Promise<ActionResult> {
+  const user = await requireMasterUser();
+
+  const parsed = z
+    .object({ workspaceId: z.string().uuid(), confirmName: z.string() })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Dados inválidos" };
+
+  const admin = createAdminClient();
+  const { data: workspace } = await admin
+    .from("workspace")
+    .select("id, name")
+    .eq("id", parsed.data.workspaceId)
+    .maybeSingle();
+  if (!workspace) return { ok: false, error: "Cliente não encontrado" };
+
+  const typed = parsed.data.confirmName.trim().toLowerCase();
+  if (typed !== workspace.name.trim().toLowerCase()) {
+    return { ok: false, error: "O nome digitado não confere com o do cliente" };
+  }
+
+  // Fica no log de quem apagou o quê: depois do delete não sobra evidência
+  // nenhuma no banco.
+  console.warn(
+    "[master] apagando cliente",
+    JSON.stringify({ workspace: workspace.name, id: workspace.id, by: user.id }),
+  );
+
+  const { error } = await admin.from("workspace").delete().eq("id", workspace.id);
+  if (error) return { ok: false, error: error.message };
+
+  // Se o master estava "dentro" desse cliente, o cookie ficaria apontando pra
+  // um workspace que não existe mais.
+  const cookieStore = await cookies();
+  if (cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value === workspace.id) {
+    cookieStore.delete(ACTIVE_WORKSPACE_COOKIE);
+  }
+
+  revalidatePath("/master");
+  revalidatePath("/", "layout");
+  return { ok: true, data: undefined };
+}

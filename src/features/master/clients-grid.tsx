@@ -3,11 +3,18 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { LogIn, Plus, Search } from "lucide-react";
+import { LogIn, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
 
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { DeleteClientDialog } from "@/features/master/delete-client-dialog";
 import { enterClientWorkspaceAction } from "@/features/master/actions";
 import type { MasterWorkspaceRow } from "@/server/master";
 import { cn } from "@/lib/utils";
@@ -57,6 +64,7 @@ const META_FILTERS: { value: MetaFilter; label: string }[] = [
 function ClientCard({ w }: { w: MasterWorkspaceRow }) {
   const conn = w.connections[0];
   const hasCoexistence = w.connections.some((c) => c.isCoexistence);
+  const [deleting, setDeleting] = useState(false);
 
   return (
     <div className="flex flex-col rounded-lg border border-line bg-card shadow-card transition-colors hover:border-line-3">
@@ -111,13 +119,37 @@ function ClientCard({ w }: { w: MasterWorkspaceRow }) {
             {hasCoexistence ? "sim" : "não"}
           </p>
         </div>
-        <form action={enterClientWorkspaceAction} className="shrink-0">
-          <input type="hidden" name="workspaceId" value={w.id} />
-          <Button type="submit" size="sm" variant="outline">
-            <LogIn className="size-3.5" /> Entrar
-          </Button>
-        </form>
+        <div className="flex shrink-0 items-center gap-1">
+          <form action={enterClientWorkspaceAction}>
+            <input type="hidden" name="workspaceId" value={w.id} />
+            <Button type="submit" size="sm" variant="outline">
+              <LogIn className="size-3.5" /> Entrar
+            </Button>
+          </form>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" aria-label="Ações do cliente">
+                <MoreVertical className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
+                <Trash2 className="size-3.5" /> Apagar cliente
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+
+      <DeleteClientDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        workspaceId={w.id}
+        name={w.name}
+        memberCount={w.memberCount}
+        contactCount={w.contactCount}
+        totalSent={w.totalSent}
+      />
     </div>
   );
 }
