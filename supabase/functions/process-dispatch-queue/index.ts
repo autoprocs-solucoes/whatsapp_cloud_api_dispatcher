@@ -160,6 +160,19 @@ type TplParam =
   | { type: "text"; text: string }
   | { type: "text"; parameter_name: string; text: string };
 
+/**
+ * Texto do template com as variáveis já trocadas — é o que vai pro espelho da
+ * conversa, pra quem abrir o Conversas ver o que a pessoa recebeu, e não
+ * "{{1}}".
+ */
+function renderBody(text: string | null, payload: Record<string, string>): string {
+  if (!text) return "";
+  return text.replace(
+    /\{\{\s*([a-zA-Z_]\w*|\d+)\s*\}\}/g,
+    (whole, key) => payload[`body:${key}`] ?? whole,
+  );
+}
+
 function buildParams(
   placeholders: string[],
   payload: Record<string, string>,
@@ -497,7 +510,7 @@ Deno.serve(async (_req) => {
       ? (
           await admin
             .from("workspace_meta_connection")
-            .select("access_token")
+            .select("id, access_token")
             .eq("id", phoneRes.data.connection_id)
             .maybeSingle()
         ).data
@@ -554,11 +567,17 @@ Deno.serve(async (_req) => {
       }
       const batch = (claimed ?? []) as Array<{
         id: string;
+        contact_id: string | null;
         phone_e164: string;
         payload: Record<string, string> | null;
         attempts: number;
       }>;
       if (batch.length === 0) break;
+
+      // Espelho da conversa: uma linha por mensagem que sai, gravada em bloco
+      // no fim do lote. Sem isso a transmissão não abria conversa nenhuma no
+      // Conversas — a thread só nascia se a pessoa respondesse.
+      const mirrorRows: Array<Record<string, unknown>> = [];
 
       for (const r of batch) {
         if (totalProcessed >= MAX_PER_INVOCATION) break;
@@ -579,14 +598,34 @@ Deno.serve(async (_req) => {
             headerImageLink: headerImageId ? null : headerImageLink,
             copyCodeButton,
           });
+          const sentAt = new Date().toISOString();
           await admin
             .from("dispatch_recipient")
             .update({
               status: "sent",
               meta_message_id: messageId,
-              sent_at: new Date().toISOString(),
+              sent_at: sentAt,
             })
             .eq("id", r.id);
+
+          mirrorRows.push({
+            workspace_id: dispatch.workspace_id,
+            connection_id: connection.id,
+            phone_number_id: dispatch.phone_number_id,
+            contact_phone_e164: r.phone_e164.startsWith("+")
+              ? r.phone_e164
+              : `+${r.phone_e164}`,
+            contact_id: r.contact_id,
+            contact_name: null,
+            direction: "out",
+            type: "template",
+            body: renderBody(template.body_text, payload) || template.name,
+            meta_message_id: messageId,
+            status: "sent",
+            read_internally: true,
+            sent_at: sentAt,
+          });
+
           sent++;
         } catch (e) {
           const err = e as GraphError;
@@ -626,6 +665,15 @@ Deno.serve(async (_req) => {
 
         totalProcessed++;
         if (INTER_MESSAGE_DELAY_MS > 0) await sleep(INTER_MESSAGE_DELAY_MS);
+      }
+
+      // Em bloco, não uma por envio: 200 inserts separados custariam mais que
+      // o próprio disparo. Falhar aqui não derruba nada — a mensagem já saiu.
+      if (mirrorRows.length > 0) {
+        const { error: mirrorErr } = await admin.from("whatsapp_message").insert(mirrorRows);
+        if (mirrorErr) {
+          console.error("[worker] espelho da conversa falhou", mirrorErr.message);
+        }
       }
     }
 

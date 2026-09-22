@@ -107,6 +107,31 @@ export async function markThreadRead(workspaceId: string, phone: string): Promis
     .eq("read_internally", false);
 }
 
+/**
+ * Volta a conversa pra não lida. Marca só a última recebida: o contador da
+ * lista conta mensagem, e marcar tudo de novo faria a conversa reaparecer com
+ * "12 não lidas" semanas depois de já terem sido lidas.
+ */
+export async function markThreadUnread(workspaceId: string, phone: string): Promise<void> {
+  const admin = createAdminClient();
+
+  const { data: lastInbound } = await admin
+    .from("whatsapp_message")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("contact_phone_e164", phone)
+    .eq("direction", "in")
+    .order("sent_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!lastInbound) return;
+
+  await admin
+    .from("whatsapp_message")
+    .update({ read_internally: false })
+    .eq("id", lastInbound.id);
+}
+
 /** Total de conversas com mensagem não lida — vai no selo do menu. */
 export async function countUnreadThreads(workspaceId: string): Promise<number> {
   const admin = createAdminClient();

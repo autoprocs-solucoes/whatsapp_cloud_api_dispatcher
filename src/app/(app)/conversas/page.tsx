@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { WhatsAppMark } from "@/components/whatsapp-mark";
 import { Card, CardContent } from "@/components/ui/card";
+import { MarkUnreadButton } from "@/features/inbox/mark-unread-button";
 import { MessageBubble } from "@/features/inbox/message-bubble";
 import { ReplyForm } from "@/features/inbox/reply-form";
 import { getThread, listConversations, markThreadRead } from "@/server/inbox";
@@ -217,6 +218,7 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
                     {thread.window.open === false && (
                       <StatusBadge tone="pending">Janela fechada</StatusBadge>
                     )}
+                    <MarkUnreadButton phone={thread.phone} />
                     {/* Fecha só a visualização — a conversa e o histórico
                         continuam intactos, e ela segue na lista à esquerda. */}
                     <Link

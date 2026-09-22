@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { sendTextMessage } from "@/lib/meta/graph-api";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getThread, markThreadRead } from "@/server/inbox";
+import { getThread, markThreadRead, markThreadUnread } from "@/server/inbox";
 import { cancelFlowRunForContact } from "@/server/flow-engine";
 import { requireActiveWorkspace } from "@/server/workspace";
 
@@ -112,5 +112,20 @@ export async function markThreadReadAction(phone: string): Promise<ActionResult>
   const workspace = await requireActiveWorkspace();
   await markThreadRead(workspace.id, phone);
   revalidatePath("/conversas");
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Marca a conversa como não lida e fecha a visualização — se continuasse
+ * aberta, o próprio render marcaria como lida de novo no segundo seguinte.
+ */
+export async function markThreadUnreadAction(phone: string): Promise<ActionResult> {
+  const workspace = await requireActiveWorkspace();
+  if (!phone) return { ok: false, error: "Conversa inválida" };
+
+  await markThreadUnread(workspace.id, phone);
+
+  revalidatePath("/conversas");
+  revalidatePath("/", "layout");
   return { ok: true, data: undefined };
 }
