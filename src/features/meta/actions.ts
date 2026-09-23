@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { credentialForWaba } from "@/server/meta-recovery";
+import { credentialForWaba, findUnlinkedWabas } from "@/server/meta-recovery";
 import { linkWabaToWorkspace } from "@/server/meta-link";
 import {
   exchangeCodeForToken,
@@ -596,7 +596,26 @@ export async function connectDiscoveredWabaAction(input: {
     return { ok: false, error: "Só o time Autoprocs pode recuperar uma conta" };
   }
 
+  const { data: workspace } = await admin
+    .from("workspace")
+    .select("name")
+    .eq("id", input.workspaceId)
+    .maybeSingle();
+  if (!workspace) return { ok: false, error: "Cliente não encontrado" };
+
   try {
+    // Confere de novo no servidor a quem a conta pertence. A lista da tela já
+    // filtra, mas quem decide o que pode ser ligado a um cliente é aqui — do
+    // contrário bastaria forjar um id pra plugar o WhatsApp de um cliente no
+    // workspace de outro.
+    const permitidas = await findUnlinkedWabas(input.workspaceId, workspace.name);
+    if (!permitidas.some((w) => w.wabaId === input.wabaId)) {
+      return {
+        ok: false,
+        error: "Essa conta não é deste cliente. Recarregue a página e tente de novo.",
+      };
+    }
+
     const accessToken = await credentialForWaba(input.wabaId);
     if (!accessToken) {
       return {

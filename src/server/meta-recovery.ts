@@ -1,12 +1,14 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getWabaInfo, listBusinessWabas, listPhoneNumbers } from "@/lib/meta/graph-api";
+import { getWabaInfo, listClientWabas, listPhoneNumbers } from "@/lib/meta/graph-api";
 
 export type RecoverableWaba = {
   wabaId: string;
   name: string | null;
   ownerBusinessName: string | null;
+  /** Por que esta conta foi atribuída a este cliente. */
+  matchedBy: "tentativa" | "nome";
   phones: { display: string; verifiedName: string | null; status: string | null }[];
 };
 
@@ -39,25 +41,101 @@ async function connectedWabaIds(): Promise<Set<string>> {
   return new Set((data ?? []).map((r) => r.waba_id));
 }
 
+/** Sem acento, sem pontuação, minúsculo — "Tj Assessoria Contábil" e "Tj
+ * Assessoria Contabil" são a mesma empresa. */
+function normalize(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Palavras que não distinguem uma empresa de outra. */
+const NOISE = new Set([
+  "ltda",
+  "me",
+  "eireli",
+  "sa",
+  "comercio",
+  "servicos",
+  "negocios",
+  "assessoria",
+  "contabil",
+  "contabilidade",
+  "solucoes",
+  "empresa",
+  "grupo",
+  "do",
+  "da",
+  "de",
+  "dos",
+  "das",
+  "e",
+]);
+
 /**
- * Contas que existem na Meta e não estão ligadas a nenhum cliente aqui.
+ * O nome do negócio dono da conta bate com o nome do cliente?
  *
- * O Login Integrado compartilha a conta do cliente com o nosso negócio no
- * momento em que ele conclui o cadastro. Quando o passo seguinte falha — e
- * falhava, quando o popup não conseguia avisar qual era a conta — a conta fica
- * existindo lá, completa, e invisível aqui. Era isso que obrigava a refazer o
- * cadastro inteiro ou a colar credencial na mão.
+ * Só uma coincidência forte conta: nome igual, um contendo o outro, ou duas
+ * palavras próprias em comum. Errar aqui é oferecer a conta de um cliente pra
+ * dentro de outro.
  */
-export async function findUnlinkedWabas(): Promise<RecoverableWaba[]> {
-  const [credentials, alreadyLinked] = await Promise.all([
+function sameCompany(workspaceName: string, businessName: string | null): boolean {
+  if (!businessName) return false;
+  const a = normalize(workspaceName);
+  const b = normalize(businessName);
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+
+  const wordsOf = (t: string) =>
+    new Set(t.split(" ").filter((w) => w.length >= 3 && !NOISE.has(w)));
+  const wa = wordsOf(a);
+  const wb = wordsOf(b);
+  let shared = 0;
+  for (const w of wa) if (wb.has(w)) shared++;
+  return shared >= 2;
+}
+
+/**
+ * Contas deste cliente que concluíram o cadastro na Meta e não viraram conexão.
+ *
+ * Duas regras estreitas de propósito, porque esta lista aparece dentro da tela
+ * de um cliente:
+ *
+ * 1. Só contas de clientes (`client_whatsapp_business_accounts`) — as contas da
+ *    própria Autoprocs nunca entram. Elas chegaram aqui por outro caminho e não
+ *    têm nada que ser oferecidas dentro de um cliente.
+ * 2. Só as que são reconhecidamente deste cliente: ou o WABA aparece no rastro
+ *    de tentativa dele, ou o negócio dono tem o nome dele.
+ *
+ * Sem isso a tela do TJ listava a conta da Advisory e a de outros clientes — e
+ * um clique errado ligaria o WhatsApp de um no cliente do outro.
+ */
+export async function findUnlinkedWabas(
+  workspaceId: string,
+  workspaceName: string,
+): Promise<RecoverableWaba[]> {
+  const admin = createAdminClient();
+
+  const [credentials, alreadyLinked, attempts] = await Promise.all([
     storedBusinessCredentials(),
     connectedWabaIds(),
+    admin
+      .from("meta_signup_attempt")
+      .select("waba_id")
+      .eq("workspace_id", workspaceId)
+      .not("waba_id", "is", null),
   ]);
+
+  const attemptedWabaIds = new Set(
+    (attempts.data ?? []).map((a) => a.waba_id).filter((id): id is string => Boolean(id)),
+  );
 
   const candidates = new Map<string, string>(); // wabaId → credencial que a alcança
   for (const { businessId, token } of credentials) {
-    const wabas = await listBusinessWabas(businessId, token);
-    for (const waba of wabas) {
+    for (const waba of await listClientWabas(businessId, token)) {
       if (alreadyLinked.has(waba.id)) continue;
       if (!candidates.has(waba.id)) candidates.set(waba.id, token);
     }
@@ -66,17 +144,26 @@ export async function findUnlinkedWabas(): Promise<RecoverableWaba[]> {
   const out: RecoverableWaba[] = [];
   for (const [wabaId, token] of candidates) {
     try {
-      const [info, phones] = await Promise.all([
-        getWabaInfo(wabaId, token),
-        listPhoneNumbers(wabaId, token),
-      ]);
-      // Sem número não há o que conectar — normalmente é conta de teste ou um
-      // cadastro abandonado antes da verificação.
+      const info = await getWabaInfo(wabaId, token);
+      const ownerBusinessName = info.owner_business_info?.name ?? null;
+
+      const matchedBy: RecoverableWaba["matchedBy"] | null = attemptedWabaIds.has(wabaId)
+        ? "tentativa"
+        : sameCompany(workspaceName, ownerBusinessName)
+          ? "nome"
+          : null;
+      if (!matchedBy) continue;
+
+      const phones = await listPhoneNumbers(wabaId, token);
+      // Sem número não há o que conectar — conta abandonada antes da
+      // verificação, ou de teste.
       if (phones.length === 0) continue;
+
       out.push({
         wabaId,
         name: info.name ?? null,
-        ownerBusinessName: info.owner_business_info?.name ?? null,
+        ownerBusinessName,
+        matchedBy,
         phones: phones.map((p) => ({
           display: p.display_phone_number,
           verifiedName: p.verified_name ?? null,

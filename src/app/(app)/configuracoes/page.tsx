@@ -47,7 +47,7 @@ export default async function ConfiguracoesPage() {
   // página. Falha aqui não pode derrubar a tela.
   const unlinkedWabas =
     user.profile.is_superadmin && metaConnections.length === 0
-      ? await findUnlinkedWabas().catch(() => [])
+      ? await findUnlinkedWabas(workspace.id, workspace.name).catch(() => [])
       : [];
 
   return (

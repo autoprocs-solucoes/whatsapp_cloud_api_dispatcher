@@ -50,12 +50,14 @@ export function RecoverWabaPanel({ workspaceId, workspaceName, wabas }: Props) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-[15px]">
           <PlugZap className="size-4 text-amber" />
-          {wabas.length === 1 ? "Uma conta sem cliente" : `${wabas.length} contas sem cliente`}
+          Cadastro concluído na Meta e não conectado aqui
         </CardTitle>
         <CardDescription>
-          Estas contas existem na sua Meta e não estão ligadas a nenhum cliente aqui — o
-          cadastro foi concluído lá e se perdeu no caminho. Conectar liga a conta a{" "}
-          <strong className="text-ink">{workspaceName}</strong>, sem o cliente refazer nada.
+          {wabas.length === 1 ? "Esta conta é" : "Estas contas são"} de{" "}
+          <strong className="text-ink">{workspaceName}</strong> e{" "}
+          {wabas.length === 1 ? "terminou" : "terminaram"} o login integrado, mas a conexão
+          não chegou a ser gravada. Conectar recupera o que ficou pra trás — o cliente não
+          precisa refazer nada.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -71,6 +73,13 @@ export function RecoverWabaPanel({ workspaceId, workspaceName, wabas }: Props) {
               <p className="truncate text-xs text-ink-2">
                 {waba.phones.map((p) => p.display).join(" · ")}
                 {waba.ownerBusinessName ? ` · ${waba.ownerBusinessName}` : ""}
+              </p>
+              {/* Dizer por que esta conta foi atribuída a este cliente: quem
+                  confirma o vínculo é quem clica, e ele precisa do motivo. */}
+              <p className="mt-0.5 text-[11px] text-ink-3">
+                {waba.matchedBy === "tentativa"
+                  ? "Encontrada pelo registro da tentativa de conexão deste cliente"
+                  : "O negócio dono da conta tem o nome deste cliente"}
               </p>
             </div>
             <Button
