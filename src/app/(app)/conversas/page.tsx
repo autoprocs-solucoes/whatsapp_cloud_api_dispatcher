@@ -1,14 +1,16 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { Search, X } from "lucide-react";
+import { PlugZap, Search, X } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
 import { WhatsAppMark } from "@/components/whatsapp-mark";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MarkUnreadButton } from "@/features/inbox/mark-unread-button";
 import { MessageBubble } from "@/features/inbox/message-bubble";
 import { ReplyForm } from "@/features/inbox/reply-form";
 import { getThread, listConversations, markThreadRead } from "@/server/inbox";
+import { getMetaConnections } from "@/server/meta";
 import { requireActiveWorkspace } from "@/server/workspace";
 import { dayKeyBR, formatDateBR, formatTimeBR } from "@/lib/format/datetime";
 import { cn } from "@/lib/utils";
@@ -62,6 +64,9 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
   // teto é alto de propósito e a busca resolve o resto — paginação aqui só
   // atrapalharia quem procura um contato específico.
   const conversations = await listConversations(workspace.id, { search: sp.q, limit: 600 });
+  // Sem número conectado a tela ficava dizendo "assim que alguém responder",
+  // o que é falso: nada chega, e quem está demonstrando não tem como saber.
+  const connections = await getMetaConnections(workspace.id);
 
   // Sem `tel` a primeira conversa abre sozinha, que é o esperado ao entrar na
   // tela. `fechado=1` é o que o botão de fechar usa pra dizer "nenhuma", já
@@ -93,15 +98,35 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
         </div>
       </div>
 
-      {conversations.length === 0 && !sp.q ? (
+      {connections.length === 0 ? (
+        <Card className="border-dashed border-amber-line bg-amber-soft/40">
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <div className="flex size-12 items-center justify-center rounded-lg bg-amber-soft text-amber">
+              <PlugZap className="size-6" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold text-ink">Nenhum número conectado</h2>
+              <p className="max-w-md text-sm text-ink-2">
+                Este cliente ainda não tem WhatsApp conectado, então nada chega aqui — nem
+                resposta de transmissão, nem mensagem do aplicativo do celular. Conecte a conta da
+                Meta pra começar.
+              </p>
+            </div>
+            <Button asChild size="sm" className="mt-1">
+              <Link href="/configuracoes">Ir para Configurações</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : conversations.length === 0 && !sp.q ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <WhatsAppMark size={48} filled />
             <div className="space-y-1">
               <h2 className="text-base font-semibold text-ink">Nenhuma conversa ainda</h2>
               <p className="max-w-md text-sm text-ink-2">
-                Assim que alguém responder uma transmissão, a conversa aparece aqui. Mensagens
-                enviadas pelo aplicativo do celular também entram, quando o número usa coexistência.
+                O número está conectado e ouvindo. Assim que alguém escrever, ou responder uma
+                transmissão, a conversa aparece aqui — incluindo o que sai pelo aplicativo do
+                celular, quando o número usa coexistência.
               </p>
             </div>
           </CardContent>

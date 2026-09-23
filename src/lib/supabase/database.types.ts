@@ -665,6 +665,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      webhook_unmatched: {
+        Row: {
+          id: number;
+          created_at: string;
+          waba_id: string | null;
+          phone_number_id: string | null;
+          from_phone: string | null;
+          kind: string | null;
+          payload: Json | null;
+        };
+        Insert: {
+          id?: number;
+          created_at?: string;
+          waba_id?: string | null;
+          phone_number_id?: string | null;
+          from_phone?: string | null;
+          kind?: string | null;
+          payload?: Json | null;
+        };
+        Update: {
+          id?: number;
+          created_at?: string;
+          waba_id?: string | null;
+          phone_number_id?: string | null;
+          from_phone?: string | null;
+          kind?: string | null;
+          payload?: Json | null;
+        };
+        Relationships: [];
+      };
       campaign: {
         Row: {
           id: string;

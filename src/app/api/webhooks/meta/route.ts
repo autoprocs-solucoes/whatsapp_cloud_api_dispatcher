@@ -481,8 +481,17 @@ export async function POST(req: NextRequest) {
         );
 
         if (!tenant) {
-          // WABA/número que não pertence a nenhum workspace — nada a fazer.
+          // Número que não está conectado a nenhum workspace. Guarda a
+          // evidência: sem isso o cliente escreve, nada aparece, e não há como
+          // provar depois se chegou ou não.
           console.warn("[meta/webhook] tenant não encontrado", metadata?.phone_number_id);
+          await admin.from("webhook_unmatched").insert({
+            waba_id: typeof entry.id === "string" ? entry.id : null,
+            phone_number_id: metadata?.phone_number_id ?? null,
+            from_phone: messages[0]?.from ?? echoes[0]?.to ?? null,
+            kind: messages.length > 0 ? "messages" : "echoes",
+            payload: { messages: messages.slice(0, 3), echoes: echoes.slice(0, 3) } as never,
+          });
         } else {
           const profiles = (value.contacts as MetaContactProfile[] | undefined) ?? [];
           const nameOf = (waId?: string) =>
