@@ -6,8 +6,7 @@ import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { credentialForWaba, findUnlinkedWabas } from "@/server/meta-recovery";
-import { linkWabaToWorkspace } from "@/server/meta-link";
+import { reconcileSignup, snapshotBeforeSignup } from "@/server/meta-signup-reconcile";
 import {
   exchangeCodeForToken,
   wabaIdsFromToken,
@@ -566,81 +565,57 @@ export async function logMetaSignupEventAction(input: {
 }
 
 /**
- * Liga ao workspace uma conta que ficou órfã na Meta.
+ * Marca o ponto de partida do login integrado.
  *
- * Existe porque um cadastro concluído já se perdeu no caminho: o cliente fez
- * tudo — número registrado, coexistência ativa, cartão cadastrado — e do lado
- * de cá não sobrou nada. A conta continuava lá, completa, e a única saída era
- * refazer o cadastro inteiro ou colar credencial na mão.
- *
- * Só o time master usa: a lista atravessa clientes, e quem é owner de um
- * workspace não pode puxar pra si a conta que apareceu no de outro.
+ * Roda antes de abrir o popup porque é a única hora em que dá pra saber o que
+ * já existia na Meta — é essa foto que permite reconhecer, depois, qual conta
+ * nasceu durante o cadastro deste cliente.
  */
-export async function connectDiscoveredWabaAction(input: {
+export async function startMetaSignupAction(input: {
   workspaceId: string;
-  wabaId: string;
-}): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Não autenticado" };
+  method: string;
+}): Promise<void> {
+  const auth = await requireOwnership(input.workspaceId);
+  if (!auth.ok) return;
+  await snapshotBeforeSignup({
+    workspaceId: input.workspaceId,
+    userId: auth.user.id,
+    method: input.method,
+  });
+}
 
-  const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profile")
-    .select("is_superadmin")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!profile?.is_superadmin) {
-    return { ok: false, error: "Só o time Autoprocs pode recuperar uma conta" };
-  }
-
-  const { data: workspace } = await admin
-    .from("workspace")
-    .select("name")
-    .eq("id", input.workspaceId)
-    .maybeSingle();
-  if (!workspace) return { ok: false, error: "Cliente não encontrado" };
+/**
+ * Conecta a conta que o cliente acabou de criar na Meta, sem depender do aviso
+ * do popup.
+ *
+ * É o que garante a cadeia inteira: concluiu na Meta, está conectado aqui. O
+ * navegador chama isto enquanto o cadastro acontece; quando a conta aparece do
+ * lado da Meta, a conexão é gravada — mesmo que o popup tenha fechado sem
+ * conseguir avisar nada.
+ */
+export async function reconcileMetaSignupAction(input: {
+  workspaceId: string;
+}): Promise<{ connected: boolean }> {
+  const auth = await requireOwnership(input.workspaceId);
+  if (!auth.ok) return { connected: false };
 
   try {
-    // Confere de novo no servidor a quem a conta pertence. A lista da tela já
-    // filtra, mas quem decide o que pode ser ligado a um cliente é aqui — do
-    // contrário bastaria forjar um id pra plugar o WhatsApp de um cliente no
-    // workspace de outro.
-    const permitidas = await findUnlinkedWabas(input.workspaceId, workspace.name);
-    if (!permitidas.some((w) => w.wabaId === input.wabaId)) {
-      return {
-        ok: false,
-        error: "Essa conta não é deste cliente. Recarregue a página e tente de novo.",
-      };
-    }
-
-    const accessToken = await credentialForWaba(input.wabaId);
-    if (!accessToken) {
-      return {
-        ok: false,
-        error: "Nenhuma conexão existente alcança essa conta. Refaça o login integrado.",
-      };
-    }
-
-    const result = await linkWabaToWorkspace({
+    const result = await reconcileSignup({
       workspaceId: input.workspaceId,
-      wabaId: input.wabaId,
-      accessToken,
-      connectedBy: user.id,
-      // O caminho que a conta percorreu foi o do login integrado; só o passo
-      // final é que está sendo refeito aqui.
-      connectionMethod: "coexistence",
+      userId: auth.user.id,
     });
-    if (!result.ok) return result;
-
-    revalidatePath("/configuracoes");
-    return { ok: true, data: undefined };
-  } catch (err) {
-    if (err instanceof GraphApiError) {
-      return { ok: false, error: `Meta Graph API: ${err.message}` };
+    if (result.status === "connected") {
+      revalidatePath("/configuracoes");
+      revalidatePath("/conversas");
+      return { connected: true };
     }
-    return { ok: false, error: err instanceof Error ? err.message : "Erro desconhecido" };
+    if (result.status === "already") return { connected: true };
+    if (result.status === "ambiguous") {
+      console.warn("[meta] mais de uma conta nova na mesma tentativa:", result.wabaIds);
+    }
+    return { connected: false };
+  } catch (e) {
+    console.error("[meta] reconciliação falhou:", (e as Error).message);
+    return { connected: false };
   }
 }

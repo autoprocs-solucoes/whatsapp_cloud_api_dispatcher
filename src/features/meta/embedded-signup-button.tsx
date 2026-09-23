@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useTransition } from "react";
 import Script from "next/script";
+import { useRouter } from "next/navigation";
 import { Facebook, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -10,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import {
   completeMetaSignupAction,
   logMetaSignupEventAction,
+  reconcileMetaSignupAction,
+  startMetaSignupAction,
 } from "@/features/meta/actions";
 
 // Tipos mínimos do FB JS SDK
@@ -95,6 +98,17 @@ export function EmbeddedSignupButton({
   const [isPending, startTransition] = useTransition();
   const sessionInfoRef = React.useRef<SessionInfo["data"] | null>(null);
   const cancelInfoRef = React.useRef<CancelInfo | null>(null);
+  const pollRef = React.useRef<number | null>(null);
+  const router = useRouter();
+  const [waiting, setWaiting] = React.useState(false);
+
+  // Parar de esperar quando a tela sai do ar, senão o intervalo continua
+  // chamando o servidor sozinho.
+  React.useEffect(() => {
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current);
+    };
+  }, []);
 
   // Listener pra capturar `session_info_response` antes do callback do login.
   React.useEffect(() => {
@@ -173,13 +187,50 @@ export function EmbeddedSignupButton({
     });
   }, [sdkReady, appId]);
 
-  function launchSignup() {
+  /**
+   * Fica perguntando ao servidor se a conta já apareceu do lado da Meta.
+   *
+   * É o que fecha a cadeia sem depender do popup: no instante em que o cliente
+   * conclui o cadastro, a conta dele passa a ser compartilhada com o nosso
+   * negócio, e o servidor reconhece isso sozinho. O cadastro leva minutos
+   * (verificar número, cadastrar cartão), por isso a espera é longa.
+   */
+  function watchForConnection() {
+    if (pollRef.current) return;
+    const startedAt = Date.now();
+
+    pollRef.current = window.setInterval(async () => {
+      if (Date.now() - startedAt > 15 * 60 * 1000) {
+        stopWatching();
+        return;
+      }
+      const { connected } = await reconcileMetaSignupAction({ workspaceId });
+      if (!connected) return;
+
+      stopWatching();
+      toast.success("Conta WhatsApp Business conectada");
+      router.refresh();
+    }, 8000);
+  }
+
+  function stopWatching() {
+    if (!pollRef.current) return;
+    window.clearInterval(pollRef.current);
+    pollRef.current = null;
+    setWaiting(false);
+  }
+
+  async function launchSignup() {
     if (!window.FB) {
       toast.error("SDK do Facebook ainda carregando. Tente novamente em 1s.");
       return;
     }
 
-    void logMetaSignupEventAction({ workspaceId, stage: "launch", method: connectionMethod });
+    // Antes de abrir o popup: depois de aberto já não dá pra saber quais
+    // contas existiam antes deste cadastro.
+    setWaiting(true);
+    await startMetaSignupAction({ workspaceId, method: connectionMethod });
+    watchForConnection();
 
     window.FB.login(
       (response: FBLoginResponse) => {
@@ -203,12 +254,11 @@ export function EmbeddedSignupButton({
             error: metaReason ?? `sem code (status ${response.status ?? "?"})`,
             detail: { hasSession: Boolean(session?.waba_id) },
           });
-          if (metaReason) {
-            toast.error(metaReason);
-          } else if (response.status === "not_authorized") {
-            toast.error("Você cancelou o Embedded Signup.");
-          } else {
-            toast.error("Não foi possível concluir o login. Tente de novo.");
+          // O popup pode ter falhado e o cadastro ter concluído mesmo assim
+          // — só o cancelamento explícito encerra a espera.
+          if (response.status === "not_authorized" || cancel?.current_step) {
+            stopWatching();
+            toast.error(metaReason ?? "Você cancelou o login integrado.");
           }
           cancelInfoRef.current = null;
           return;
@@ -245,9 +295,13 @@ export function EmbeddedSignupButton({
           });
 
           if (result.ok) {
+            stopWatching();
             toast.success("Conta WhatsApp Business conectada");
+            router.refresh();
           } else {
-            toast.error(result.error);
+            // Não mostra erro nem desiste: a conta pode estar a caminho e a
+            // espera resolve. Só avisa se nem isso funcionar.
+            console.warn("[meta] signup pelo popup falhou:", result.error);
           }
           sessionInfoRef.current = null;
           cancelInfoRef.current = null;
@@ -283,14 +337,26 @@ export function EmbeddedSignupButton({
         strategy="afterInteractive"
         onLoad={() => setSdkReady(true)}
       />
-      <Button onClick={launchSignup} disabled={!sdkReady || isPending} size="lg">
-        {isPending ? (
+      <Button
+        onClick={() => void launchSignup()}
+        disabled={!sdkReady || isPending || waiting}
+        size="lg"
+      >
+        {isPending || waiting ? (
           <Loader2 className="size-4 animate-spin" />
         ) : (
           <Facebook className="size-4" />
         )}
-        {isPending ? "Conectando..." : ctaLabel}
+        {isPending || waiting ? "Conectando..." : ctaLabel}
       </Button>
+      {waiting && (
+        // O cadastro acontece na janela da Meta e leva minutos. Sem isto, a
+        // tela parece travada e a pessoa fecha tudo no meio.
+        <p className="text-xs text-ink-2">
+          Termine o cadastro na janela da Meta. A conexão aparece aqui sozinha assim que
+          a conta estiver pronta — pode deixar esta aba aberta.
+        </p>
+      )}
     </>
   );
 }

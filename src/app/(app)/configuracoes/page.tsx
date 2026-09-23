@@ -11,7 +11,6 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetaConnectionPanel } from "@/features/meta/meta-connection-panel";
-import { RecoverWabaPanel } from "@/features/meta/recover-waba-panel";
 import { WorkspaceLogoForm } from "@/features/workspace/workspace-logo-form";
 import { InviteMemberForm } from "@/features/workspace/invite-member-form";
 import { MembersTable } from "@/features/workspace/members-table";
@@ -20,8 +19,8 @@ import { WorkspaceSettingsForm } from "@/features/workspace/workspace-settings-f
 import { serverEnv } from "@/lib/env";
 import { requireUser } from "@/server/auth";
 import { getConnectionsCost, getLastFailedSignup, getMetaConnections } from "@/server/meta";
-import { findUnlinkedWabas } from "@/server/meta-recovery";
 import { getWorkspaceMembers } from "@/server/members";
+import { reconcileSignup } from "@/server/meta-signup-reconcile";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 /**
@@ -35,20 +34,26 @@ export default async function ConfiguracoesPage() {
   const canManage = workspace.role === "owner" || user.profile.is_superadmin;
   if (!canManage) notFound();
 
-  const [members, metaConnections] = await Promise.all([
+  const [members, initialConnections] = await Promise.all([
     getWorkspaceMembers(workspace.id),
     getMetaConnections(workspace.id),
   ]);
+
+  // Se o cliente fechou a aba no meio do cadastro, ninguém ficou esperando por
+  // ele. Ao abrir esta tela, termina o serviço: sai barato quando não houve
+  // tentativa recente — a primeira consulta já devolve "nada a fazer".
+  let metaConnections = initialConnections;
+  if (metaConnections.length === 0) {
+    const reconciled = await reconcileSignup({
+      workspaceId: workspace.id,
+      userId: user.id,
+    }).catch(() => null);
+    if (reconciled?.status === "connected") {
+      metaConnections = await getMetaConnections(workspace.id);
+    }
+  }
   const costByConnectionId = await getConnectionsCost(metaConnections);
   const lastFailedSignup = await getLastFailedSignup(workspace.id);
-  // Só o time master vê: a busca atravessa clientes, e é o master quem liga
-  // uma conta órfã ao dono certo. Só em cliente sem conexão nenhuma, que é o
-  // caso em que ela serve — são várias chamadas à Meta e elas seguram a
-  // página. Falha aqui não pode derrubar a tela.
-  const unlinkedWabas =
-    user.profile.is_superadmin && metaConnections.length === 0
-      ? await findUnlinkedWabas(workspace.id, workspace.name).catch(() => [])
-      : [];
 
   return (
     <div className="space-y-5">
@@ -122,11 +127,6 @@ export default async function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="meta" className="space-y-4">
-          <RecoverWabaPanel
-            workspaceId={workspace.id}
-            workspaceName={workspace.name}
-            wabas={unlinkedWabas}
-          />
           <MetaConnectionPanel
             workspaceId={workspace.id}
             canManage={canManage}
