@@ -97,3 +97,48 @@ export async function getConnectionForPhoneNumber(
     .maybeSingle();
   return connection ?? null;
 }
+
+export type SignupAttempt = {
+  stage: string;
+  error: string | null;
+  wabaId: string | null;
+  at: string;
+};
+
+/**
+ * Última tentativa de conexão que não terminou em conexão salva.
+ *
+ * Serve pra tela poder dizer o que houve depois que o toast sumiu — e pra
+ * diferenciar "ninguém tentou" de "tentou e a Meta recusou".
+ */
+export async function getLastFailedSignup(
+  workspaceId: string,
+): Promise<SignupAttempt | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("meta_signup_attempt")
+    .select("stage, error, waba_id, created_at")
+    .eq("workspace_id", workspaceId)
+    .in("stage", ["failed", "cancel", "finish"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+
+  // Conectou depois da tentativa? Então aquilo já foi resolvido.
+  const { data: connected } = await admin
+    .from("workspace_meta_connection")
+    .select("connected_at")
+    .eq("workspace_id", workspaceId)
+    .gte("connected_at", data.created_at)
+    .limit(1)
+    .maybeSingle();
+  if (connected) return null;
+
+  return {
+    stage: data.stage,
+    error: data.error,
+    wabaId: data.waba_id,
+    at: data.created_at,
+  };
+}

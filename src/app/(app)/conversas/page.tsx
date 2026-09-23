@@ -105,11 +105,13 @@ export default async function ConversasPage({ searchParams }: { searchParams: Se
               <PlugZap className="size-6" />
             </div>
             <div className="space-y-1">
-              <h2 className="text-base font-semibold text-ink">Nenhum número conectado</h2>
+              <h2 className="text-base font-semibold text-ink">
+                {workspace.name} não tem número conectado
+              </h2>
               <p className="max-w-md text-sm text-ink-2">
-                Este cliente ainda não tem WhatsApp conectado, então nada chega aqui — nem
-                resposta de transmissão, nem mensagem do aplicativo do celular. Conecte a conta da
-                Meta pra começar.
+                Nada chega aqui — nem resposta de transmissão, nem mensagem do aplicativo do
+                celular. Se o WhatsApp foi conectado em outro cliente, troque de cliente no menu
+                lateral: cada um tem o número e as conversas dele.
               </p>
             </div>
             <Button asChild size="sm" className="mt-1">

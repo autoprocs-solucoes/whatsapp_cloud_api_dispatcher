@@ -8,7 +8,7 @@ import { EmbeddedSignupButton } from "@/features/meta/embedded-signup-button";
 import { ManualMetaConnectForm } from "@/features/meta/manual-connect-form";
 import { RegisterPhoneNumberButton } from "@/features/meta/register-phone-number-button";
 import { SyncMetaButton } from "@/features/meta/sync-meta-button";
-import type { MetaConnectionView } from "@/server/meta";
+import type { MetaConnectionView, SignupAttempt } from "@/server/meta";
 import type { ConversationCostSummary, WabaHealthStatus } from "@/lib/meta/graph-api";
 import { formatDateTimeBR } from "@/lib/format/datetime";
 
@@ -395,6 +395,8 @@ type Props = {
   metaAppId: string | undefined;
   coexistenceConfigId: string | undefined;
   standardSignupConfigId: string | undefined;
+  /** Última tentativa que não virou conexão — some quando conecta. */
+  lastFailedSignup: SignupAttempt | null;
 };
 
 export function MetaConnectionPanel({
@@ -405,6 +407,7 @@ export function MetaConnectionPanel({
   metaAppId,
   coexistenceConfigId,
   standardSignupConfigId,
+  lastFailedSignup,
 }: Props) {
   const coexistenceEnabled = Boolean(metaAppId && coexistenceConfigId);
   const standardSignupEnabled = Boolean(metaAppId && standardSignupConfigId);
@@ -416,8 +419,38 @@ export function MetaConnectionPanel({
     return null;
   }
 
+  const failureLabel: Record<string, string> = {
+    failed: "A conexão não foi concluída",
+    cancel: "O fluxo foi interrompido na Meta",
+    finish: "A Meta concluiu, mas a conexão não chegou a ser salva aqui",
+  };
+
   const connectOptions = canManage ? (
     <div className="space-y-3">
+      {lastFailedSignup && (
+        // O toast some; isto fica. Sem esta faixa, "fiz tudo e não conectou"
+        // não tinha como ser explicado nem pra quem tentou nem pra quem dá
+        // suporte.
+        <div className="rounded-lg border border-amber-line bg-amber-soft px-4 py-3">
+          <p className="text-[13px] font-semibold text-amber">
+            {failureLabel[lastFailedSignup.stage] ?? "Tentativa anterior não concluída"}
+          </p>
+          <p className="mt-1 text-xs text-ink-2">
+            {lastFailedSignup.error
+              ? lastFailedSignup.error
+              : "A Meta não devolveu um motivo. Repita o fluxo até o popup fechar sozinho."}
+            {lastFailedSignup.wabaId ? ` · WABA ${lastFailedSignup.wabaId}` : ""}
+            {" · "}
+            {new Date(lastFailedSignup.at).toLocaleString("pt-BR", {
+              timeZone: "America/Sao_Paulo",
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+      )}
       <ChoiceCard
         icon={Sparkles}
         title="Criar do zero"

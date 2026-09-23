@@ -499,3 +499,44 @@ export async function disconnectMetaAction(input: unknown): Promise<ActionResult
   revalidatePath("/configuracoes");
   return { ok: true, data: undefined };
 }
+
+/**
+ * Marca onde o Embedded Signup está.
+ *
+ * O fluxo mora no navegador e toda falha dele vira um toast que some. Sem esse
+ * rastro, "o cliente fez tudo e não conectou" não tem como ser investigado:
+ * não sobra nada no servidor.
+ *
+ * Nunca lança: registro de diagnóstico não pode ser o motivo de a conexão
+ * falhar.
+ */
+export async function logMetaSignupEventAction(input: {
+  workspaceId?: string | null;
+  stage: "launch" | "finish" | "cancel" | "saved" | "failed";
+  method?: string | null;
+  wabaId?: string | null;
+  phoneNumberId?: string | null;
+  error?: string | null;
+  detail?: unknown;
+}): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const admin = createAdminClient();
+    await admin.from("meta_signup_attempt").insert({
+      workspace_id: input.workspaceId ?? null,
+      user_id: user?.id ?? null,
+      stage: input.stage,
+      method: input.method ?? null,
+      waba_id: input.wabaId ?? null,
+      phone_number_id: input.phoneNumberId ?? null,
+      error: input.error?.slice(0, 500) ?? null,
+      detail: (input.detail ?? null) as never,
+    });
+  } catch (e) {
+    console.error("[meta] rastro do signup falhou:", (e as Error).message);
+  }
+}

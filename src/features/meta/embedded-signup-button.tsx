@@ -7,7 +7,10 @@ import { Facebook, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { completeMetaSignupAction } from "@/features/meta/actions";
+import {
+  completeMetaSignupAction,
+  logMetaSignupEventAction,
+} from "@/features/meta/actions";
 
 // Tipos mínimos do FB JS SDK
 type FBInitOptions = {
@@ -120,12 +123,25 @@ export function EmbeddedSignupButton({
         // "Sem conexão", sem nada explicando.
         if (typeof parsed.event === "string" && parsed.event.startsWith("FINISH")) {
           sessionInfoRef.current = parsed.data ?? null;
+          void logMetaSignupEventAction({
+            workspaceId,
+            stage: "finish",
+            wabaId: parsed.data?.waba_id ?? null,
+            phoneNumberId: parsed.data?.phone_number_id ?? null,
+            detail: { event: parsed.event },
+          });
           return;
         }
 
         // CANCEL carrega o motivo real quando o fluxo falha do lado da Meta.
         if (parsed.event === "CANCEL") {
           cancelInfoRef.current = parsed.data ?? null;
+          void logMetaSignupEventAction({
+            workspaceId,
+            stage: "cancel",
+            error: parsed.data?.error_message ?? null,
+            detail: parsed.data ?? null,
+          });
         }
       } catch {
         // Ignora mensagens não-JSON.
@@ -134,7 +150,7 @@ export function EmbeddedSignupButton({
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [workspaceId]);
 
   // Inicializa FB SDK quando o script carregar.
   //
@@ -163,6 +179,8 @@ export function EmbeddedSignupButton({
       return;
     }
 
+    void logMetaSignupEventAction({ workspaceId, stage: "launch", method: connectionMethod });
+
     window.FB.login(
       (response: FBLoginResponse) => {
         const code = response.authResponse?.code;
@@ -178,6 +196,13 @@ export function EmbeddedSignupButton({
             : null;
 
         if (!code) {
+          void logMetaSignupEventAction({
+            workspaceId,
+            stage: "failed",
+            method: connectionMethod,
+            error: metaReason ?? `sem code (status ${response.status ?? "?"})`,
+            detail: { hasSession: Boolean(session?.waba_id) },
+          });
           if (metaReason) {
             toast.error(metaReason);
           } else if (response.status === "not_authorized") {
@@ -189,6 +214,12 @@ export function EmbeddedSignupButton({
           return;
         }
         if (!session?.waba_id) {
+          void logMetaSignupEventAction({
+            workspaceId,
+            stage: "failed",
+            method: connectionMethod,
+            error: metaReason ?? "terminou sem informar o WABA",
+          });
           toast.error(
             metaReason ??
               "Embedded Signup terminou sem informar o WABA. Verifique permissões da configuração no painel Meta.",
@@ -204,6 +235,15 @@ export function EmbeddedSignupButton({
             wabaId: session.waba_id,
             phoneNumberIds: session.phone_number_id ? [session.phone_number_id] : undefined,
             connectionMethod,
+          });
+
+          void logMetaSignupEventAction({
+            workspaceId,
+            stage: result.ok ? "saved" : "failed",
+            method: connectionMethod,
+            wabaId: session.waba_id,
+            phoneNumberId: session.phone_number_id ?? null,
+            error: result.ok ? null : result.error,
           });
 
           if (result.ok) {

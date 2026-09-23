@@ -695,6 +695,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      meta_signup_attempt: {
+        Row: {
+          id: number;
+          created_at: string;
+          workspace_id: string | null;
+          user_id: string | null;
+          stage: string;
+          method: string | null;
+          waba_id: string | null;
+          phone_number_id: string | null;
+          error: string | null;
+          detail: Json | null;
+        };
+        Insert: {
+          id?: number;
+          created_at?: string;
+          workspace_id?: string | null;
+          user_id?: string | null;
+          stage: string;
+          method?: string | null;
+          waba_id?: string | null;
+          phone_number_id?: string | null;
+          error?: string | null;
+          detail?: Json | null;
+        };
+        Update: {
+          id?: number;
+          created_at?: string;
+          workspace_id?: string | null;
+          user_id?: string | null;
+          stage?: string;
+          method?: string | null;
+          waba_id?: string | null;
+          phone_number_id?: string | null;
+          error?: string | null;
+          detail?: Json | null;
+        };
+        Relationships: [];
+      };
       campaign: {
         Row: {
           id: string;

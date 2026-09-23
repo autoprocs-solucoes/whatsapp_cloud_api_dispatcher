@@ -18,7 +18,7 @@ import { removeMemberAction } from "@/features/workspace/actions";
 import { WorkspaceSettingsForm } from "@/features/workspace/workspace-settings-form";
 import { serverEnv } from "@/lib/env";
 import { requireUser } from "@/server/auth";
-import { getConnectionsCost, getMetaConnections } from "@/server/meta";
+import { getConnectionsCost, getLastFailedSignup, getMetaConnections } from "@/server/meta";
 import { getWorkspaceMembers } from "@/server/members";
 import { requireActiveWorkspace } from "@/server/workspace";
 
@@ -38,6 +38,7 @@ export default async function ConfiguracoesPage() {
     getMetaConnections(workspace.id),
   ]);
   const costByConnectionId = await getConnectionsCost(metaConnections);
+  const lastFailedSignup = await getLastFailedSignup(workspace.id);
 
   return (
     <div className="space-y-5">
@@ -119,6 +120,7 @@ export default async function ConfiguracoesPage() {
             metaAppId={serverEnv.META_APP_ID}
             coexistenceConfigId={serverEnv.META_COEXISTENCE_CONFIG_ID}
             standardSignupConfigId={serverEnv.META_EMBEDDED_SIGNUP_CONFIG_ID}
+            lastFailedSignup={lastFailedSignup}
           />
         </TabsContent>
       </Tabs>
