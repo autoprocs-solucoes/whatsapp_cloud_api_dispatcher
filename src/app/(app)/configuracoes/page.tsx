@@ -42,10 +42,13 @@ export default async function ConfiguracoesPage() {
   const costByConnectionId = await getConnectionsCost(metaConnections);
   const lastFailedSignup = await getLastFailedSignup(workspace.id);
   // Só o time master vê: a busca atravessa clientes, e é o master quem liga
-  // uma conta órfã ao dono certo. Falha aqui não pode derrubar a página.
-  const unlinkedWabas = user.profile.is_superadmin
-    ? await findUnlinkedWabas().catch(() => [])
-    : [];
+  // uma conta órfã ao dono certo. Só em cliente sem conexão nenhuma, que é o
+  // caso em que ela serve — são várias chamadas à Meta e elas seguram a
+  // página. Falha aqui não pode derrubar a tela.
+  const unlinkedWabas =
+    user.profile.is_superadmin && metaConnections.length === 0
+      ? await findUnlinkedWabas().catch(() => [])
+      : [];
 
   return (
     <div className="space-y-5">
