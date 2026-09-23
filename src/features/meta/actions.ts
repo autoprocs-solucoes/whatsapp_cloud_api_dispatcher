@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   exchangeCodeForToken,
+  wabaIdsFromToken,
   getWabaHealthStatus,
   getWabaInfo,
   GraphApiError,
@@ -91,9 +92,23 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
 
   try {
     const accessToken = await exchangeCodeForToken(code);
-    const wabaInfo = await getWabaInfo(wabaId, accessToken);
-    const phoneNumbers = await listPhoneNumbers(wabaId, accessToken);
-    const healthStatus = await getWabaHealthStatus(wabaId, accessToken);
+
+    // O popup nem sempre consegue avisar qual é o WABA. O token consegue.
+    // Mais de um WABA só acontece quando a pessoa já administrava outras
+    // contas; o cadastro que acabou de sair é o primeiro da lista.
+    const resolvedWabaId = wabaId ?? (await wabaIdsFromToken(accessToken))[0];
+    if (!resolvedWabaId) {
+      return {
+        ok: false,
+        error:
+          "A Meta concluiu o cadastro mas não liberou o acesso à conta. " +
+          "Refaça o login integrado e confirme as permissões do WhatsApp.",
+      };
+    }
+
+    const wabaInfo = await getWabaInfo(resolvedWabaId, accessToken);
+    const phoneNumbers = await listPhoneNumbers(resolvedWabaId, accessToken);
+    const healthStatus = await getWabaHealthStatus(resolvedWabaId, accessToken);
 
     const admin = createAdminClient();
 
@@ -102,7 +117,7 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
       .upsert(
         {
           workspace_id: workspaceId,
-          waba_id: wabaId,
+          waba_id: resolvedWabaId,
           business_id: wabaInfo.owner_business_info?.id ?? null,
           business_name: wabaInfo.owner_business_info?.name ?? wabaInfo.name ?? null,
           access_token: accessToken,
@@ -140,7 +155,14 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
     // silenciosamente, e sem ele o número não consegue enviar mensagem via
     // Cloud API mesmo com o Embedded Signup concluído.
     const registrationByPhoneId = new Map<string, { pin: string; registered: boolean }>();
-    for (const phoneNumberId of phoneNumberIds ?? []) {
+    // Sem a mensagem do popup não sabemos qual número a pessoa escolheu — então
+    // registra os da conta. Registrar um número já registrado é inofensivo, e
+    // deixar de registrar é o que impede o número de enviar pela Cloud API.
+    const idsToRegister =
+      phoneNumberIds && phoneNumberIds.length > 0
+        ? phoneNumberIds
+        : phoneNumbers.map((p) => p.id);
+    for (const phoneNumberId of idsToRegister) {
       const pin = existingByPhoneId.get(phoneNumberId)?.pin || generatePin();
       const result = await registerPhoneNumber(phoneNumberId, accessToken, pin);
       if (!result.ok) {
@@ -189,7 +211,7 @@ export async function completeMetaSignupAction(input: unknown): Promise<ActionRe
 
     // Subscreve app pro WABA receber webhooks. Falha aqui não bloqueia conexão.
     try {
-      await subscribeAppToWaba(wabaId, accessToken);
+      await subscribeAppToWaba(resolvedWabaId, accessToken);
     } catch (err) {
       console.warn("subscribeAppToWaba failed", err);
     }

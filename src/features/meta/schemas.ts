@@ -3,7 +3,9 @@ import { z } from "zod";
 export const completeMetaSignupSchema = z.object({
   workspaceId: z.string().uuid(),
   code: z.string().min(10),
-  wabaId: z.string().min(1),
+  // Opcional de propósito: quando o `postMessage` da Meta não chega, o
+  // servidor descobre o WABA pelo próprio token em vez de perder o cadastro.
+  wabaId: z.string().min(1).optional(),
   phoneNumberIds: z.array(z.string()).optional(),
   connectionMethod: z.enum(["embedded_signup", "coexistence"]).default("embedded_signup"),
 });

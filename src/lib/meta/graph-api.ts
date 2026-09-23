@@ -113,6 +113,46 @@ export async function exchangeCodeForToken(code: string): Promise<string> {
 }
 
 // ----------------------------------------------------------------------------
+// Quais WABAs o token do Embedded Signup alcança.
+//
+// O popup da Meta avisa o WABA por `postMessage`, e essa mensagem se perde com
+// facilidade: o cliente fecha o popup no último clique, a aba recarrega, ou a
+// mensagem chega depois do callback do login. Quando isso acontecia, um `code`
+// perfeitamente válido era descartado e o cliente terminava o cadastro inteiro
+// — número registrado, cartão cadastrado — sem conexão nenhuma do nosso lado.
+//
+// O token sabe sozinho a que conta ele dá acesso: `debug_token` devolve os
+// escopos granulares, e o alvo de `whatsapp_business_management` é o WABA.
+// Docs: https://developers.facebook.com/docs/whatsapp/embedded-signup/steps/exchange-code
+// ----------------------------------------------------------------------------
+type DebugTokenResponse = {
+  data?: {
+    granular_scopes?: { scope: string; target_ids?: string[] }[];
+  };
+};
+
+const WABA_SCOPES = ["whatsapp_business_management", "whatsapp_business_messaging"];
+
+export async function wabaIdsFromToken(token: string): Promise<string[]> {
+  if (!serverEnv.META_APP_ID || !serverEnv.META_APP_SECRET) return [];
+
+  const data = await request<DebugTokenResponse>("/debug_token", {
+    method: "GET",
+    query: {
+      input_token: token,
+      access_token: `${serverEnv.META_APP_ID}|${serverEnv.META_APP_SECRET}`,
+    },
+  });
+
+  const ids = new Set<string>();
+  for (const scope of data.data?.granular_scopes ?? []) {
+    if (!WABA_SCOPES.includes(scope.scope)) continue;
+    for (const id of scope.target_ids ?? []) ids.add(id);
+  }
+  return Array.from(ids);
+}
+
+// ----------------------------------------------------------------------------
 // Info do business associado ao WABA.
 // ----------------------------------------------------------------------------
 type WabaInfo = {

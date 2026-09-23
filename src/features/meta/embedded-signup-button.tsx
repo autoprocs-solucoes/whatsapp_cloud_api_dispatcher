@@ -213,27 +213,25 @@ export function EmbeddedSignupButton({
           cancelInfoRef.current = null;
           return;
         }
+        // Ter o `code` basta. Antes, faltar o aviso do popup abortava tudo
+        // aqui — e o cliente terminava o cadastro na Meta, com número
+        // registrado e cartão cadastrado, sem conexão nenhuma deste lado. O
+        // servidor descobre o WABA pelo token quando o popup não contou.
         if (!session?.waba_id) {
           void logMetaSignupEventAction({
             workspaceId,
-            stage: "failed",
+            stage: "finish",
             method: connectionMethod,
-            error: metaReason ?? "terminou sem informar o WABA",
+            error: "popup não informou o WABA — resolvendo pelo token",
           });
-          toast.error(
-            metaReason ??
-              "Embedded Signup terminou sem informar o WABA. Verifique permissões da configuração no painel Meta.",
-          );
-          cancelInfoRef.current = null;
-          return;
         }
 
         startTransition(async () => {
           const result = await completeMetaSignupAction({
             workspaceId,
             code,
-            wabaId: session.waba_id,
-            phoneNumberIds: session.phone_number_id ? [session.phone_number_id] : undefined,
+            wabaId: session?.waba_id,
+            phoneNumberIds: session?.phone_number_id ? [session.phone_number_id] : undefined,
             connectionMethod,
           });
 
@@ -241,8 +239,8 @@ export function EmbeddedSignupButton({
             workspaceId,
             stage: result.ok ? "saved" : "failed",
             method: connectionMethod,
-            wabaId: session.waba_id,
-            phoneNumberId: session.phone_number_id ?? null,
+            wabaId: session?.waba_id ?? null,
+            phoneNumberId: session?.phone_number_id ?? null,
             error: result.ok ? null : result.error,
           });
 
