@@ -1092,6 +1092,22 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      dispatch_status_counts: {
+        Args: { p_dispatch_ids: string[] };
+        Returns: {
+          dispatch_id: string;
+          status: string;
+          n: number;
+        }[];
+      };
+      dispatch_daily_counts: {
+        Args: { p_dispatch_ids: string[]; p_days?: number };
+        Returns: {
+          day: string;
+          status: string;
+          n: number;
+        }[];
+      };
       list_whatsapp_conversations: {
         Args: {
           p_workspace_id: string;

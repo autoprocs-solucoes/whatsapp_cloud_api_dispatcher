@@ -3,6 +3,7 @@ import "server-only";
 import { notFound } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { statusCountsByDispatch, sumSent } from "@/server/dispatch-counts";
 import { requireUser, type AuthenticatedUser } from "@/server/auth";
 
 /**
@@ -108,16 +109,15 @@ export async function listWorkspacesForMaster(): Promise<MasterWorkspaceRow[]> {
   );
   const sentCountByWorkspace = new Map<string, number>();
   if (dispatchIds.length > 0) {
-    const { data: recipients } = await admin
-      .from("dispatch_recipient")
-      .select("dispatch_id, status")
-      .in("dispatch_id", dispatchIds)
-      .in("status", ["sent", "delivered", "read"]);
-    (recipients ?? []).forEach((r) => {
-      const wsId = workspaceByDispatchId.get(r.dispatch_id);
-      if (!wsId) return;
-      sentCountByWorkspace.set(wsId, (sentCountByWorkspace.get(wsId) ?? 0) + 1);
-    });
+    const counts = await statusCountsByDispatch(dispatchIds);
+    for (const [dispatchId, byStatus] of counts) {
+      const wsId = workspaceByDispatchId.get(dispatchId);
+      if (!wsId) continue;
+      sentCountByWorkspace.set(
+        wsId,
+        (sentCountByWorkspace.get(wsId) ?? 0) + sumSent(byStatus),
+      );
+    }
   }
 
   const connectionsByWorkspace = new Map<string, MasterConnectionSummary[]>();

@@ -52,6 +52,9 @@ export async function GET(req: Request) {
       .select("*")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false })
+      // Desempate obrigatório: uma importação cria milhares de contatos no
+      // mesmo instante, e sem isso as páginas se embaralham e alguns somem.
+      .order("id", { ascending: true })
       .range(from, from + BATCH - 1);
 
     if (optOutFilter === "active") query = query.eq("opt_out", false);

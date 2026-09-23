@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { statusCountsByDispatch } from "@/server/dispatch-counts";
 import {
   SpreadsheetParseError,
   detectAutoMapping,
@@ -145,17 +147,7 @@ export async function listDispatches(): Promise<DispatchListItem[]> {
   if (!dispatches || dispatches.length === 0) return [];
 
   const ids = dispatches.map((d) => d.id);
-  const { data: recipients } = await admin
-    .from("dispatch_recipient")
-    .select("dispatch_id, status")
-    .in("dispatch_id", ids);
-
-  const byDispatch: Record<string, Record<string, number>> = {};
-  (recipients ?? []).forEach((r) => {
-    const m = byDispatch[r.dispatch_id] ?? {};
-    m[r.status] = (m[r.status] ?? 0) + 1;
-    byDispatch[r.dispatch_id] = m;
-  });
+  const byDispatch = await statusCountsByDispatch(ids);
 
   return dispatches.map((d) => {
     const tpl = (d as { template?: { name: string } | null }).template;
@@ -169,7 +161,7 @@ export async function listDispatches(): Promise<DispatchListItem[]> {
       template_name: tpl?.name ?? null,
       segment_name: seg?.name ?? null,
       campaign_name: camp?.name ?? null,
-      counts: byDispatch[d.id] ?? {},
+      counts: byDispatch.get(d.id) ?? {},
     } as DispatchListItem;
   });
 }
@@ -295,15 +287,24 @@ export async function getDispatch(
 
   const { data: recipients, count } = await recipientsQ.range(from, to);
 
-  const { data: allRows } = await admin
-    .from("dispatch_recipient")
-    .select("status, sent_at, failed_at, error_code, error_message")
-    .eq("dispatch_id", id);
+  const counts = (await statusCountsByDispatch([id])).get(id) ?? {};
 
-  const counts: Record<string, number> = {};
-  (allRows ?? []).forEach((r) => {
-    counts[r.status] = (counts[r.status] ?? 0) + 1;
-  });
+  // A linha do tempo e o agrupamento de erros precisam de cada linha, não só
+  // do total — então aqui é página por página, senão param nos primeiros 1000.
+  const allRows = await fetchAllRows<{
+    status: string;
+    sent_at: string | null;
+    failed_at: string | null;
+    error_code: string | null;
+    error_message: string | null;
+  }>((from, to) =>
+    admin
+      .from("dispatch_recipient")
+      .select("status, sent_at, failed_at, error_code, error_message")
+      .eq("dispatch_id", id)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const { count: reactionCount } = await admin
     .from("dispatch_recipient")
@@ -318,8 +319,8 @@ export async function getDispatch(
     totalRecipients: count ?? 0,
     counts,
     reactionCount: reactionCount ?? 0,
-    timeline: buildDispatchTimeline(allRows ?? []),
-    errorGroups: buildErrorGroups(allRows ?? []),
+    timeline: buildDispatchTimeline(allRows),
+    errorGroups: buildErrorGroups(allRows),
   };
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeBR } from "@/lib/phone/e164";
 import {
@@ -168,15 +169,28 @@ async function analyzeRows(
   ctx: { workspaceId: string; userId: string },
 ): Promise<{ analysis: ImportAnalysis; upserts: UpsertRow[] }> {
   const admin = createAdminClient();
-  const { data: existing } = await admin
-    .from("contact")
-    .select("phone_e164, full_name, custom_fields, tags")
-    .eq("workspace_id", ctx.workspaceId);
-  const existingSet = new Set((existing ?? []).map((c) => c.phone_e164));
+  // Precisa ser a base inteira, página por página. Lendo só as primeiras 1000,
+  // quem já era contato depois disso passava por novo — e como o upsert troca
+  // a linha toda, a importação apagava nome, campos e etiquetas dessa gente.
+  // Era isso que fazia o disparo cair no fallback em vez de usar o nome.
+  const existing = await fetchAllRows<{
+    phone_e164: string;
+    full_name: string | null;
+    custom_fields: unknown;
+    tags: string[] | null;
+  }>((from, to) =>
+    admin
+      .from("contact")
+      .select("phone_e164, full_name, custom_fields, tags")
+      .eq("workspace_id", ctx.workspaceId)
+      .order("phone_e164", { ascending: true })
+      .range(from, to),
+  );
+  const existingSet = new Set(existing.map((c) => c.phone_e164));
   // O upsert troca a linha inteira, então o que a planilha não traz precisa
   // ser remontado aqui — sem isso, importar uma lista só de telefones apagava
   // nome, campos custom e etiquetas de quem já era contato.
-  const currentByPhone = new Map((existing ?? []).map((c) => [c.phone_e164, c] as const));
+  const currentByPhone = new Map(existing.map((c) => [c.phone_e164, c] as const));
 
   const seenInFile = new Set<string>();
   const analysis: ImportAnalysis = {
@@ -351,7 +365,12 @@ export async function listContacts(
 
   const from = (parsed.page - 1) * parsed.pageSize;
   const to = from + parsed.pageSize - 1;
-  query = query.order("created_at", { ascending: false }).range(from, to);
+  // `id` como desempate: sem ele, contatos criados no mesmo instante pela
+  // importação trocam de página e somem da listagem.
+  query = query
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: true })
+    .range(from, to);
 
   const { data, count } = await query;
 

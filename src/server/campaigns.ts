@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { statusCountsByDispatch, sumSent } from "@/server/dispatch-counts";
 import { openingTemplateId, parseGraph } from "@/features/flows/schemas";
 import { requireActiveWorkspace } from "@/server/workspace";
 
@@ -89,15 +90,14 @@ export async function listCampaigns(): Promise<CampaignRow[]> {
     const campaignByDispatch = new Map(
       (dispatches ?? []).map((d) => [d.id, d.campaign_id] as const),
     );
-    const { data: recipients } = await admin
-      .from("dispatch_recipient")
-      .select("dispatch_id, status")
-      .in("dispatch_id", dispatchIds)
-      .in("status", ["sent", "delivered", "read"]);
-    for (const r of recipients ?? []) {
-      const campaignId = campaignByDispatch.get(r.dispatch_id);
+    const counts = await statusCountsByDispatch(dispatchIds);
+    for (const [dispatchId, byStatus] of counts) {
+      const campaignId = campaignByDispatch.get(dispatchId);
       if (!campaignId) continue;
-      sentByCampaign.set(campaignId, (sentByCampaign.get(campaignId) ?? 0) + 1);
+      sentByCampaign.set(
+        campaignId,
+        (sentByCampaign.get(campaignId) ?? 0) + sumSent(byStatus),
+      );
     }
   }
 

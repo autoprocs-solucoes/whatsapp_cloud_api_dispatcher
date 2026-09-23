@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { normalizeBR } from "@/lib/phone/e164";
 import { parseCustomFields } from "@/features/contacts/custom-fields";
 import { applyRules } from "@/features/segments/rules";
@@ -63,15 +64,21 @@ export async function resolveFromSegment(
     parsedRules = { match: "and", rules: [] };
   }
 
-  const base = admin
-    .from("contact")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: true });
-  const query = applyRules(base, parsedRules);
-  const { data } = await query;
+  // Página por página: o corte de 1000 do PostgREST já mandou uma transmissão
+  // de 3.792 contatos com 1.000 destinatários, sem erro nenhum na tela.
+  const data = await fetchAllRows<Contact>((from, to) =>
+    applyRules(
+      admin
+        .from("contact")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
+      parsedRules,
+    ).range(from, to),
+  );
 
-  const recipients = (data ?? []).map(contactToRecipient);
+  const recipients = data.map(contactToRecipient);
   return {
     recipients,
     stats: {
@@ -114,14 +121,27 @@ export async function resolveFromManual(
   if (normalized.size === 0) return { recipients: [], stats };
 
   const admin = createAdminClient();
-  const { data: contacts } = await admin
-    .from("contact")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .in("phone_e164", Array.from(normalized));
 
+  // A lista da planilha passa fácil de mil números. Em pedaços porque um `in`
+  // gigante vira uma URL que o PostgREST recusa, e paginado porque mesmo
+  // assim a resposta é cortada em 1000 — o que fazia contato conhecido chegar
+  // aqui como desconhecido e o disparo usar o fallback no lugar do nome.
+  const phones = Array.from(normalized);
   const byPhone = new Map<string, Contact>();
-  (contacts ?? []).forEach((c) => byPhone.set(c.phone_e164, c));
+
+  for (let i = 0; i < phones.length; i += 400) {
+    const chunk = phones.slice(i, i + 400);
+    const rows = await fetchAllRows<Contact>((from, to) =>
+      admin
+        .from("contact")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .in("phone_e164", chunk)
+        .order("id", { ascending: true })
+        .range(from, to),
+    );
+    rows.forEach((c) => byPhone.set(c.phone_e164, c));
+  }
 
   const out: ResolvedRecipient[] = [];
   for (const phone of normalized) {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
 import { parseCustomFields } from "@/features/contacts/custom-fields";
@@ -111,14 +112,19 @@ export async function listCustomFieldKeys(): Promise<string[]> {
   const ctx = await ensureMember();
   if (!ctx) return [];
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("contact")
-    .select("custom_fields")
-    .eq("workspace_id", ctx.workspaceId)
-    .limit(2000);
+  // Percorre todos: coluna que só aparece depois do milésimo contato sumia do
+  // combobox, e sem ela não dá pra mapear a variável do modelo.
+  const data = await fetchAllRows<{ custom_fields: unknown }>((from, to) =>
+    admin
+      .from("contact")
+      .select("custom_fields")
+      .eq("workspace_id", ctx.workspaceId)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const keys = new Set<string>();
-  (data ?? []).forEach((row) => {
+  data.forEach((row) => {
     const cf = parseCustomFields(row.custom_fields);
     Object.keys(cf).forEach((k) => keys.add(k));
   });

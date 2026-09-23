@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildFunnel, countByStatus, formatInt, formatPct, rate } from "@/lib/metrics/funnel";
+import { statusCountsByDispatch } from "@/server/dispatch-counts";
+import { buildFunnel, countsFromRecord, formatInt, formatPct, rate } from "@/lib/metrics/funnel";
 import { serverEnv } from "@/lib/env";
 import { getWorkspaceOwnerIds, sendPushToUsers } from "@/server/push";
 
@@ -43,12 +44,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Transmissão não encontrada" }, { status: 404 });
   }
 
-  const { data: rows } = await admin
-    .from("dispatch_recipient")
-    .select("status")
-    .eq("dispatch_id", dispatch.id);
+  const counts = (await statusCountsByDispatch([dispatch.id])).get(dispatch.id) ?? {};
 
-  const funnel = buildFunnel(countByStatus(rows ?? []), dispatch.total_recipients || 0);
+  const funnel = buildFunnel(countsFromRecord(counts), dispatch.total_recipients || 0);
   const tpl = dispatch.template as { name: string } | null;
   const name = tpl?.name ?? "Transmissão";
 

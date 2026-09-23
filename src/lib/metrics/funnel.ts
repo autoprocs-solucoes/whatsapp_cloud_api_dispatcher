@@ -70,6 +70,20 @@ export function countByStatus(rows: { status: string }[]): StatusCounts {
 }
 
 /**
+ * Mesma contagem, vinda já somada do banco (`dispatch_status_counts`) em vez
+ * de linha a linha.
+ */
+export function countsFromRecord(record: Record<string, number>): StatusCounts {
+  return {
+    queued: record.queued ?? 0,
+    sent: record.sent ?? 0,
+    delivered: record.delivered ?? 0,
+    read: record.read ?? 0,
+    failed: record.failed ?? 0,
+  };
+}
+
+/**
  * Converte os baldes exclusivos no funil acumulado que o cliente lê.
  *
  * `planned` vem de `dispatch.total_recipients`. Quando não for informado, cai

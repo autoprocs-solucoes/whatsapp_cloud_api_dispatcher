@@ -2,7 +2,8 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { buildFunnel, countByStatus, type Funnel } from "@/lib/metrics/funnel";
+import { buildFunnel, countsFromRecord, type Funnel } from "@/lib/metrics/funnel";
+import { dailyCounts, statusCountsByDispatch } from "@/server/dispatch-counts";
 import { requireActiveWorkspace } from "@/server/workspace";
 
 export type TimelineDay = {
@@ -96,26 +97,29 @@ export async function getDashboardStatsForWorkspace(
   // ----------------------------------------------------------------------
   // Recipients dos últimos 30d (pra timeline + funil)
   // ----------------------------------------------------------------------
-  let recipients30: Array<{ status: string; sent_at: string | null }> | null = null;
+  const totals30: Record<string, number> = {};
+  let days30: Awaited<ReturnType<typeof dailyCounts>> = [];
   let reactions30 = 0;
   if (dispatchIds30.length > 0) {
-    const [{ data }, { count: reactionCount }] = await Promise.all([
-      admin.from("dispatch_recipient").select("status, sent_at").in("dispatch_id", dispatchIds30),
+    const [byDispatch, daily, { count: reactionCount }] = await Promise.all([
+      statusCountsByDispatch(dispatchIds30),
+      dailyCounts(dispatchIds30, 30),
       admin
         .from("dispatch_recipient")
         .select("id", { count: "exact", head: true })
         .in("dispatch_id", dispatchIds30)
         .not("reaction_emoji", "is", null),
     ]);
-    recipients30 = data ?? [];
+    for (const counts of byDispatch.values()) {
+      for (const [status, n] of Object.entries(counts)) {
+        totals30[status] = (totals30[status] ?? 0) + n;
+      }
+    }
+    days30 = daily;
     reactions30 = reactionCount ?? 0;
   }
 
-  const funnel30 = buildFunnel(
-    countByStatus(recipients30 ?? []),
-    totalRecipientsSum30,
-    reactions30,
-  );
+  const funnel30 = buildFunnel(countsFromRecord(totals30), totalRecipientsSum30, reactions30);
 
   const timelineMap = new Map<string, TimelineDay>();
   for (let i = 29; i >= 0; i--) {
@@ -125,20 +129,18 @@ export async function getDashboardStatsForWorkspace(
     const key = dateKey(d.toISOString());
     timelineMap.set(key, { date: key, sent: 0, delivered: 0, read: 0, failed: 0 });
   }
-  (recipients30 ?? []).forEach((r) => {
-    if (!r.sent_at) return;
-    const key = dateKey(r.sent_at);
-    const day = timelineMap.get(key);
+  days30.forEach((row) => {
+    const day = timelineMap.get(row.day);
     if (!day) return;
-    if (r.status === "sent") day.sent++;
-    else if (r.status === "delivered") {
-      day.sent++;
-      day.delivered++;
-    } else if (r.status === "read") {
-      day.sent++;
-      day.delivered++;
-      day.read++;
-    } else if (r.status === "failed") day.failed++;
+    if (row.status === "sent") day.sent += row.n;
+    else if (row.status === "delivered") {
+      day.sent += row.n;
+      day.delivered += row.n;
+    } else if (row.status === "read") {
+      day.sent += row.n;
+      day.delivered += row.n;
+      day.read += row.n;
+    } else if (row.status === "failed") day.failed += row.n;
   });
   const timeline30: TimelineDay[] = Array.from(timelineMap.values());
 
@@ -148,8 +150,8 @@ export async function getDashboardStatsForWorkspace(
   let lastWithFunnel: DashboardStats["dispatches"]["last"] = null;
   if (lastDispatch.data) {
     const last = lastDispatch.data;
-    const [{ data: lastRecipients }, { count: lastReactions }] = await Promise.all([
-      admin.from("dispatch_recipient").select("status").eq("dispatch_id", last.id),
+    const [lastCounts, { count: lastReactions }] = await Promise.all([
+      statusCountsByDispatch([last.id]),
       admin
         .from("dispatch_recipient")
         .select("id", { count: "exact", head: true })
@@ -163,7 +165,7 @@ export async function getDashboardStatsForWorkspace(
       status: last.status,
       created_at: last.created_at,
       funnel: buildFunnel(
-        countByStatus(lastRecipients ?? []),
+        countsFromRecord(lastCounts.get(last.id) ?? {}),
         last.total_recipients,
         lastReactions ?? 0,
       ),

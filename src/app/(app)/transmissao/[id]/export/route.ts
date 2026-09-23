@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
 
@@ -48,14 +49,20 @@ export async function GET(
     .maybeSingle();
   if (!dispatch) return new NextResponse("Não encontrado", { status: 404 });
 
-  const { data: recipients } = await admin
-    .from("dispatch_recipient")
-    .select("*")
-    .eq("dispatch_id", id)
-    .order("phone_e164", { ascending: true });
+  // O CSV é o que o cliente leva pro time de vendas: se parar em 1000 linhas
+  // sem avisar, some gente da lista e ninguém percebe.
+  const recipients = await fetchAllRows<Record<string, unknown>>((from, to) =>
+    admin
+      .from("dispatch_recipient")
+      .select("*")
+      .eq("dispatch_id", id)
+      .order("phone_e164", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const header = COLUMNS.join(",");
-  const rows = (recipients ?? []).map((r) =>
+  const rows = recipients.map((r) =>
     COLUMNS.map((c) => csvEscape((r as Record<string, unknown>)[c])).join(","),
   );
   const body = "﻿" + [header, ...rows].join("\n");
