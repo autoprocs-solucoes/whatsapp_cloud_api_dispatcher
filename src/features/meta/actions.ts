@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { credentialForWaba } from "@/server/meta-recovery";
+import { linkWabaToWorkspace } from "@/server/meta-link";
 import {
   exchangeCodeForToken,
   wabaIdsFromToken,
@@ -560,5 +562,66 @@ export async function logMetaSignupEventAction(input: {
     });
   } catch (e) {
     console.error("[meta] rastro do signup falhou:", (e as Error).message);
+  }
+}
+
+/**
+ * Liga ao workspace uma conta que ficou órfã na Meta.
+ *
+ * Existe porque um cadastro concluído já se perdeu no caminho: o cliente fez
+ * tudo — número registrado, coexistência ativa, cartão cadastrado — e do lado
+ * de cá não sobrou nada. A conta continuava lá, completa, e a única saída era
+ * refazer o cadastro inteiro ou colar credencial na mão.
+ *
+ * Só o time master usa: a lista atravessa clientes, e quem é owner de um
+ * workspace não pode puxar pra si a conta que apareceu no de outro.
+ */
+export async function connectDiscoveredWabaAction(input: {
+  workspaceId: string;
+  wabaId: string;
+}): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("profile")
+    .select("is_superadmin")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!profile?.is_superadmin) {
+    return { ok: false, error: "Só o time Autoprocs pode recuperar uma conta" };
+  }
+
+  try {
+    const accessToken = await credentialForWaba(input.wabaId);
+    if (!accessToken) {
+      return {
+        ok: false,
+        error: "Nenhuma conexão existente alcança essa conta. Refaça o login integrado.",
+      };
+    }
+
+    const result = await linkWabaToWorkspace({
+      workspaceId: input.workspaceId,
+      wabaId: input.wabaId,
+      accessToken,
+      connectedBy: user.id,
+      // O caminho que a conta percorreu foi o do login integrado; só o passo
+      // final é que está sendo refeito aqui.
+      connectionMethod: "coexistence",
+    });
+    if (!result.ok) return result;
+
+    revalidatePath("/configuracoes");
+    return { ok: true, data: undefined };
+  } catch (err) {
+    if (err instanceof GraphApiError) {
+      return { ok: false, error: `Meta Graph API: ${err.message}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : "Erro desconhecido" };
   }
 }

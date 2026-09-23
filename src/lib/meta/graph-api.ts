@@ -153,6 +153,40 @@ export async function wabaIdsFromToken(token: string): Promise<string[]> {
 }
 
 // ----------------------------------------------------------------------------
+// WABAs que um negócio enxerga: as dele e as de clientes compartilhadas com ele.
+//
+// É por aqui que se encontra uma conta que concluiu o Login Integrado mas não
+// chegou a virar conexão — a Meta já compartilhou a conta do cliente com o
+// negócio nesse momento, mesmo quando o popup não conseguiu nos avisar.
+// ----------------------------------------------------------------------------
+type BusinessWabaList = { data?: { id: string; name?: string }[] };
+
+export async function listBusinessWabas(
+  businessId: string,
+  token: string,
+): Promise<{ id: string; name: string | null }[]> {
+  const edges = ["client_whatsapp_business_accounts", "owned_whatsapp_business_accounts"];
+  const found = new Map<string, string | null>();
+
+  for (const edge of edges) {
+    try {
+      const data = await request<BusinessWabaList>(`/${businessId}/${edge}`, {
+        method: "GET",
+        token,
+        query: { fields: "id,name", limit: "100" },
+      });
+      for (const waba of data.data ?? []) {
+        if (!found.has(waba.id)) found.set(waba.id, waba.name ?? null);
+      }
+    } catch {
+      // Um negócio pode não expor uma das duas bordas; a outra ainda serve.
+    }
+  }
+
+  return Array.from(found, ([id, name]) => ({ id, name }));
+}
+
+// ----------------------------------------------------------------------------
 // Info do business associado ao WABA.
 // ----------------------------------------------------------------------------
 type WabaInfo = {

@@ -11,6 +11,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetaConnectionPanel } from "@/features/meta/meta-connection-panel";
+import { RecoverWabaPanel } from "@/features/meta/recover-waba-panel";
 import { WorkspaceLogoForm } from "@/features/workspace/workspace-logo-form";
 import { InviteMemberForm } from "@/features/workspace/invite-member-form";
 import { MembersTable } from "@/features/workspace/members-table";
@@ -19,6 +20,7 @@ import { WorkspaceSettingsForm } from "@/features/workspace/workspace-settings-f
 import { serverEnv } from "@/lib/env";
 import { requireUser } from "@/server/auth";
 import { getConnectionsCost, getLastFailedSignup, getMetaConnections } from "@/server/meta";
+import { findUnlinkedWabas } from "@/server/meta-recovery";
 import { getWorkspaceMembers } from "@/server/members";
 import { requireActiveWorkspace } from "@/server/workspace";
 
@@ -39,6 +41,11 @@ export default async function ConfiguracoesPage() {
   ]);
   const costByConnectionId = await getConnectionsCost(metaConnections);
   const lastFailedSignup = await getLastFailedSignup(workspace.id);
+  // Só o time master vê: a busca atravessa clientes, e é o master quem liga
+  // uma conta órfã ao dono certo. Falha aqui não pode derrubar a página.
+  const unlinkedWabas = user.profile.is_superadmin
+    ? await findUnlinkedWabas().catch(() => [])
+    : [];
 
   return (
     <div className="space-y-5">
@@ -111,7 +118,12 @@ export default async function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="meta">
+        <TabsContent value="meta" className="space-y-4">
+          <RecoverWabaPanel
+            workspaceId={workspace.id}
+            workspaceName={workspace.name}
+            wabas={unlinkedWabas}
+          />
           <MetaConnectionPanel
             workspaceId={workspace.id}
             canManage={canManage}
