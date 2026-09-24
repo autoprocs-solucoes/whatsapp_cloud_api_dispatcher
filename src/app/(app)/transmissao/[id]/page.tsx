@@ -259,6 +259,7 @@ export default async function TransmissaoDetalhe({
                   <TableHead>Código</TableHead>
                   <TableHead>Mensagem</TableHead>
                   <TableHead className="text-right">Ocorrências</TableHead>
+                  <TableHead className="text-right">Lista</TableHead>
                 </tr>
               </TableHeader>
               <TableBody>
@@ -269,6 +270,19 @@ export default async function TransmissaoDetalhe({
                     </TableCell>
                     <TableCell className="text-xs text-ink-2">{g.error_message || ""}</TableCell>
                     <TableCell className="num text-right text-[13px]">{g.count}</TableCell>
+                    <TableCell className="text-right">
+                      {/* Baixar só quem caiu nesta causa é o que transforma a
+                          tabela de erros em ação: dá pra cobrar o cliente, ou
+                          reenviar, sem garimpar no CSV inteiro. */}
+                      <Button variant="ghost" size="sm" asChild>
+                        <a
+                          href={`/transmissao/${dispatch.id}/export?status=failed&error=${encodeURIComponent(g.error_code || "none")}`}
+                          download
+                        >
+                          <Download className="size-4" /> Exportar
+                        </a>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -293,23 +307,35 @@ export default async function TransmissaoDetalhe({
           <p className="text-sm text-ink-2">
             {totalRecipients.toLocaleString("pt-BR")} nesta visão
           </p>
-          <div className="flex flex-wrap items-center rounded-md border border-line-2 bg-card p-0.5">
-            {(["all", "queued", "sent", "delivered", "read", "failed"] as const).map((f) => (
-              <Link
-                key={f}
-                href={`/transmissao/${dispatch.id}?status=${f}`}
-                className={cn(
-                  "rounded-sm px-2.5 py-1 text-[13px] font-medium transition-colors",
-                  statusFilter === f
-                    ? "bg-brand-soft text-brand-strong"
-                    : "text-ink-2 hover:text-ink",
-                )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Exporta o que está na tela, não a transmissão inteira: quem
+                filtrou "Falhou" quer justamente essa lista pra retrabalhar. */}
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href={`/transmissao/${dispatch.id}/export${statusFilter === "all" ? "" : `?status=${statusFilter}`}`}
+                download
               >
-                {f === "all"
-                  ? `Todos ${formatInt(funnel.planned)}`
-                  : `${RECIPIENT_STATUS_LABELS[f]} ${formatInt(counts[f] ?? 0)}`}
-              </Link>
-            ))}
+                <Download className="size-4" /> Exportar esta visão
+              </a>
+            </Button>
+            <div className="flex flex-wrap items-center rounded-md border border-line-2 bg-card p-0.5">
+              {(["all", "queued", "sent", "delivered", "read", "failed"] as const).map((f) => (
+                <Link
+                  key={f}
+                  href={`/transmissao/${dispatch.id}?status=${f}`}
+                  className={cn(
+                    "rounded-sm px-2.5 py-1 text-[13px] font-medium transition-colors",
+                    statusFilter === f
+                      ? "bg-brand-soft text-brand-strong"
+                      : "text-ink-2 hover:text-ink",
+                  )}
+                >
+                  {f === "all"
+                    ? `Todos ${formatInt(funnel.planned)}`
+                    : `${RECIPIENT_STATUS_LABELS[f]} ${formatInt(counts[f] ?? 0)}`}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
 
