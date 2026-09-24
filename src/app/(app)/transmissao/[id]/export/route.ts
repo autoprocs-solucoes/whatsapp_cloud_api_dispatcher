@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { parseCustomFields } from "@/features/contacts/custom-fields";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
@@ -74,9 +75,11 @@ export async function GET(
   const recipients = await fetchAllRows<Record<string, unknown>>((from, to) => {
     let query = admin
       .from("dispatch_recipient")
-      // O nome vem junto porque o CSV de falhas vira lista de retrabalho: quem
-      // vai ligar pra essas pessoas precisa saber com quem está falando.
-      .select("*, contact:contact_id(full_name)")
+      // O contato vem junto porque o CSV de falhas vira lista de retrabalho:
+      // quem vai reenviar precisa do nome, das etiquetas e das variáveis que
+      // alimentam o modelo — sem elas, é preciso cruzar com a planilha antiga
+      // na mão pra recuperar coisas como o motoclube de cada pessoa.
+      .select("*, contact:contact_id(full_name, tags, custom_fields)")
       .eq("dispatch_id", id);
 
     if (status) query = query.eq("status", status);
@@ -92,11 +95,42 @@ export async function GET(
       .range(from, to);
   });
 
-  const header = COLUMNS.join(",");
-  const rows = recipients.map((r) => {
-    const contact = r.contact as { full_name?: string | null } | null;
-    const flat: Record<string, unknown> = { ...r, full_name: contact?.full_name ?? "" };
-    return COLUMNS.map((c) => csvEscape(flat[c])).join(",");
+  type ContactSide = {
+    full_name?: string | null;
+    tags?: string[] | null;
+    custom_fields?: unknown;
+  };
+
+  // Uma coluna por variável que existir nesta lista. Cada cliente tem as suas
+  // ("motoclube", "cidade", "plano"), então a planilha se monta a partir dos
+  // dados em vez de ter colunas fixas que não servem pra ninguém.
+  const flattened = recipients.map((r) => {
+    const contact = r.contact as ContactSide | null;
+    const custom = parseCustomFields(contact?.custom_fields);
+    return {
+      ...r,
+      full_name: contact?.full_name ?? "",
+      tags: (contact?.tags ?? []).join("; "),
+      custom,
+    };
+  });
+
+  const customColumns = Array.from(
+    new Set(flattened.flatMap((r) => Object.keys(r.custom))),
+  )
+    // O importador guarda o telefone e o nome também como variável; repetir a
+    // mesma informação em duas colunas só atrapalha quem abre a planilha.
+    .filter((key) => !COLUMNS.includes(key as (typeof COLUMNS)[number]))
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  const allColumns = [...COLUMNS, "tags", ...customColumns];
+
+  const header = allColumns.join(",");
+  const rows = flattened.map((r) => {
+    // A base vem por último: o nome do contato vale mais que a cópia dele
+    // que o importador guardou como variável.
+    const flat: Record<string, unknown> = { ...r.custom, ...r };
+    return allColumns.map((c) => csvEscape(flat[c])).join(",");
   });
   const body = "﻿" + [header, ...rows].join("\n");
 
