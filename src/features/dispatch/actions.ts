@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { statusCountsByDispatch } from "@/server/dispatch-counts";
+import { syncTemplatesForWorkspace } from "@/server/templates";
 import {
   SpreadsheetParseError,
   detectAutoMapping,
@@ -648,8 +649,33 @@ export async function executeDispatchAction(
   }
 
   // Validações antes de enfileirar — pra dar erro síncrono cedo.
+  // Pergunta à Meta agora, não confia no que foi sincronizado há minutos: é
+  // exatamente entre um sync e outro que um modelo é pausado, e a partir daí
+  // todo envio é recusado.
+  await syncTemplatesForWorkspace(ctx.workspaceId).catch(() => null);
+
   const template = await loadTemplate(ctx.workspaceId, dispatch.template_id);
   if (!template) return { ok: false, error: "Template da transmissão não existe mais" };
+
+  // Modelo pausado ou desabilitado não entrega pra ninguém: a Meta recusa
+  // todas as mensagens e cada recusa ainda derruba mais a nota do número.
+  // Um disparo já saiu com 1.905 destinatários e nenhuma mensagem entregue
+  // porque ninguém percebeu que a Meta tinha pausado o modelo.
+  if (template.status === "PAUSED" || template.status === "DISABLED") {
+    return {
+      ok: false,
+      error:
+        template.status === "PAUSED"
+          ? "A Meta pausou este modelo por qualidade baixa. Enquanto estiver pausado, nenhuma mensagem é entregue — espere a liberação ou use outro modelo."
+          : "A Meta desabilitou este modelo. Ele não entrega mais nada; crie um novo.",
+    };
+  }
+  if (template.status !== "APPROVED") {
+    return {
+      ok: false,
+      error: `Este modelo está como "${template.status}" na Meta. Só modelo aprovado envia.`,
+    };
+  }
 
   const connection = await getConnectionForPhoneNumber(ctx.workspaceId, dispatch.phone_number_id);
   if (!connection) return { ok: false, error: "Número remetente sem conexão Meta" };
