@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Copy, Download } from "lucide-react";
+import { ChevronLeft, Copy, Download, PauseCircle } from "lucide-react";
 
 import { StageCard } from "@/components/stage-card";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
@@ -152,6 +152,25 @@ export default async function TransmissaoDetalhe({
           </div>
         </div>
       </div>
+
+      {dispatch.status === "paused" && dispatch.paused_reason && (
+        // Um disparo parado por bloqueio tem gente esperando na fila e não sai
+        // do lugar sozinho. Sem o motivo em cima, "Pausada" manda a pessoa
+        // procurar o que houve na tabela de erros lá embaixo.
+        <Card className="border-amber-line bg-amber-soft/40">
+          <CardContent className="flex items-start gap-3 py-4">
+            <PauseCircle className="mt-0.5 size-5 shrink-0 text-amber" />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-ink">A transmissão parou sozinha</p>
+              <p className="text-sm text-ink-2">{dispatch.paused_reason}</p>
+              <p className="text-xs text-ink-3">
+                Quem ficou na fila continua esperando. Resolvido o motivo, use &quot;Retomar&quot;
+                na lista de transmissões e o envio segue de onde parou.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {(dispatch.status === "draft" ||
         dispatch.status === "queued" ||

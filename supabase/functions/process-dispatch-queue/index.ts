@@ -73,6 +73,24 @@ const PERMANENT_META_CODES = new Set([
   133010, // Número não registrado
 ]);
 
+/**
+ * Erros que condenam a transmissão inteira, não só aquele destinatário.
+ *
+ * O modelo pausado, a conta sem pagamento e o número não registrado valem
+ * igual pra todo mundo da fila: insistir só produz mais falha e, no caso de
+ * qualidade, afunda ainda mais a nota do número. Uma transmissão já queimou
+ * 1.905 destinatários contra um modelo que a Meta tinha pausado no começo do
+ * envio — nenhuma mensagem saiu, e o disparo foi até o fim mesmo assim.
+ */
+const DISPATCH_BLOCKING_CODES = new Map<number, string>([
+  [132015, "A Meta pausou este modelo por qualidade baixa"],
+  [132016, "A Meta desabilitou este modelo"],
+  [132001, "Este modelo não existe mais na conta"],
+  [131042, "A conta está com pendência de pagamento na Meta"],
+  [131031, "A Meta restringiu esta conta"],
+  [133010, "O número não está registrado na Cloud API"],
+]);
+
 /** Espera antes da próxima tentativa: 30s, 2min, 8min, 32min… com teto de 1h. */
 function backoffSeconds(attempts: number): number {
   const base = 30 * Math.pow(4, Math.max(0, attempts - 1));
@@ -555,8 +573,10 @@ Deno.serve(async (_req) => {
     // Rate limit é do número, não do destinatário: insistir nos próximos da
     // fila só piora. Ao bater, larga este dispatch e deixa o backoff cuidar.
     let rateLimitHit = false;
+    // Problema que vale pra fila inteira (modelo pausado, conta sem pagamento).
+    let blockingReason: string | null = null;
 
-    while (totalProcessed < MAX_PER_INVOCATION && !rateLimitHit) {
+    while (totalProcessed < MAX_PER_INVOCATION && !rateLimitHit && !blockingReason) {
       const { data: claimed, error: claimErr } = await admin.rpc(
         "claim_dispatch_recipients",
         { p_dispatch_id: dispatch.id, p_limit: BATCH_SIZE },
@@ -660,6 +680,15 @@ Deno.serve(async (_req) => {
               })
               .eq("id", r.id);
             failed++;
+
+            // Este erro não é desta pessoa: é do modelo ou da conta. Continuar
+            // só gera mais falha — e, quando é qualidade, afunda a nota do
+            // número a cada tentativa.
+            const blocking = err?.code != null ? DISPATCH_BLOCKING_CODES.get(err.code) : undefined;
+            if (blocking) {
+              blockingReason = `${blocking} (erro ${err.code})`;
+              break;
+            }
           }
         }
 
@@ -687,7 +716,27 @@ Deno.serve(async (_req) => {
     const left = leftCount ?? 0;
     let finalStatus: string | undefined;
 
-    if (left === 0) {
+    if (blockingReason) {
+      // Pausa, não cancela: o que sobrou fica na fila esperando. Resolvido o
+      // modelo ou o pagamento, é só retomar de onde parou — reconstruir a
+      // transmissão inteira do zero seria absurdo.
+      finalStatus = "paused";
+      const { error: pauseError } = await admin
+        .from("dispatch")
+        .update({
+          status: finalStatus,
+          paused_reason: `${blockingReason}. Parou com ${left} ${
+            left === 1 ? "pessoa ainda na fila" : "pessoas ainda na fila"
+          }.`,
+        })
+        .eq("id", dispatch.id)
+        .in("status", ["queued", "running"]);
+
+      if (!pauseError) {
+        console.warn(`[worker] ${dispatch.id} pausado: ${blockingReason}`);
+        await notifyDispatchFinished(dispatch.id);
+      }
+    } else if (left === 0) {
       // Sucesso = ao menos um destinatário saiu. Precisa contar delivered e
       // read também: o webhook da Meta promove 'sent' assim que a mensagem
       // chega, então num disparo rápido e bem-sucedido a contagem de 'sent'

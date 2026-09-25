@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: dispatch } = await admin
     .from("dispatch")
-    .select("id, workspace_id, status, total_recipients, template:template_id(name)")
+    .select("id, workspace_id, status, total_recipients, paused_reason, template:template_id(name)")
     .eq("id", body.dispatchId)
     .maybeSingle();
 
@@ -50,16 +50,22 @@ export async function POST(req: NextRequest) {
   const tpl = dispatch.template as { name: string } | null;
   const name = tpl?.name ?? "Transmissão";
 
-  // O resumo carrega o que importa decidir: quanto saiu e quanto falhou. Sem
-  // isso a notificação obrigaria a abrir a plataforma só pra saber se deu certo.
-  const title =
-    dispatch.status === "failed"
+  // Pausa por bloqueio é o caso urgente: tem gente esperando na fila e nada vai
+  // sair até alguém resolver o modelo ou o pagamento. A notificação carrega o
+  // motivo porque é o que decide o que fazer — abrir a plataforma pra descobrir
+  // custa tempo que, em disparo parado, é o que falta.
+  const paused = dispatch.status === "paused";
+
+  const title = paused
+    ? `${name}: disparo parou`
+    : dispatch.status === "failed"
       ? `${name}: disparo falhou`
       : `${name}: disparo concluído`;
 
-  const parts = [
+  const parts = paused && dispatch.paused_reason ? [dispatch.paused_reason] : [];
+  parts.push(
     `${formatInt(funnel.sent)} de ${formatInt(funnel.planned)} enviadas (${formatPct(rate(funnel.sent, funnel.planned))})`,
-  ];
+  );
   if (funnel.failed > 0) parts.push(`${formatInt(funnel.failed)} falharam`);
 
   const owners = await getWorkspaceOwnerIds(dispatch.workspace_id);

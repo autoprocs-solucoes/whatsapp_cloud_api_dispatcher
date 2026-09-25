@@ -792,6 +792,7 @@ export type Database = {
           campaign_id: string | null;
           name: string | null;
           scheduled_at: string | null;
+          paused_reason: string | null;
           template_id: string;
           phone_number_id: string;
           segment_id: string | null;
@@ -820,6 +821,7 @@ export type Database = {
           campaign_id?: string | null;
           name?: string | null;
           scheduled_at?: string | null;
+          paused_reason?: string | null;
           template_id: string;
           phone_number_id: string;
           segment_id?: string | null;
@@ -848,6 +850,7 @@ export type Database = {
           campaign_id?: string | null;
           name?: string | null;
           scheduled_at?: string | null;
+          paused_reason?: string | null;
           template_id?: string;
           phone_number_id?: string;
           segment_id?: string | null;
