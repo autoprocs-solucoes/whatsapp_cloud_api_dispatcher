@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { RecoveryRedirect } from "@/features/auth/recovery-redirect";
+import { IntroSplash, introSeenScript } from "@/components/intro-splash";
 
 import "./globals.css";
 
@@ -33,7 +34,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        {/* Antes da primeira pintura: sem isso, quem já viu a abertura nesta
+            sessão veria um lampejo dela a cada recarga. */}
+        <script dangerouslySetInnerHTML={{ __html: introSeenScript }} />
+      </head>
       <body className={`${sans.variable} ${mono.variable} font-sans antialiased`}>
+        <IntroSplash />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
