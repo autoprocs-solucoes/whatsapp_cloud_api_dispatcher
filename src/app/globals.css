@@ -402,12 +402,6 @@ pre {
   animation: intro-out 420ms cubic-bezier(0.4, 0, 1, 1) 1980ms both;
 }
 
-/* Já viu nesta sessão: não repete. A classe entra antes da primeira pintura,
-   por script inline, pra não piscar a abertura e sumir. */
-html.intro-seen .intro {
-  display: none;
-}
-
 .intro-stage {
   position: relative;
   display: grid;
