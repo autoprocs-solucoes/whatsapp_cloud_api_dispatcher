@@ -160,6 +160,54 @@ function namedExamples(
   }));
 }
 
+/**
+ * Renumera as variáveis por posição pra 1, 2, 3… na ordem em que aparecem.
+ *
+ * Pra Meta, `{{2}}` não é um nome: é a segunda posição de uma lista. Um corpo
+ * que só tem `{{3}}` faz ela esperar três exemplos, receber um e recusar o
+ * modelo inteiro com "component of type BODY is missing expected field(s)
+ * (example)" — mensagem que não diz nada sobre a numeração.
+ *
+ * E isso acontece à toa: basta escrever `{{1}} {{2}} {{3}}` e depois apagar as
+ * duas primeiras. Como o número não carrega significado nenhum, renumerar
+ * preserva o texto exatamente como ele é lido e só arruma o que a Meta cobra.
+ *
+ * Cabeçalho e corpo contam separado — a Meta trata cada um como sua própria
+ * lista.
+ */
+function renumberPositional(
+  text: string,
+  examples: Record<string, string>,
+  prefix: "header" | "body",
+): { text: string; examples: Record<string, string>; changed: boolean } {
+  const order: string[] = [];
+  const re = /\{\{\s*(\d+)\s*\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const n = m[1]!;
+    if (!order.includes(n)) order.push(n);
+  }
+  if (order.length === 0) return { text, examples, changed: false };
+
+  const renamed = new Map(order.map((old, i) => [old, String(i + 1)]));
+  const changed = order.some((old, i) => old !== String(i + 1));
+  if (!changed) return { text, examples, changed: false };
+
+  const nextText = text.replace(re, (_all, n: string) => `{{${renamed.get(n) ?? n}}}`);
+
+  // Tira todas as chaves antigas antes de pôr as novas: renumerar embaralha
+  // (3 vira 1, 1 vira 2) e escrever direto sobrescreveria um exemplo que ainda
+  // vai ser lido.
+  const nextExamples = { ...examples };
+  for (const old of renamed.keys()) delete nextExamples[`${prefix}:${old}`];
+  for (const [old, novo] of renamed) {
+    const value = examples[`${prefix}:${old}`];
+    if (value !== undefined) nextExamples[`${prefix}:${novo}`] = value;
+  }
+
+  return { text: nextText, examples: nextExamples, changed: true };
+}
+
 function positionalExamples(
   placeholders: string[],
   examples: Record<string, string>,
@@ -207,7 +255,7 @@ export async function uploadTemplateHeaderAction(
 
 export async function createTemplateAction(
   input: unknown,
-): Promise<ActionResult<{ status: string }>> {
+): Promise<ActionResult<{ status: string; renumbered: boolean }>> {
   const manager = await requireTemplateManager();
   if (!manager.ok) return { ok: false, error: manager.error };
   const { workspace } = manager;
@@ -240,9 +288,19 @@ export async function createTemplateAction(
     };
   }
 
+  // Renumera antes de qualquer coisa: o que vai pra Meta e o que fica salvo
+  // aqui precisam ser o mesmo texto, senão a pré-visualização e o disparo
+  // passam a falar de variáveis que o modelo aprovado não tem.
+  const fixedHeader = renumberPositional(data.headerText ?? "", data.examples, "header");
+  const fixedBody = renumberPositional(data.bodyText, fixedHeader.examples, "body");
+  const headerText = data.headerType === "TEXT" ? fixedHeader.text : data.headerText;
+  const bodyText = fixedBody.text;
+  const examples = fixedBody.examples;
+  const renumbered = fixedHeader.changed || fixedBody.changed;
+
   const headerPlaceholders =
-    data.headerType === "TEXT" ? extractPlaceholders(data.headerText) : [];
-  const bodyPlaceholders = extractPlaceholders(data.bodyText);
+    data.headerType === "TEXT" ? extractPlaceholders(headerText) : [];
+  const bodyPlaceholders = extractPlaceholders(bodyText);
   const allPlaceholders = [...headerPlaceholders, ...bodyPlaceholders];
 
   // A Meta exige um modo só por modelo: ou tudo {{1}}, ou tudo {{nome}}.
@@ -257,7 +315,7 @@ export async function createTemplateAction(
 
   const missing = allPlaceholders.filter((p) => {
     const prefix = headerPlaceholders.includes(p) ? "header" : "body";
-    return !(data.examples[`${prefix}:${p}`] ?? "").trim();
+    return !(examples[`${prefix}:${p}`] ?? "").trim();
   });
   if (missing.length > 0) {
     return {
@@ -272,19 +330,19 @@ export async function createTemplateAction(
     components.push({
       type: "HEADER",
       format: "TEXT",
-      text: data.headerText,
+      text: headerText,
       ...(headerPlaceholders.length > 0
         ? {
             example: named
               ? {
                   header_text_named_params: namedExamples(
                     headerPlaceholders,
-                    data.examples,
+                    examples,
                     "header",
                   ),
                 }
               : {
-                  header_text: positionalExamples(headerPlaceholders, data.examples, "header"),
+                  header_text: positionalExamples(headerPlaceholders, examples, "header"),
                 },
           }
         : {}),
@@ -299,12 +357,12 @@ export async function createTemplateAction(
 
   components.push({
     type: "BODY",
-    text: data.bodyText,
+    text: bodyText,
     ...(bodyPlaceholders.length > 0
       ? {
           example: named
-            ? { body_text_named_params: namedExamples(bodyPlaceholders, data.examples, "body") }
-            : { body_text: [positionalExamples(bodyPlaceholders, data.examples, "body")] },
+            ? { body_text_named_params: namedExamples(bodyPlaceholders, examples, "body") }
+            : { body_text: [positionalExamples(bodyPlaceholders, examples, "body")] },
         }
       : {}),
   });
@@ -365,8 +423,8 @@ export async function createTemplateAction(
       language: data.language,
       category: created.category ?? data.category,
       status: created.status ?? "PENDING",
-      header_text: data.headerType === "TEXT" ? data.headerText : null,
-      body_text: data.bodyText,
+      header_text: data.headerType === "TEXT" ? headerText : null,
+      body_text: bodyText,
       footer_text: data.footerText || null,
       buttons: data.buttons as never,
       components_raw: components as never,
@@ -383,7 +441,7 @@ export async function createTemplateAction(
   }
 
   revalidatePath("/templates");
-  return { ok: true, data: { status: created.status ?? "PENDING" } };
+  return { ok: true, data: { status: created.status ?? "PENDING", renumbered } };
 }
 
 /** Apaga o modelo na Meta e o espelho local. */

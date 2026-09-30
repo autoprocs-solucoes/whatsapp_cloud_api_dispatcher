@@ -255,7 +255,13 @@ export function TemplateWizard({ connections, existing }: Props) {
         examples,
       });
       if (result.ok) {
-        toast.success("Modelo enviado para revisão da Meta");
+        toast.success("Modelo enviado para revisão da Meta", {
+          // Só aparece quando de fato mudou: o texto salvo é o que foi pra
+          // Meta, e ver {{1}} onde se escreveu {{3}} sem explicação assusta.
+          description: result.data.renumbered
+            ? "As variáveis foram renumeradas para {{1}}, {{2}}… — a Meta numera por posição e não aceita começar do meio."
+            : undefined,
+        });
         router.push("/templates");
       } else {
         toast.error(result.error);
