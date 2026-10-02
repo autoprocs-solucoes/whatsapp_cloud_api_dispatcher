@@ -645,13 +645,23 @@ export function DispatchWizard({
                           </Button>
                         )}
                       </div>
-                      <Input
-                        value={v?.fallback ?? ""}
-                        onChange={(e) => updateMapping(key, { fallback: e.target.value })}
-                        placeholder={
-                          hasColumn ? "usado se coluna vazia" : "valor fixo pra todos"
-                        }
-                      />
+                      <div className="space-y-1">
+                        <Input
+                          value={v?.fallback ?? ""}
+                          onChange={(e) => updateMapping(key, { fallback: e.target.value })}
+                          placeholder={
+                            hasColumn ? "usado se coluna vazia" : "valor fixo pra todos"
+                          }
+                        />
+                        {hasColumn && (v?.fallback ?? "").trim().length === 0 && (
+                          /* A Meta recusa a mensagem inteira quando a variável
+                             vai em branco. Avisar aqui evita descobrir isso só
+                             na hora de criar a transmissão. */
+                          <p className="text-[11px] text-amber">
+                            Sem valor padrão, quem não tiver esse dado preenchido não recebe.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -857,8 +867,9 @@ export function DispatchWizard({
               </div>
             </div>
             <p className="text-muted-foreground text-xs">
-              Manda 1 mensagem com o mesmo template + mapping atual. Sem custom fields (usa só
-              fallbacks). Pode pular se confiar no template.
+              Manda 1 mensagem com este modelo pra conferir o formato. Não existe contato por
+              trás do teste: variável ligada a uma coluna chega com o valor padrão, ou com o
+              nome dela quando não há padrão. Pode pular se confiar no modelo.
             </p>
           </div>
         )}

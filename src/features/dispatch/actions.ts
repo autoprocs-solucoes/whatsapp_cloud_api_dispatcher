@@ -437,6 +437,17 @@ export async function testSendAction(formData: FormData): Promise<ActionResult<{
     custom_fields: {},
   };
   const resolved = resolveVariables(syntheticRecipient, parsed.data.variable_mapping);
+
+  // O teste não tem contato por trás, então variável ligada a uma coluna chega
+  // aqui vazia — e a Meta recusa a mensagem inteira por causa disso. Como o
+  // teste existe pra conferir o formato do modelo, e não os dados, entra o
+  // nome da variável no lugar: aparece visível no celular, deixando claro que
+  // ali vai o dado real de cada pessoa.
+  for (const [key, value] of Object.entries(resolved)) {
+    if (String(value).trim().length > 0) continue;
+    resolved[key] = key.split(":")[1] ?? "exemplo";
+  }
+
   const headerParameters = buildParameters(headerPlaceholders, resolved, "header");
   const bodyParameters = buildParameters(bodyPlaceholders, resolved, "body");
   const headerImageLink = extractHeaderImageLink(template.components_raw);
@@ -573,6 +584,34 @@ export async function createDispatchAction(
     payload: resolveVariables(r, parsed.data.variable_mapping) as never,
     status: "queued" as const,
   }));
+
+  // A Meta recusa variável em branco: mensagem com parâmetro vazio volta como
+  // "(#131008) Parameter of type text is missing text value" e aquele
+  // destinatário simplesmente não recebe. Contar aqui é o único momento em que
+  // ainda dá pra resolver — depois de enfileirado, vira falha silenciosa espalhada
+  // pelo relatório.
+  const emptyByVariable = new Map<string, number>();
+  for (const row of recipientRows) {
+    for (const [key, value] of Object.entries(row.payload as Record<string, string>)) {
+      if (String(value).trim().length > 0) continue;
+      emptyByVariable.set(key, (emptyByVariable.get(key) ?? 0) + 1);
+    }
+  }
+  if (emptyByVariable.size > 0) {
+    const detalhe = Array.from(emptyByVariable)
+      .map(([key, n]) => {
+        const nome = key.split(":")[1] ?? key;
+        return `{{${nome}}} em ${n} ${n === 1 ? "contato" : "contatos"}`;
+      })
+      .join(", ");
+    await admin.from("dispatch").delete().eq("id", dispatch.id);
+    return {
+      ok: false,
+      error:
+        `A Meta recusa mensagem com variável em branco, e ficaria vazia: ${detalhe}. ` +
+        "Preencha um valor padrão no passo Variáveis, ou tire esses contatos do público.",
+    };
+  }
 
   const BATCH = 500;
   for (let i = 0; i < recipientRows.length; i += BATCH) {
