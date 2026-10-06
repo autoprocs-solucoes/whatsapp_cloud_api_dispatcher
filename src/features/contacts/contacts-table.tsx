@@ -227,14 +227,12 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
     });
   }
 
-  // O número mostrado é sempre o do servidor, o mesmo que produziu a lista que
-  // está na tela. Eu tinha posto aqui um contador que adiantava no clique pra
-  // dar resposta imediata; ele travou num valor e passou a dizer "4 / 5" com a
-  // lista mostrando outra página. Contador que pode discordar da lista é pior
-  // que contador que demora: o retorno do clique fica por conta dos botões
-  // travando e da lista esmaecendo.
-  function goToPage(next: number) {
-    updateParams({ page: String(next) });
+  /** Endereço de cada página. Os controles são links comuns: o navegador vai
+   *  ao servidor e mostra o que voltou, sem nada no meio que possa discordar. */
+  function pageHref(next: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", String(next));
+    return `/contatos?${params.toString()}`;
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -588,8 +586,7 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
           pageSize={pageSize}
           total={total}
           unit="contatos"
-          disabled={isPending}
-          onPageChange={goToPage}
+          hrefFor={pageHref}
         />
       </TableShell>
 

@@ -16,7 +16,18 @@ type Props = {
   total: number;
   /** Plural do que está sendo listado: "contatos", "transmissões", "segmentos". */
   unit: string;
-  onPageChange: (page: number) => void;
+  /** Listagem que pagina em memória: troca de página sem sair da tela. */
+  onPageChange?: (page: number) => void;
+  /**
+   * Listagem que pagina no servidor: devolve o endereço de cada página e os
+   * controles viram links de verdade.
+   *
+   * Tem motivo pra não ser navegação do Next: com o caminho igual e só o
+   * `?page=` mudando, ele reaproveitava a tela já renderizada e a lista
+   * congelava numa página enquanto a URL avançava. Link comum não tem como
+   * mostrar coisa diferente do que o servidor respondeu.
+   */
+  hrefFor?: (page: number) => string;
   disabled?: boolean;
 };
 
@@ -24,10 +35,38 @@ type Props = {
  * Rodapé de paginação das listagens. É só apresentação — quem chama decide se a
  * página vive na URL (servidor) ou em estado local (filtro em memória).
  */
-export function TablePager({ page, pageSize, total, unit, onPageChange, disabled }: Props) {
+export function TablePager({
+  page,
+  pageSize,
+  total,
+  unit,
+  onPageChange,
+  hrefFor,
+  disabled,
+}: Props) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const last = Math.min(page * pageSize, total);
+
+  function control(destino: number, bloqueado: boolean, conteudo: React.ReactNode) {
+    if (hrefFor && !bloqueado) {
+      return (
+        <Button variant="outline" size="sm" asChild>
+          <a href={hrefFor(destino)}>{conteudo}</a>
+        </Button>
+      );
+    }
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={bloqueado}
+        onClick={() => onPageChange?.(destino)}
+      >
+        {conteudo}
+      </Button>
+    );
+  }
 
   return (
     <TableToolbar>
@@ -46,25 +85,23 @@ export function TablePager({ page, pageSize, total, unit, onPageChange, disabled
       </p>
       {totalPages > 1 && (
         <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1 || disabled}
-            onClick={() => onPageChange(page - 1)}
-          >
-            <ChevronLeft className="size-3.5" /> Anterior
-          </Button>
+          {control(
+            page - 1,
+            page <= 1 || Boolean(disabled),
+            <>
+              <ChevronLeft className="size-3.5" /> Anterior
+            </>,
+          )}
           <span className="num px-2 text-ink-2">
             {page} / {totalPages}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages || disabled}
-            onClick={() => onPageChange(page + 1)}
-          >
-            Próxima <ChevronRight className="size-3.5" />
-          </Button>
+          {control(
+            page + 1,
+            page >= totalPages || Boolean(disabled),
+            <>
+              Próxima <ChevronRight className="size-3.5" />
+            </>,
+          )}
         </div>
       )}
     </TableToolbar>
