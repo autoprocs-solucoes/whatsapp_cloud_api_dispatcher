@@ -153,6 +153,61 @@ export async function wabaIdsFromToken(token: string): Promise<string[]> {
 }
 
 // ----------------------------------------------------------------------------
+// Webhook do app: para onde a Meta manda os eventos de TODAS as contas.
+//
+// É um ajuste do app inteiro, não de uma conta. Quando ele cai, nada chega de
+// ninguém: nem entrega, nem leitura, nem resposta de cliente. E cai calado —
+// a inscrição de cada WABA continua dizendo que o app está inscrito.
+//
+// Usa token de app (`id|segredo`), o único que fala por essa configuração.
+// ----------------------------------------------------------------------------
+type AppSubscription = {
+  object: string;
+  callback_url?: string;
+  active?: boolean;
+  fields?: { name: string; version?: string }[];
+};
+
+function appAccessToken(): string {
+  if (!serverEnv.META_APP_ID || !serverEnv.META_APP_SECRET) {
+    throw new Error("META_APP_ID/META_APP_SECRET ausentes");
+  }
+  return `${serverEnv.META_APP_ID}|${serverEnv.META_APP_SECRET}`;
+}
+
+export async function getAppWebhookSubscriptions(): Promise<AppSubscription[]> {
+  const data = await request<{ data?: AppSubscription[] }>(
+    `/${serverEnv.META_APP_ID}/subscriptions`,
+    { method: "GET", query: { access_token: appAccessToken() } },
+  );
+  return data.data ?? [];
+}
+
+/**
+ * Reinscreve o app nos eventos de WhatsApp.
+ *
+ * A Meta chama a URL com um desafio antes de aceitar; se o endereço não
+ * responder com o token certo, ela recusa aqui mesmo — então sucesso nesta
+ * chamada já prova que o caminho de volta está de pé.
+ */
+export async function subscribeAppWebhook(params: {
+  callbackUrl: string;
+  verifyToken: string;
+  fields: string[];
+}): Promise<void> {
+  await request(`/${serverEnv.META_APP_ID}/subscriptions`, {
+    method: "POST",
+    query: {
+      access_token: appAccessToken(),
+      object: "whatsapp_business_account",
+      callback_url: params.callbackUrl,
+      verify_token: params.verifyToken,
+      fields: params.fields.join(","),
+    },
+  });
+}
+
+// ----------------------------------------------------------------------------
 // Contas de CLIENTES compartilhadas com um negócio.
 //
 // É por aqui que se encontra uma conta que concluiu o Login Integrado mas não

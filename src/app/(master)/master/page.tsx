@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { ClientsGrid } from "@/features/master/clients-grid";
+import { WebhookPanel } from "@/features/master/webhook-panel";
 import { listWorkspacesForMaster } from "@/server/master";
 
 export default async function MasterClientesPage() {
@@ -11,6 +12,7 @@ export default async function MasterClientesPage() {
         title="Clientes"
         description="Visão cross-tenant de todos os workspaces da plataforma. Clique em Entrar pra acessar o cliente com o menu completo dele."
       />
+      <WebhookPanel />
       <ClientsGrid workspaces={workspaces} />
     </div>
   );
