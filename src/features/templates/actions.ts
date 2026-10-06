@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import {
   GraphApiError,
   createTemplate,
@@ -22,6 +21,7 @@ import { syncTemplatesForWorkspace, syncTemplatesIfStale } from "@/server/templa
 import { getMetaConnections, type MetaConnectionView } from "@/server/meta";
 import { requireActiveWorkspace, type WorkspaceWithRole } from "@/server/workspace";
 import type { Template } from "@/lib/supabase/database.types";
+import { getAuthUser } from "@/server/auth-user";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -129,10 +129,7 @@ export async function setTemplateActiveAction(
 }
 
 export async function syncTemplatesAction(): Promise<ActionResult<{ synced: number }>> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
   const workspace = await requireActiveWorkspace();

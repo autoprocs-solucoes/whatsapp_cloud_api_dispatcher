@@ -1,8 +1,8 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import type { WorkspaceRole } from "@/lib/supabase/database.types";
+import { getAuthUser } from "@/server/auth-user";
 
 export type MemberRow = {
   user_id: string;
@@ -19,10 +19,7 @@ export type MemberRow = {
  * server-side com @supabase/ssr.
  */
 export async function getWorkspaceMembers(workspaceId: string): Promise<MemberRow[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return [];
 
   const admin = createAdminClient();

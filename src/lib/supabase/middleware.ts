@@ -27,6 +27,18 @@ const PROTECTED_PREFIXES = [
 const AUTH_ROUTES = ["/login", "/signup"];
 
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const isAuthRoute = AUTH_ROUTES.includes(pathname);
+
+  // Perguntar quem é só serve pra decidir redirecionamento. Em rota que não é
+  // nem protegida nem de login, a resposta ia pro lixo — e não era de graça:
+  // `auth.getUser()` é uma chamada de rede ao Supabase, que daqui sai do
+  // Brasil e vai a Ohio, antes de a página sequer começar a renderizar.
+  if (!isProtected && !isAuthRoute) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient<Database>(
@@ -51,11 +63,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
-
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
-  const isAuthRoute = AUTH_ROUTES.includes(pathname);
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

@@ -17,6 +17,7 @@ import {
   registerPhoneNumber,
   subscribeAppToWaba,
 } from "@/lib/meta/graph-api";
+import { getAuthUser } from "@/server/auth-user";
 import {
   completeMetaSignupSchema,
   connectMetaManuallySchema,
@@ -35,10 +36,7 @@ export type ActionResult<T = void> =
   | { ok: false; error: string };
 
 async function requireOwnership(workspaceId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return { ok: false as const, error: "Não autenticado" };
 
   const admin = createAdminClient();
@@ -58,10 +56,7 @@ async function requireOwnership(workspaceId: string) {
 // troca credenciais, só corrige um estado inconsistente do lado da Meta) —
 // por isso qualquer membro do workspace pode fazer, não só o owner.
 async function requireMembership(workspaceId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return { ok: false as const, error: "Não autenticado" };
 
   const admin = createAdminClient();

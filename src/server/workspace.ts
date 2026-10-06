@@ -1,11 +1,13 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import type { Workspace, WorkspaceRole } from "@/lib/supabase/database.types";
+import { getAuthUser } from "@/server/auth-user";
 
 export const ACTIVE_WORKSPACE_COOKIE = "active_workspace_id";
 
@@ -16,11 +18,8 @@ export type WorkspaceWithRole = Workspace & { role: WorkspaceRole };
  * Usa admin client com filtro manual por user_id, pois RLS via @supabase/ssr
  * server-side nem sempre propaga JWT consistentemente. Auth via getUser().
  */
-export async function getUserWorkspaces(): Promise<WorkspaceWithRole[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const getUserWorkspaces = cache(async (): Promise<WorkspaceWithRole[]> => {
+  const user = await getAuthUser();
   if (!user) return [];
 
   const admin = createAdminClient();
@@ -37,13 +36,13 @@ export async function getUserWorkspaces(): Promise<WorkspaceWithRole[]> {
   return data
     .filter((row): row is WithWorkspace => row.workspace !== null)
     .map((row) => ({ ...row.workspace, role: row.role }));
-}
+});
 
 /**
  * Workspace ativo, baseado em cookie. Faz fallback no primeiro disponível.
  * Retorna null se usuário não tem nenhum workspace.
  */
-export async function getActiveWorkspace(): Promise<WorkspaceWithRole | null> {
+export const getActiveWorkspace = cache(async (): Promise<WorkspaceWithRole | null> => {
   const workspaces = await getUserWorkspaces();
   if (workspaces.length === 0) return null;
 
@@ -56,7 +55,7 @@ export async function getActiveWorkspace(): Promise<WorkspaceWithRole | null> {
   }
 
   return workspaces[0] ?? null;
-}
+});
 
 /**
  * Server-side: redireciona pra /onboarding se usuário não tem workspace.

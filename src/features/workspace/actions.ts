@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { slugifyWithSuffix } from "@/lib/slug";
 import { env } from "@/lib/env";
 import {
@@ -16,6 +15,7 @@ import {
   updateWorkspaceSchema,
 } from "@/features/workspace/schemas";
 import { ACTIVE_WORKSPACE_COOKIE } from "@/server/workspace";
+import { getAuthUser } from "@/server/auth-user";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -36,10 +36,7 @@ export async function createWorkspaceAction(
     };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) {
     return { ok: false, error: "Não autenticado" };
   }
@@ -102,10 +99,7 @@ export async function updateWorkspaceAction(
     return { ok: false, error: "Verifique os campos" };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) {
     return { ok: false, error: "Não autenticado" };
   }
@@ -149,10 +143,7 @@ export async function updateWorkspaceLogoAction(formData: FormData): Promise<Act
   const workspaceId = String(formData.get("workspaceId") ?? "");
   const file = formData.get("logo");
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
   const admin = createAdminClient();
@@ -201,10 +192,7 @@ export async function updateWorkspaceLogoAction(formData: FormData): Promise<Act
 }
 
 export async function removeWorkspaceLogoAction(workspaceId: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
   const admin = createAdminClient();
@@ -229,10 +217,7 @@ export async function removeWorkspaceLogoAction(workspaceId: string): Promise<Ac
 }
 
 export async function switchWorkspaceAction(workspaceId: string): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return;
 
   const admin = createAdminClient();
@@ -273,10 +258,7 @@ export async function inviteMemberAction(
     };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) {
     return { ok: false, error: "Não autenticado" };
   }
@@ -329,10 +311,7 @@ export async function removeMemberAction(
     return { ok: false, error: "Dados inválidos" };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) {
     return { ok: false, error: "Não autenticado" };
   }
@@ -376,10 +355,7 @@ export async function updateMemberRoleAction(input: unknown): Promise<ActionResu
   }
   const { workspaceId, userId, role } = parsed.data;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) {
     return { ok: false, error: "Não autenticado" };
   }

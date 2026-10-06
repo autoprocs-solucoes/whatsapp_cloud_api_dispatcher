@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
-import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
 import { parseCustomFields } from "@/features/contacts/custom-fields";
 import {
@@ -16,16 +15,14 @@ import {
 } from "@/features/segments/schemas";
 import { applyRules } from "@/features/segments/rules";
 import type { Segment } from "@/lib/supabase/database.types";
+import { getAuthUser } from "@/server/auth-user";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 async function ensureMember(): Promise<{ workspaceId: string; userId: string } | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return null;
 
   const workspace = await requireActiveWorkspace();

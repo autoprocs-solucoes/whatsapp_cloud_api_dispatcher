@@ -1,10 +1,12 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { redirect } from "next/navigation";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/supabase/database.types";
+import { getAuthUser } from "@/server/auth-user";
 
 export type AuthenticatedUser = {
   id: string;
@@ -16,11 +18,8 @@ export type AuthenticatedUser = {
  * Retorna user autenticado + profile. null se não logado.
  * Usa admin pra ler profile (RLS server-side com @supabase/ssr não confiável).
  */
-export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const getCurrentUser = cache(async (): Promise<AuthenticatedUser | null> => {
+  const user = await getAuthUser();
   if (!user) return null;
 
   const admin = createAdminClient();
@@ -37,7 +36,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
     email: user.email ?? "",
     profile,
   };
-}
+});
 
 /**
  * Server-side: redireciona para /login se não autenticado.

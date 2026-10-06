@@ -1,10 +1,10 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { buildFunnel, countsFromRecord, type Funnel } from "@/lib/metrics/funnel";
 import { dailyCounts, statusCountsByDispatch } from "@/server/dispatch-counts";
 import { requireActiveWorkspace } from "@/server/workspace";
+import { getAuthUser } from "@/server/auth-user";
 
 export type TimelineDay = {
   date: string; // YYYY-MM-DD
@@ -199,10 +199,7 @@ export async function getDashboardStatsForWorkspace(
  * Métricas do workspace ativo (sessão do usuário logado). Server-side only.
  */
 export async function getDashboardStats(): Promise<DashboardStats | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return null;
 
   const workspace = await requireActiveWorkspace();

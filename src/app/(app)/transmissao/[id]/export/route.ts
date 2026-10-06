@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { parseCustomFields } from "@/features/contacts/custom-fields";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
-import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
+import { getAuthUser } from "@/server/auth-user";
 
 const COLUMNS = [
   "phone_e164",
@@ -53,10 +53,7 @@ export async function GET(
   const status = STATUSES.find((s) => s === statusParam) ?? null;
   const errorCode = url.searchParams.get("error")?.trim() || null;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return new NextResponse("Não autenticado", { status: 401 });
 
   const workspace = await requireActiveWorkspace();

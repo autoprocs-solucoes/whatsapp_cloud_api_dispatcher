@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { translateAuthError } from "@/features/auth/error-messages";
+import { getAuthUser } from "@/server/auth-user";
 import {
   acceptInviteSchema,
   forgotPasswordSchema,
@@ -143,14 +144,14 @@ export async function acceptInviteAction(
     };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) {
     return { ok: false, error: "Sessão expirada. Abra o link do convite novamente." };
   }
 
+  // Aqui o cliente de sessão é necessário mesmo: trocar a senha é escrita, e
+  // só ele carrega o token do convidado.
+  const supabase = await createClient();
   const { error: updateError } = await supabase.auth.updateUser({
     password: parsed.data.password,
     data: { full_name: parsed.data.fullName },

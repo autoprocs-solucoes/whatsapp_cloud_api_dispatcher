@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
 import { parseCustomFields } from "@/features/contacts/custom-fields";
 import type { Contact } from "@/lib/supabase/database.types";
+import { getAuthUser } from "@/server/auth-user";
 
 const BASE_COLUMNS = [
   "phone_e164",
@@ -32,10 +32,7 @@ function formatBase(contact: Contact, key: (typeof BASE_COLUMNS)[number]): unkno
 }
 
 export async function GET(req: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return new NextResponse("Não autenticado", { status: 401 });
 
   const workspace = await requireActiveWorkspace();

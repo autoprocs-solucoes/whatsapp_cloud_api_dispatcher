@@ -11,7 +11,6 @@ import {
   detectAutoMapping,
   parseSpreadsheet,
 } from "@/lib/import/parse-spreadsheet";
-import { createClient } from "@/lib/supabase/server";
 import { requireActiveWorkspace } from "@/server/workspace";
 import { getConnectionForPhoneNumber } from "@/server/meta";
 import { env, serverEnv } from "@/lib/env";
@@ -49,16 +48,14 @@ import type {
   Template,
 } from "@/lib/supabase/database.types";
 import type { TimelineDay } from "@/features/dashboard/queries";
+import { getAuthUser } from "@/server/auth-user";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
 async function ensureMember(): Promise<{ workspaceId: string; userId: string } | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return null;
 
   const workspace = await requireActiveWorkspace();
