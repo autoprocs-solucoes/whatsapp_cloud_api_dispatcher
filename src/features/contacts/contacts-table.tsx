@@ -215,12 +215,15 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
       if (v === null || v === "") params.delete(k);
       else params.set(k, v);
     });
-    // Dentro da transição: a lista vem do servidor e demora. Sem isso a tela
-    // não muda nada enquanto a página carrega, os botões continuam clicáveis e
-    // o segundo clique calcula o mesmo destino do primeiro — o número da
-    // página ficava preso e parecia que os cliques não eram registrados.
     startTransition(() => {
       router.push(`/contatos?${params.toString()}`);
+      // `refresh` junto porque o `push` sozinho não bastava: como o caminho é
+      // sempre /contatos e só o `?page=` muda, o Next reaproveitava a tela já
+      // renderizada e a lista ficava congelada numa página enquanto a URL
+      // avançava. Dava pra ver a contradição: a URL em `?page=4`, a tela
+      // mostrando 11–20, e o servidor respondendo 31–40 quando perguntado
+      // direto. `refresh` descarta essa cópia e manda buscar de novo.
+      router.refresh();
     });
   }
 
