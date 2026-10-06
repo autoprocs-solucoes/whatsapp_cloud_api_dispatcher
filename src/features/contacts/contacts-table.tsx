@@ -215,7 +215,25 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
       if (v === null || v === "") params.delete(k);
       else params.set(k, v);
     });
-    router.push(`/contatos?${params.toString()}`);
+    // Dentro da transição: a lista vem do servidor e demora. Sem isso a tela
+    // não muda nada enquanto a página carrega, os botões continuam clicáveis e
+    // o segundo clique calcula o mesmo destino do primeiro — o número da
+    // página ficava preso e parecia que os cliques não eram registrados.
+    startTransition(() => {
+      router.push(`/contatos?${params.toString()}`);
+    });
+  }
+
+  // O contador anda na hora do clique, sem esperar o servidor. Volta a seguir o
+  // servidor assim que a página nova chega.
+  const [pendingPage, setPendingPage] = useState<number | null>(null);
+  useEffect(() => {
+    setPendingPage(null);
+  }, [page]);
+
+  function goToPage(next: number) {
+    setPendingPage(next);
+    updateParams({ page: String(next) });
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -385,6 +403,13 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
       )}
 
       <TableShell>
+        {/* Esmaece enquanto a página nova vem do servidor: sem nenhum sinal, a
+            lista antiga parada na tela passa a impressão de que o clique não
+            fez nada. */}
+        <div
+          aria-busy={isPending}
+          className={cn("transition-opacity", isPending && "opacity-60")}
+        >
         <Table>
           <TableHeader>
             <tr>
@@ -555,14 +580,15 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
             )}
           </TableBody>
         </Table>
+        </div>
 
         <TablePager
-          page={page}
+          page={pendingPage ?? page}
           pageSize={pageSize}
           total={total}
           unit="contatos"
           disabled={isPending}
-          onPageChange={(next) => updateParams({ page: String(next) })}
+          onPageChange={goToPage}
         />
       </TableShell>
 
