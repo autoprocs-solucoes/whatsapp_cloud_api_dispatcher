@@ -227,15 +227,13 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
     });
   }
 
-  // O contador anda na hora do clique, sem esperar o servidor. Volta a seguir o
-  // servidor assim que a página nova chega.
-  const [pendingPage, setPendingPage] = useState<number | null>(null);
-  useEffect(() => {
-    setPendingPage(null);
-  }, [page]);
-
+  // O número mostrado é sempre o do servidor, o mesmo que produziu a lista que
+  // está na tela. Eu tinha posto aqui um contador que adiantava no clique pra
+  // dar resposta imediata; ele travou num valor e passou a dizer "4 / 5" com a
+  // lista mostrando outra página. Contador que pode discordar da lista é pior
+  // que contador que demora: o retorno do clique fica por conta dos botões
+  // travando e da lista esmaecendo.
   function goToPage(next: number) {
-    setPendingPage(next);
     updateParams({ page: String(next) });
   }
 
@@ -586,7 +584,7 @@ export function ContactsTable({ contacts, total, page, pageSize }: Props) {
         </div>
 
         <TablePager
-          page={pendingPage ?? page}
+          page={page}
           pageSize={pageSize}
           total={total}
           unit="contatos"
