@@ -22,8 +22,14 @@ import { env, serverEnv } from "@/lib/env";
  */
 const WEBHOOK_FIELDS = ["messages"];
 
-function callbackUrl(): string {
-  return `${env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "")}/api/webhooks/meta`;
+function callbackUrl(req: NextRequest): string {
+  // O host de quem chegou, não o da variável de ambiente: foi uma variável
+  // apontando pra um túnel de desenvolvimento que derrubou tudo.
+  const h = req.headers;
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const base = host ? `${proto}://${host}` : env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
+  return `${base}/api/webhooks/meta`;
 }
 
 function autorizado(req: NextRequest): boolean {
@@ -31,12 +37,12 @@ function autorizado(req: NextRequest): boolean {
   return Boolean(esperado) && req.headers.get("authorization") === `Bearer ${esperado}`;
 }
 
-async function estado() {
+async function estado(req: NextRequest) {
   const subs = await getAppWebhookSubscriptions();
   const waba = subs.find((s) => s.object === "whatsapp_business_account");
   return {
     callbackUrl: waba?.callback_url ?? null,
-    esperado: callbackUrl(),
+    esperado: callbackUrl(req),
     ativo: Boolean(waba?.active),
     campos: (waba?.fields ?? []).map((f) => f.name),
   };
@@ -45,7 +51,7 @@ async function estado() {
 export async function GET(req: NextRequest) {
   if (!autorizado(req)) return new NextResponse(null, { status: 401 });
   try {
-    return NextResponse.json({ ok: true, antes: await estado() });
+    return NextResponse.json({ ok: true, antes: await estado(req) });
   } catch (e) {
     const msg = e instanceof GraphApiError ? e.message : (e as Error).message;
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
@@ -63,13 +69,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const antes = await estado();
+    const antes = await estado(req);
     await subscribeAppWebhook({
-      callbackUrl: callbackUrl(),
+      callbackUrl: callbackUrl(req),
       verifyToken: serverEnv.META_VERIFY_TOKEN,
       fields: WEBHOOK_FIELDS,
     });
-    const depois = await estado();
+    const depois = await estado(req);
     return NextResponse.json({ ok: true, antes, depois });
   } catch (e) {
     const msg = e instanceof GraphApiError ? e.message : (e as Error).message;

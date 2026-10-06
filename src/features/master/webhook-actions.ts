@@ -7,8 +7,9 @@ import {
   GraphApiError,
   subscribeAppWebhook,
 } from "@/lib/meta/graph-api";
-import { env, serverEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { appOrigin } from "@/server/app-origin";
 import { getAuthUser } from "@/server/auth-user";
 
 export type ActionResult<T = void> =
@@ -18,8 +19,8 @@ export type ActionResult<T = void> =
 /** Os eventos de que o Dispatcher depende pra funcionar. */
 const WEBHOOK_FIELDS = ["messages"];
 
-function callbackUrl(): string {
-  return `${env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "")}/api/webhooks/meta`;
+async function callbackUrl(): Promise<string> {
+  return `${await appOrigin()}/api/webhooks/meta`;
 }
 
 async function requireMaster(): Promise<boolean> {
@@ -89,7 +90,7 @@ export async function inspectWebhookAction(): Promise<ActionResult<WebhookStatus
       ok: true,
       data: {
         callbackUrl: waba?.callback_url ?? null,
-        esperado: callbackUrl(),
+        esperado: await callbackUrl(),
         ativo: Boolean(waba?.active),
         campos: (waba?.fields ?? []).map((f) => f.name),
         ultimoEvento,
@@ -116,7 +117,7 @@ export async function repairWebhookAction(): Promise<ActionResult> {
 
   try {
     await subscribeAppWebhook({
-      callbackUrl: callbackUrl(),
+      callbackUrl: await callbackUrl(),
       verifyToken: serverEnv.META_VERIFY_TOKEN,
       fields: WEBHOOK_FIELDS,
     });
